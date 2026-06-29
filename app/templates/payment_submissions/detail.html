@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Submission {{ item.submission_ref }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="flex items-center gap-x-4">
+      <a href="/payment-submissions" class="text-slate-400 hover:text-white transition-colors">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+        </svg>
+      </a>
+      <div>
+        <h1 class="text-2xl font-bold text-white flex items-center gap-x-3">
+          {{ item.submission_ref }}
+          <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ item.status_badge_cls() }}">
+            {{ item.status.value.title() }}
+          </span>
+        </h1>
+        <p class="mt-1 text-sm text-slate-400">
+          Submitted by <span class="font-medium text-white">{{ item.rep.full_name if item.rep else 'Unknown' }}</span> on {{ item.submitted_at.strftime('%B %d, %Y') if item.submitted_at else '—' }}
+        </p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-x-3">
+      {% if item.status.value == 'pending' and current_user.role.value in ['admin', 'territory_manager'] %}
+        <button type="button" onclick="document.getElementById('reject-modal').classList.remove('hidden')"
+                class="rounded-lg border border-red-500/50 bg-red-900/20 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-900/40 transition-colors">
+          Reject
+        </button>
+        <form method="post" action="/payment-submissions/{{ item.id }}/approve">
+          <button type="submit"
+                  class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 transition-colors">
+            Approve
+          </button>
+        </form>
+      {% elif item.status.value == 'approved' and current_user.role.value == 'admin' %}
+        <form method="post" action="/payment-submissions/{{ item.id }}/post-zap">
+          <button type="submit"
+                  class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+            Post to ZAP
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Left Column: Details -->
+    <div class="lg:col-span-2 space-y-6">
+      
+      <!-- Payments List -->
+      <div class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+        <div class="p-5 border-b border-slate-700">
+          <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Included Payments ({{ item.payment_items|length }})</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-700/80">
+            <thead>
+              <tr class="bg-slate-800/80">
+                <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Ref</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Outlet</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Method</th>
+                <th class="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Amount</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-700/50">
+              {% for p in item.payment_items %}
+              <tr class="hover:bg-slate-700/30">
+                <td class="px-5 py-3 text-sm font-mono text-white">{{ p.payment_ref }}</td>
+                <td class="px-5 py-3 text-sm text-slate-300">{{ p.outlet.name if p.outlet else '—' }}</td>
+                <td class="px-5 py-3 text-sm text-slate-300">{{ p.method.value.title() }}</td>
+                <td class="px-5 py-3 text-sm font-medium text-white text-right">₹{{ "%.2f"|format(p.amount) }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-slate-500">No payments found.</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="bg-slate-800/80">
+              <tr>
+                <td colspan="3" class="px-5 py-3 text-sm font-semibold text-slate-300 text-right">Total</td>
+                <td class="px-5 py-3 text-sm font-bold text-white text-right">₹{{ "%.2f"|format(item.total_amount) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Denomination Breakdown -->
+      {% if item.denom_2000_total > 0 or item.denom_500_total > 0 or item.denom_200_total > 0 or item.denom_100_total > 0 or item.denom_50_total > 0 or item.denom_20_total > 0 or item.denom_10_total > 0 %}
+      <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-4">
+        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Cash Denominations</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {% if item.denom_2000_total > 0 %}<div class="bg-slate-900 rounded-lg p-3 text-center"><div class="text-xs text-slate-400 mb-1">₹2000</div><div class="font-mono text-lg text-white">{{ item.denom_2000_total }}</div></div>{% endif %}
+          {% if item.denom_500_total > 0 %}<div class="bg-slate-900 rounded-lg p-3 text-center"><div class="text-xs text-slate-400 mb-1">₹500</div><div class="font-mono text-lg text-white">{{ item.denom_500_total }}</div></div>{% endif %}
+          {% if item.denom_200_total > 0 %}<div class="bg-slate-900 rounded-lg p-3 text-center"><div class="text-xs text-slate-400 mb-1">₹200</div><div class="font-mono text-lg text-white">{{ item.denom_200_total }}</div></div>{% endif %}
+          {% if item.denom_100_total > 0 %}<div class="bg-slate-900 rounded-lg p-3 text-center"><div class="text-xs text-slate-400 mb-1">₹100</div><div class="font-mono text-lg text-white">{{ item.denom_100_total }}</div></div>{% endif %}
+          {% if item.denom_50_total > 0 %}<div class="bg-slate-900 rounded-lg p-3 text-center"><div class="text-xs text-slate-400 mb-1">₹50</div><div class="font-mono text-lg text-white">{{ item.denom_50_total }}</div></div>{% endif %}
+          {% if item.denom_20_total > 0 %}<div class="bg-slate-900 rounded-lg p-3 text-center"><div class="text-xs text-slate-400 mb-1">₹20</div><div class="font-mono text-lg text-white">{{ item.denom_20_total }}</div></div>{% endif %}
+          {% if item.denom_10_total > 0 %}<div class="bg-slate-900 rounded-lg p-3 text-center"><div class="text-xs text-slate-400 mb-1">₹10</div><div class="font-mono text-lg text-white">{{ item.denom_10_total }}</div></div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+      
+    </div>
+    
+    <!-- Right Column: Meta info -->
+    <div class="space-y-6">
+      
+      <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-5 space-y-4">
+        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Summary</h2>
+        <dl class="space-y-3 text-sm">
+          <div class="flex justify-between">
+            <dt class="text-slate-400">Total Amount</dt>
+            <dd class="font-medium text-white">₹{{ "%.2f"|format(item.total_amount) }}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-slate-400">Online Amount</dt>
+            <dd class="font-medium text-white">₹{{ "%.2f"|format(item.online_amount) }}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-slate-400">Cash Amount</dt>
+            <dd class="font-medium text-white">₹{{ "%.2f"|format(item.total_amount - item.online_amount) }}</dd>
+          </div>
+          <div class="pt-3 border-t border-slate-700 flex justify-between">
+            <dt class="text-slate-400">Target Account</dt>
+            <dd class="font-medium text-white">{{ item.target_account or '—' }}</dd>
+          </div>
+        </dl>
+      </div>
+      
+      {% if item.notes %}
+      <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
+        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-2">Notes</h2>
+        <p class="text-sm text-slate-300">{{ item.notes }}</p>
+      </div>
+      {% endif %}
+      
+      {% if item.rejection_reason %}
+      <div class="rounded-xl border border-red-900 bg-red-900/10 p-5">
+        <h2 class="text-sm font-semibold text-red-400 uppercase tracking-wider mb-2">Rejection Reason</h2>
+        <p class="text-sm text-red-300">{{ item.rejection_reason }}</p>
+      </div>
+      {% endif %}
+      
+      {% if item.journal_entry_ref %}
+      <div class="rounded-xl border border-indigo-900 bg-indigo-900/10 p-5">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider mb-2">ZAP Journal Entry</h2>
+        <p class="text-sm text-indigo-300 font-mono">{{ item.journal_entry_ref }}</p>
+      </div>
+      {% endif %}
+      
+    </div>
+  </div>
+</div>
+
+<!-- Reject Modal -->
+<div id="reject-modal" class="hidden relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity"></div>
+  <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+      <div class="relative transform overflow-hidden rounded-xl border border-slate-700 bg-slate-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+        <form method="post" action="/payment-submissions/{{ item.id }}/reject">
+          <div class="px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+            <h3 class="text-lg font-semibold leading-6 text-white" id="modal-title">Reject Submission</h3>
+            <div class="mt-4">
+              <label class="block text-sm font-medium text-slate-300 mb-1.5">Reason for rejection</label>
+              <textarea name="reason" rows="3" required
+                        class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
+            </div>
+          </div>
+          <div class="bg-slate-800/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 border-t border-slate-700">
+            <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto">Confirm Rejection</button>
+            <button type="button" onclick="document.getElementById('reject-modal').classList.add('hidden')" class="mt-3 inline-flex w-full justify-center rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-600 sm:mt-0 sm:w-auto">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

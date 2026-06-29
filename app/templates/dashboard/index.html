@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Welcome banner -->
+<div class="mb-8 rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-500 to-cyan-500 p-8 shadow-2xl shadow-indigo-500/20 relative overflow-hidden">
+  <div class="absolute top-0 right-0 -mt-20 -mr-20 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
+  <div class="absolute bottom-0 left-0 -mb-20 -ml-20 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl"></div>
+  
+  <div class="relative flex items-center justify-between flex-wrap gap-6">
+    <div>
+      <p class="text-indigo-100 text-xs font-bold uppercase tracking-[0.2em] opacity-80">Command Center</p>
+      <h2 class="text-white text-4xl font-bold mt-2 tracking-tight">Welcome, {{ current_user.full_name }}</h2>
+      <div class="flex items-center gap-x-3 mt-3">
+        <span class="px-3 py-1 rounded-full bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider border border-white/10 backdrop-blur-md">
+          {{ current_user.display_role() }}
+        </span>
+        <span class="h-1 w-1 rounded-full bg-indigo-200"></span>
+        <p class="text-indigo-100 text-sm font-medium opacity-90">Sastrybalm SFA Platform</p>
+      </div>
+    </div>
+    <div class="text-right hidden sm:block">
+      <div class="glass px-6 py-4 rounded-2xl border border-white/10 backdrop-blur-xl">
+        <p class="text-indigo-100 text-[10px] font-bold uppercase tracking-widest opacity-60">Real-time Clock</p>
+        <p class="text-white text-xl font-bold mt-1 font-mono tracking-tight" id="live-clock"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- KPI Row 1: Catalogue & Workforce -->
+<div class="grid grid-cols-2 gap-6 lg:grid-cols-4 mb-6">
+
+  <a href="/outlets?status=approved"
+     class="glass rounded-3xl p-6 border border-white/5 hover:border-indigo-500/30 transition-all group relative overflow-hidden">
+    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+       <svg class="h-12 w-12 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64" />
+       </svg>
+    </div>
+    <div class="flex items-center gap-x-3 mb-4">
+      <div class="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+        <svg class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21" />
+        </svg>
+      </div>
+      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Outlets</p>
+    </div>
+    <p class="text-3xl font-bold text-white">{{ total_outlets }}</p>
+    <p class="mt-1 text-xs text-slate-400 font-medium">Verified retail points</p>
+  </a>
+
+  <a href="/products"
+     class="glass rounded-3xl p-6 border border-white/5 hover:border-cyan-500/30 transition-all group relative overflow-hidden">
+    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+       <svg class="h-12 w-12 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25" />
+       </svg>
+    </div>
+    <div class="flex items-center gap-x-3 mb-4">
+      <div class="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
+        <svg class="h-5 w-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5" />
+        </svg>
+      </div>
+      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">SKUs</p>
+    </div>
+    <p class="text-3xl font-bold text-white">{{ total_products }}</p>
+    <p class="mt-1 text-xs text-slate-400 font-medium">Active products</p>
+  </a>
+
+  <a href="/outlets?status=draft"
+     class="glass rounded-3xl p-6 border border-white/5 hover:border-amber-500/30 transition-all group relative overflow-hidden">
+    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+       <svg class="h-12 w-12 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0" />
+       </svg>
+    </div>
+    <div class="flex items-center gap-x-3 mb-4">
+      <div class="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+        <svg class="h-5 w-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5" />
+        </svg>
+      </div>
+      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Pending</p>
+    </div>
+    <p class="text-3xl font-bold {% if pending_approvals > 0 %}text-amber-400{% else %}text-white{% endif %}">
+      {{ pending_approvals }}
+    </p>
+    <p class="mt-1 text-xs text-slate-400 font-medium">Awaiting approval</p>
+  </a>
+
+  <a href="/users?role=field_rep"
+     class="glass rounded-3xl p-6 border border-white/5 hover:border-purple-500/30 transition-all group relative overflow-hidden">
+    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+       <svg class="h-12 w-12 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372" />
+       </svg>
+    </div>
+    <div class="flex items-center gap-x-3 mb-4">
+      <div class="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
+        <svg class="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128v-.003" />
+        </svg>
+      </div>
+      <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Workforce</p>
+    </div>
+    <p class="text-3xl font-bold text-white">{{ active_reps }}</p>
+    <p class="mt-1 text-xs text-slate-400 font-medium">Field representatives</p>
+  </a>
+
+</div>
+
+<!-- KPI Row 2: Today's Operations -->
+<div class="grid grid-cols-2 gap-6 lg:grid-cols-4 mb-8">
+
+  <a href="/orders"
+     class="bg-slate-900/40 rounded-3xl p-6 border border-white/5 hover:bg-slate-900/60 transition-all">
+    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Orders Today</p>
+    <div class="flex items-end justify-between">
+      <div>
+        <p class="text-2xl font-bold text-white">{{ orders_today }}</p>
+        <p class="text-[10px] text-emerald-400 font-bold mt-1 uppercase tracking-wider">
+          {% if revenue_today > 0 %}₹{{ "{:,.0f}".format(revenue_today) }} Volume{% else %}Active Today{% endif %}
+        </p>
+      </div>
+      <div class="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+        <svg class="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835" />
+        </svg>
+      </div>
+    </div>
+  </a>
+
+  <a href="/timesheets"
+     class="bg-slate-900/40 rounded-3xl p-6 border border-white/5 hover:bg-slate-900/60 transition-all">
+    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Attendance</p>
+    <div class="flex items-end justify-between">
+      <div>
+        <p class="text-2xl font-bold text-white">{{ checkins_today }} / {{ active_reps }}</p>
+        <p class="text-[10px] text-indigo-400 font-bold mt-1 uppercase tracking-wider">Checked-in Reps</p>
+      </div>
+      <div class="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+        <svg class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25" />
+        </svg>
+      </div>
+    </div>
+  </a>
+
+  <a href="/payments"
+     class="bg-slate-900/40 rounded-3xl p-6 border border-white/5 hover:bg-slate-900/60 transition-all">
+    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Receivables</p>
+    <div class="flex items-end justify-between">
+      <div>
+        <p class="text-2xl font-bold {% if pending_payments > 0 %}text-rose-400{% else %}text-white{% endif %}">{{ pending_payments }}</p>
+        <p class="text-[10px] text-rose-500/80 font-bold mt-1 uppercase tracking-wider">Awaiting Verification</p>
+      </div>
+      <div class="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20">
+        <svg class="h-5 w-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0" />
+        </svg>
+      </div>
+    </div>
+  </a>
+
+  <a href="/analytics/alerts"
+     class="bg-slate-900/40 rounded-3xl p-6 border border-white/5 hover:bg-slate-900/60 transition-all">
+    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">System Health</p>
+    <div class="flex items-end justify-between">
+      <div>
+        <p class="text-2xl font-bold {% if unread_alerts > 0 %}text-indigo-400{% else %}text-white{% endif %}">{{ unread_alerts }}</p>
+        <p class="text-[10px] text-indigo-500/80 font-bold mt-1 uppercase tracking-wider">Unread Alerts</p>
+      </div>
+      <div class="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+        <svg class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082" />
+        </svg>
+      </div>
+    </div>
+  </a>
+
+</div>
+
+<!-- Main content: Recent Orders + Side panel -->
+<div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+
+  <!-- Recent Orders -->
+  <div class="lg:col-span-2 table-container shadow-2xl shadow-black/50">
+    <div class="flex items-center justify-between px-6 py-5 bg-slate-900/80 backdrop-blur-md border-b border-white/5">
+      <h3 class="text-sm font-bold text-white uppercase tracking-widest">Recent Sales Activity</h3>
+      <a href="/orders" class="text-xs text-indigo-400 hover:text-indigo-300 font-bold uppercase tracking-wider">Full Ledger &rarr;</a>
+    </div>
+    {% if recent_orders %}
+    <table class="min-w-full divide-y divide-white/5">
+      <thead>
+        <tr class="bg-slate-950/20">
+          <th class="px-6 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Order</th>
+          <th class="px-6 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden sm:table-cell">Outlet</th>
+          <th class="px-6 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Amount</th>
+          <th class="px-6 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for o in recent_orders %}
+        <tr class="table-row-hover transition-colors">
+          <td class="px-6 py-4 whitespace-nowrap">
+            <a href="/orders/{{ o.id }}" class="text-sm font-mono font-bold text-indigo-400 hover:text-indigo-300 transition-colors">{{ o.order_number }}</a>
+            <p class="text-[10px] text-slate-500 mt-1 uppercase font-medium">{{ o.order_date }}</p>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300 hidden sm:table-cell font-medium">{{ o.outlet.name if o.outlet else '—' }}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white text-right">₹{{ "{:,.0f}".format(o.total_amount) }}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm">
+            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase {{ o.status_badge_cls() }}">
+              {{ o.status.value.title() }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="px-6 py-20 text-center">
+       <div class="flex flex-col items-center">
+         <div class="h-12 w-12 rounded-full bg-slate-900 flex items-center justify-center mb-4 border border-white/5">
+           <svg class="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+           </svg>
+         </div>
+         <p class="text-slate-400 font-medium">No recent orders recorded.</p>
+         <a href="/orders/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Create first order &rarr;</a>
+       </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Side panel -->
+  <div class="space-y-6">
+
+    <!-- Quick Actions -->
+    <div class="glass rounded-3xl p-6 border border-white/5">
+      <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Command Actions</h3>
+      <div class="grid grid-cols-1 gap-3">
+        <a href="/orders/new"
+           class="premium-btn flex items-center gap-x-3 rounded-2xl bg-slate-900/50 px-4 py-3 text-sm font-semibold text-white border border-white/5 hover:bg-slate-900 transition-all">
+          <div class="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+            <svg class="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </div>
+          Create New Order
+        </a>
+        {% if current_user.role.value in ['admin', 'territory_manager'] %}
+        <a href="/tracking/map"
+           class="premium-btn flex items-center gap-x-3 rounded-2xl bg-slate-900/50 px-4 py-3 text-sm font-semibold text-white border border-white/5 hover:bg-slate-900 transition-all">
+          <div class="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+            <svg class="h-4 w-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25" />
+            </svg>
+          </div>
+          Live GPS Fleet
+        </a>
+        <a href="/analytics/sales"
+           class="premium-btn flex items-center gap-x-3 rounded-2xl bg-slate-900/50 px-4 py-3 text-sm font-semibold text-white border border-white/5 hover:bg-slate-900 transition-all">
+          <div class="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
+            <svg class="h-4 w-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125" />
+            </svg>
+          </div>
+          Market Intelligence
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- System Status -->
+    <div class="glass rounded-3xl p-6 border border-white/5">
+      <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Core Infrastructure</h3>
+      <div class="space-y-4">
+        {% set status_items = [
+          ("API Core", True), ("Datastore", True), ("Job Scheduler", True),
+          ("ZAP Sync", zap_configured), ("CMMS Sync", cmms_configured), ("CONNECT Sync", connect_configured),
+        ] %}
+        {% for label, online in status_items %}
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-400 font-medium">{{ label }}</span>
+          <div class="flex items-center gap-x-2">
+            <span class="h-1.5 w-1.5 rounded-full {% if online %}bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]{% else %}bg-slate-700{% endif %}"></span>
+            <span class="text-[10px] font-bold uppercase tracking-wider {% if online %}text-emerald-400{% else %}text-slate-500{% endif %}">
+              {{ "Operational" if online else "Offline" }}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Phase Roadmap -->
+    {% if current_user.role.value in ['admin', 'territory_manager'] %}
+    <div class="glass rounded-3xl p-6 border border-white/5">
+      <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Platform Maturity</h3>
+      <div class="space-y-4">
+        {% set phases = [
+          ("1", "Foundation",              True),
+          ("2", "Master Data",             True),
+          ("3", "Transactions",            True),
+          ("4", "GPS Tracking",            True),
+          ("5", "Intelligence",            True),
+          ("6", "REST Core",               True),
+          ("7", "Sync Adapters",           True),
+        ] %}
+        {% for num, desc, done in phases %}
+        <div class="flex items-center gap-x-3">
+          <div class="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black
+                      {% if done %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-slate-900 text-slate-600 border border-white/5{% endif %}">
+            {{ num }}
+          </div>
+          <p class="flex-1 text-[11px] font-bold uppercase tracking-wide {% if done %}text-slate-300{% else %}text-slate-600{% endif %} truncate">{{ desc }}</p>
+          {% if done %}
+          <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function updateClock() {
+    const el = document.getElementById('live-clock');
+    if (el) {
+      const now = new Date();
+      el.textContent = now.toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit' 
+      });
+    }
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+</script>
+{% endblock %}

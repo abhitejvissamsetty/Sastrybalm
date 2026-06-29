@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}System Configuration{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/company/profiles" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">System Configuration</h1>
+      <p class="mt-1 text-sm text-slate-400">Global settings applied to all mobile users</p>
+    </div>
+  </div>
+
+  <form method="post" action="/company/config" class="space-y-6">
+
+    <!-- API Sync Settings -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">API Sync Intervals (Minutes)</h2>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">ZAP Fetch Interval (Minutes)</label>
+        <p class="text-xs text-slate-500 mb-2">How often local products and invoices are fetched from the ZAP system.</p>
+        <input type="number" name="zap_fetch_interval_minutes" min="5"
+               value="{{ config.zap_fetch_interval_minutes if config else 60 }}"
+               class="w-40 rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">CMMS Post Interval (Minutes)</label>
+        <p class="text-xs text-slate-500 mb-2">How often local material requests and capitalizations are posted to the CMMS system.</p>
+        <input type="number" name="cmms_post_interval_minutes" min="5"
+               value="{{ config.cmms_post_interval_minutes if config else 30 }}"
+               class="w-40 rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">CONNECT Sync Interval (Minutes)</label>
+        <p class="text-xs text-slate-500 mb-2">How often orders and outlet updates are synced with the CONNECT system.</p>
+        <input type="number" name="connect_sync_interval_minutes" min="5"
+               value="{{ config.connect_sync_interval_minutes if config else 30 }}"
+               class="w-40 rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <!-- Field Settings -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Field Settings</h2>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">GPS Threshold (metres)</label>
+        <p class="text-xs text-slate-500 mb-2">Maximum distance allowed from outlet GPS for a check-in to be considered valid.</p>
+        <input type="number" name="gps_threshold_metres" min="10" max="5000"
+               value="{{ config.gps_threshold_metres if config else 100 }}"
+               class="w-40 rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Sync Interval (seconds)</label>
+        <p class="text-xs text-slate-500 mb-2">How often the mobile app syncs data with the server. Minimum 60 seconds.</p>
+        <input type="number" name="sync_interval_seconds" min="60" max="86400"
+               value="{{ config.sync_interval_seconds if config else 300 }}"
+               class="w-40 rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <!-- Auto-Flagging Thresholds -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Auto-Flagging Thresholds</h2>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">GPS Deviation Flag Threshold (metres)</label>
+        <p class="text-xs text-slate-500 mb-2">Distance from outlet GPS beyond which a visit check-in is auto-flagged as suspicious.</p>
+        <input type="number" name="flag_gps_distance_metres" min="10" max="5000"
+               value="{{ config.flag_gps_distance_metres if config else 100 }}"
+               class="w-40 rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Short Visit Flag Threshold (seconds)</label>
+        <p class="text-xs text-slate-500 mb-2">Visit duration (between check-in and check-out) below which the visit is auto-flagged.</p>
+        <input type="number" name="flag_min_visit_seconds" min="10" max="3600"
+               value="{{ config.flag_min_visit_seconds if config else 120 }}"
+               class="w-40 rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <!-- Payment Settings -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Payment Settings</h2>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Global Payment Mode</label>
+        <p class="text-xs text-slate-500 mb-2">Choose which payment modes are accepted from field representatives.</p>
+        <select name="payment_mode"
+                class="w-56 rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="cash_only" {% if config and (config.payment_mode == 'cash_only' or config.payment_mode.value == 'cash_only' or config.payment_mode.name == 'cash_only') %}selected{% endif %}>Cash Only</option>
+          <option value="online_only" {% if config and (config.payment_mode == 'online_only' or config.payment_mode.value == 'online_only' or config.payment_mode.name == 'online_only') %}selected{% endif %}>Online Only</option>
+          <option value="cash_and_online" {% if config and (config.payment_mode == 'cash_and_online' or config.payment_mode.value == 'cash_and_online' or config.payment_mode.name == 'cash_and_online') %}selected{% endif %}>Cash and Online</option>
+        </select>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex h-5 items-center">
+          <input type="checkbox" id="denomination_mandatory" name="denomination_mandatory"
+                 {% if config and config.denomination_mandatory %}checked{% endif %}
+                 class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900">
+        </div>
+        <div class="ml-3 text-sm">
+          <label for="denomination_mandatory" class="font-medium text-slate-300">Mandatory Denomination Entry</label>
+          <p class="text-xs text-slate-500">Force field reps to enter details for individual notes/coins during cash check-in.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end">
+      <button type="submit"
+              class="rounded-lg bg-indigo-600 px-6 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        Save Configuration
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

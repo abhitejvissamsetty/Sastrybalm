@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from "shared/pagination.html" import render as paginate %}
+
+{% block title %}Beats{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-white tracking-tight">Beats &amp; Routes</h1>
+      <p class="mt-2 text-sm text-slate-400 font-medium">Manage and monitor field coverage across GT and MT channels</p>
+    </div>
+    {% if current_user.role.value in ['admin', 'territory_manager'] %}
+    <a href="/beats/new"
+       class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      New Beat
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="glass rounded-2xl p-6 border border-white/5">
+    <form method="get" class="flex flex-wrap items-center gap-4">
+      <div class="relative flex-1 min-w-[280px]">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search by name, code or territory…"
+               class="w-full rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-slate-500 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+      </div>
+      
+      <select name="beat_type"
+              class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[140px]">
+        <option value="">All Types</option>
+        {% for bt in BeatType %}
+        <option value="{{ bt.value }}" {% if beat_type == bt.value %}selected{% endif %}>{{ bt.value }}</option>
+        {% endfor %}
+      </select>
+
+      <button type="submit" class="premium-btn rounded-xl bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition-all border border-white/5">
+        Apply Filters
+      </button>
+      
+      {% if q or beat_type %}
+      <a href="/beats" class="text-sm font-medium text-slate-400 hover:text-white transition-colors px-2">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="table-container shadow-2xl shadow-black/50">
+    <table class="min-w-full divide-y divide-white/5">
+      <thead>
+        <tr class="bg-slate-900/80 backdrop-blur-md">
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Name & Details</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Code</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Type</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden md:table-cell">Territory</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden lg:table-cell text-center">Outlets</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
+          {% if current_user.role.value in ['admin', 'territory_manager'] %}
+          <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for item in pagination.items %}
+        <tr class="table-row-hover transition-colors">
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="text-sm font-semibold text-white">{{ item.name }}</div>
+            <div class="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">Beat Route</div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="inline-flex items-center rounded-md bg-slate-900 px-2 py-1 text-xs font-mono text-indigo-400 border border-white/5">
+              {{ item.code }}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold tracking-wider uppercase
+                         {% if item.beat_type.value == 'GT' %}bg-blue-500/10 text-blue-400 border border-blue-500/20
+                         {% elif item.beat_type.value == 'MT' %}bg-purple-500/10 text-purple-400 border border-purple-500/20
+                         {% elif item.beat_type.value == 'pharmacy' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
+                         {% elif item.beat_type.value == 'horeca' %}bg-orange-500/10 text-orange-400 border border-orange-500/20
+                         {% elif item.beat_type.value == 'institutional' %}bg-cyan-500/10 text-cyan-400 border border-cyan-500/20
+                         {% else %}bg-slate-500/10 text-slate-400 border border-slate-500/20{% endif %}">
+              {{ item.beat_type.value }}
+            </span>
+            {% if item.beat_grade %}
+            <span class="ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium bg-slate-800 text-slate-400 border border-white/5">
+              {{ item.beat_grade.value }}
+            </span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400 hidden md:table-cell">
+            {{ item.territory.name if item.territory else '—' }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300 hidden lg:table-cell text-center font-semibold">
+            {{ item.active_outlet_count }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            {% if item.is_active %}
+            <span class="inline-flex items-center gap-x-1.5 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span>
+              Active
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-x-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+              <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
+              Inactive
+            </span>
+            {% endif %}
+          </td>
+          {% if current_user.role.value in ['admin', 'territory_manager'] %}
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <div class="flex items-center justify-end gap-x-4">
+              {% if item.is_active %}
+                <a href="/beats/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
+                {% if current_user.role.value in ['admin', 'territory_manager'] %}
+                <form method="post" action="/beats/{{ item.id }}/delete" class="inline"
+                      onsubmit="return confirm('Deactivate {{ item.name }}?')">
+                  <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">Deactivate</button>
+                </form>
+                {% endif %}
+              {% else %}
+                {% if current_user.role.value in ['admin', 'territory_manager'] %}
+                <form method="post" action="/beats/{{ item.id }}/activate" class="inline">
+                  <button type="submit" class="text-emerald-400 hover:text-emerald-300 transition-colors">Activate</button>
+                </form>
+                {% endif %}
+              {% endif %}
+            </div>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="px-6 py-20 text-center">
+            <div class="flex flex-col items-center">
+               <div class="h-12 w-12 rounded-full bg-slate-900 flex items-center justify-center mb-4 border border-white/5">
+                 <svg class="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                 </svg>
+               </div>
+               <p class="text-slate-400 font-medium">No beats found matching your filters.</p>
+               {% if current_user.role.value in ['admin', 'territory_manager'] %}
+               <a href="/beats/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Add the first one &rarr;</a>
+               {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if pagination.pages > 1 %}
+    <div class="bg-slate-900/50 px-6 py-4 border-t border-white/5">
+      {% set qs = "q=" ~ q ~ "&beat_type=" ~ beat_type %}
+      {{ paginate(pagination, "/beats?" ~ qs) }}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Employees - {{ vendor.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center gap-x-4">
+    <a href="/vendors" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white flex items-center gap-x-3">
+        Vendor Employees
+        <span class="inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-slate-400 border border-slate-700">
+          {{ vendor.name }}
+        </span>
+      </h1>
+      <p class="mt-1 text-sm text-slate-400">Manage technicians and staff under this vendor.</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Add Employee Form -->
+    <div class="lg:col-span-1">
+      <form method="post" action="/vendors/{{ vendor.id }}/employees/add" class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Add Employee</h2>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Name <span class="text-red-400">*</span></label>
+          <input type="text" name="name" required
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Mobile</label>
+          <input type="text" name="mobile"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
+          <input type="email" name="email"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+          <input type="password" name="password"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                 placeholder="Leave blank if no login needed">
+        </div>
+        
+        <div class="pt-2">
+          <button type="submit" class="w-full rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+            Add Employee
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Employee List -->
+    <div class="lg:col-span-2">
+      <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50 shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-700/80">
+            <thead>
+              <tr class="bg-slate-800/50">
+                <th class="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Mobile</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-700/50">
+              {% for e in employees %}
+              <tr class="hover:bg-slate-700/30 transition-colors duration-100">
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-white">
+                  {{ e.name }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-slate-300">
+                  <div class="flex flex-col gap-y-1">
+                    {% if e.mobile %}<span>{{ e.mobile }}</span>{% endif %}
+                    {% if e.email %}<span class="text-xs text-slate-500">{{ e.email }}</span>{% endif %}
+                    {% if not e.mobile and not e.email %}<span class="text-slate-500">—</span>{% endif %}
+                  </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                  {% if e.is_active %}
+                  <span class="inline-flex items-center rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">Active</span>
+                  {% else %}
+                  <span class="inline-flex items-center rounded-full bg-slate-700 px-2.5 py-0.5 text-xs font-semibold text-slate-300">Inactive</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3" class="px-3 py-8 text-center text-sm text-slate-500">
+                  No employees added for this vendor.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

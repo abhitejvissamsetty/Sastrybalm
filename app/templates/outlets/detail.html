@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/outlets" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div class="flex-1 min-w-0">
+      <div class="flex flex-wrap items-center gap-3">
+        <h1 class="text-2xl font-bold text-white">{{ item.name }}</h1>
+        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ item.status_badge_cls() }}">
+          {{ item.status.value.title() }}
+        </span>
+        {% if item.channel %}
+        <span class="inline-flex items-center rounded-full bg-slate-700 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
+          {{ item.channel }}
+        </span>
+        {% endif %}
+      </div>
+      {% if item.code %}<p class="mt-1 text-sm font-mono text-slate-500">{{ item.code }}</p>{% endif %}
+    </div>
+    <a href="/outlets/{{ item.id }}/edit"
+       class="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors">
+      Edit
+    </a>
+  </div>
+
+  <!-- Info cards -->
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Owner</p>
+      <p class="mt-1 text-sm font-medium text-white">{{ item.owner_name or '—' }}</p>
+      {% if item.mobile %}
+      <p class="mt-0.5 text-xs text-slate-500">{{ item.mobile }}</p>
+      {% endif %}
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Beat / Territory</p>
+      <p class="mt-1 text-sm font-medium text-white">{{ item.beat.name if item.beat else '—' }}</p>
+      <p class="mt-0.5 text-xs text-slate-500">{{ item.territory.name if item.territory else '' }}</p>
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">GPS Coordinates</p>
+      {% if item.gps_lat and item.gps_lng %}
+      <p class="mt-1 text-sm font-mono text-white">{{ "%.5f"|format(item.gps_lat) }}, {{ "%.5f"|format(item.gps_lng) }}</p>
+      <a href="https://maps.google.com/?q={{ item.gps_lat }},{{ item.gps_lng }}" target="_blank"
+         class="mt-0.5 inline-block text-xs text-indigo-400 hover:text-indigo-300">Open in Maps →</a>
+      {% else %}
+      <p class="mt-1 text-sm text-slate-600">Not set</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if item.address %}
+  <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+    <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Address</p>
+    <p class="text-sm text-slate-300">{{ item.address }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Mini map if GPS set -->
+  {% if item.gps_lat and item.gps_lng %}
+  <div class="overflow-hidden rounded-xl border border-slate-700">
+    <div id="outlet-map" style="height:260px"></div>
+  </div>
+  {% endif %}
+
+  <!-- Recent Orders -->
+  {% if recent_orders %}
+  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
+    <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-slate-300">Recent Orders</h2>
+      <a href="/orders?outlet_id={{ item.id }}" class="text-xs text-indigo-400 hover:text-indigo-300">View all →</a>
+    </div>
+    <table class="min-w-full divide-y divide-slate-700">
+      <thead>
+        <tr class="bg-slate-800">
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Order #</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Rep</th>
+          <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700/50">
+        {% for o in recent_orders %}
+        <tr class="hover:bg-slate-800/60">
+          <td class="px-4 py-3 text-sm">
+            <a href="/orders/{{ o.id }}" class="font-mono text-indigo-400 hover:text-indigo-300">{{ o.order_number }}</a>
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-300">{{ o.order_date }}</td>
+          <td class="px-4 py-3 text-sm text-slate-400 hidden sm:table-cell">{{ o.user.full_name if o.user else '—' }}</td>
+          <td class="px-4 py-3 text-sm font-semibold text-white text-right">₹{{ "%.2f"|format(o.total_amount) }}</td>
+          <td class="px-4 py-3 text-sm">
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold {{ o.status_badge_cls() }}">
+              {{ o.status.value.title() }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Recent Visits -->
+  {% if recent_visits %}
+  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
+    <div class="px-5 py-4 border-b border-slate-700">
+      <h2 class="text-sm font-semibold text-slate-300">Recent Visits</h2>
+    </div>
+    <table class="min-w-full divide-y divide-slate-700">
+      <thead>
+        <tr class="bg-slate-800">
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Time</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Rep</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Purpose</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Distance</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700/50">
+        {% for v in recent_visits %}
+        <tr class="hover:bg-slate-800/60">
+          <td class="px-4 py-3 text-sm text-slate-300">{{ v.visit_time.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="px-4 py-3 text-sm text-white">{{ v.user.full_name if v.user else '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-400 hidden sm:table-cell">{{ v.purpose or '—' }}</td>
+          <td class="px-4 py-3 text-sm">
+            {% if v.distance_from_outlet is not none %}
+            <span class="{% if v.distance_from_outlet > 200 %}text-red-400{% else %}text-emerald-400{% endif %}">
+              {{ v.distance_from_outlet|int }}m
+            </span>
+            {% else %}
+            <span class="text-slate-600">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if item.gps_lat and item.gps_lng %}
+<script>
+(function() {
+  const lat = {{ item.gps_lat }}, lng = {{ item.gps_lng }};
+  const map = L.map("outlet-map", { zoomControl: true }).setView([lat, lng], 15);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors", maxZoom: 19,
+  }).addTo(map);
+  L.marker([lat, lng]).addTo(map).bindPopup("<b>{{ item.name }}</b>{% if item.address %}<br>{{ item.address }}{% endif %}").openPopup();
+})();
+</script>
+{% endif %}
+{% endblock %}

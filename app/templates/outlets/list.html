@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% from "shared/pagination.html" import render as paginate %}
+
+{% block title %}Outlets{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-white tracking-tight">Outlets</h1>
+      <p class="mt-2 text-sm text-slate-400 font-medium">Customer touchpoints and retail distribution network</p>
+    </div>
+    <div class="flex items-center gap-x-3">
+      {% if current_user.role.value in ['admin', 'territory_manager'] %}
+      <form method="post" action="/outlets/import" enctype="multipart/form-data" class="flex items-center gap-x-2">
+        <label class="premium-btn cursor-pointer rounded-xl border border-white/5 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white transition-all">
+          Import
+          <input type="file" name="file" accept=".csv" class="hidden" onchange="this.form.submit()">
+        </label>
+      </form>
+      <a href="/outlets/export"
+         class="premium-btn rounded-xl border border-white/5 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white transition-all">
+        Export
+      </a>
+      {% endif %}
+      <a href="/outlets/new"
+         class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        New Outlet
+      </a>
+    </div>
+  </div>
+
+  <div class="glass rounded-2xl p-6 border border-white/5">
+    <form method="get" class="flex flex-wrap items-center gap-4">
+      <div class="relative flex-1 min-w-[240px]">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search outlets…"
+               class="w-full rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-slate-500 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+      </div>
+      
+      <select name="status"
+              class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[140px]">
+        <option value="">All Statuses</option>
+        {% for s in OutletStatus %}
+        <option value="{{ s.value }}" {% if status == s.value %}selected{% endif %}>{{ s.value.title() }}</option>
+        {% endfor %}
+      </select>
+
+      <div class="relative min-w-[180px]" id="beat-filter-autocomplete">
+        <input type="text" id="beat-filter-search" placeholder="Search beat..." autocomplete="off"
+               value="{{ selected_beat.name if selected_beat else '' }}"
+               class="w-full rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+        <input type="hidden" name="beat_id" id="beat-filter-id" value="{{ beat_id }}">
+        <div id="beat-filter-suggestions" class="suggestions-list absolute z-10 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg bg-slate-900 border border-slate-700 text-white hidden">
+          <div class="suggestion-item px-3 py-2 text-sm hover:bg-indigo-600 cursor-pointer text-slate-400 border-b border-white/5" data-id="" data-name="All Beats">
+            All Beats
+          </div>
+          {% for b in beats %}
+          <div class="suggestion-item px-3 py-2 text-sm hover:bg-indigo-600 cursor-pointer" data-id="{{ b.id }}" data-name="{{ b.name }}">
+            {{ b.name }} ({{ b.code }})
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <button type="submit" class="premium-btn rounded-xl bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition-all border border-white/5">
+        Filter
+      </button>
+      
+      {% if q or status or beat_id %}
+      <a href="/outlets" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="table-container shadow-2xl shadow-black/50">
+    <table class="min-w-full divide-y divide-white/5">
+      <thead>
+        <tr class="bg-slate-900/80 backdrop-blur-md">
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Name & Owner</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden sm:table-cell">Code</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden md:table-cell">Beat</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden lg:table-cell">Mobile</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
+          <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for item in pagination.items %}
+        <tr class="table-row-hover transition-colors">
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="text-sm font-semibold text-white">{{ item.name }}</div>
+            {% if item.owner_name %}<div class="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">{{ item.owner_name }}</div>{% endif %}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+             <span class="inline-flex items-center rounded-md bg-slate-900 px-2 py-1 text-xs font-mono text-indigo-400 border border-white/5">
+              {{ item.code or '—' }}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400 hidden md:table-cell font-medium">
+            {{ item.beat.name if item.beat else '—' }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400 hidden lg:table-cell">
+            {{ item.mobile or '—' }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold tracking-wider uppercase {{ item.status_badge_cls() }}">
+              {{ item.status.value.title() }}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <div class="flex items-center justify-end gap-x-4">
+              <a href="/outlets/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
+              {% if current_user.role.value in ['admin', 'territory_manager'] %}
+                {% if item.status.value == 'active' %}
+                  <form method="post" action="/outlets/{{ item.id }}/toggle" class="inline" onsubmit="return confirm('Disable {{ item.name }}?')">
+                    <button type="submit" class="text-red-400 hover:text-red-300 transition-colors">Disable</button>
+                  </form>
+                {% else %}
+                  <form method="post" action="/outlets/{{ item.id }}/toggle" class="inline" onsubmit="return confirm('Activate {{ item.name }}?')">
+                    <button type="submit" class="text-emerald-400 hover:text-emerald-300 transition-colors">Activate</button>
+                  </form>
+                {% endif %}
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="px-6 py-20 text-center">
+             <div class="flex flex-col items-center">
+               <div class="h-12 w-12 rounded-full bg-slate-900 flex items-center justify-center mb-4 border border-white/5">
+                 <svg class="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                 </svg>
+               </div>
+               <p class="text-slate-400 font-medium">No outlets discovered yet.</p>
+               <a href="/outlets/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Add New Outlet &rarr;</a>
+             </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="bg-slate-900/50 px-6 py-4 border-t border-white/5">
+      {% set qs = "q=" ~ q ~ "&status=" ~ status ~ "&beat_id=" ~ beat_id %}
+      {{ paginate(pagination, "/outlets?" ~ qs) }}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const container = document.getElementById('beat-filter-autocomplete');
+  const searchInput = document.getElementById('beat-filter-search');
+  const hiddenInput = document.getElementById('beat-filter-id');
+  const suggestionsDiv = document.getElementById('beat-filter-suggestions');
+  const items = suggestionsDiv.querySelectorAll('.suggestion-item');
+
+  searchInput.addEventListener('focus', function() {
+    filterSuggestions();
+    suggestionsDiv.classList.remove('hidden');
+  });
+
+  searchInput.addEventListener('input', function() {
+    filterSuggestions();
+    suggestionsDiv.classList.remove('hidden');
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#beat-filter-autocomplete')) {
+      suggestionsDiv.classList.add('hidden');
+    }
+  });
+
+  items.forEach(item => {
+    item.addEventListener('click', function() {
+      const id = item.getAttribute('data-id');
+      const name = item.getAttribute('data-name');
+      
+      searchInput.value = id ? name : '';
+      hiddenInput.value = id;
+      suggestionsDiv.classList.add('hidden');
+    });
+  });
+
+  function filterSuggestions() {
+    const filter = searchInput.value.toLowerCase();
+    items.forEach(item => {
+      const text = item.innerText.toLowerCase();
+      if (text.includes(filter) || !filter) {
+        item.classList.remove('hidden');
+      } else {
+        item.classList.add('hidden');
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

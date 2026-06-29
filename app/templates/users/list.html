@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% from "shared/pagination.html" import render as paginate %}
+
+{% block title %}Users{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-white tracking-tight">Users &amp; Reps</h1>
+      <p class="mt-2 text-sm text-slate-400 font-medium">Manage administrative accounts, territory managers and field representatives</p>
+    </div>
+    <a href="/users/new"
+       class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      New User
+    </a>
+  </div>
+
+  <div class="glass rounded-2xl p-6 border border-white/5">
+    <form method="get" class="flex flex-wrap items-center gap-4">
+      <div class="relative flex-1 min-w-[280px]">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search by name, email or username…"
+               class="w-full rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-slate-500 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+      </div>
+      
+      <select name="role"
+              class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[140px]">
+        <option value="">All Roles</option>
+        {% for r in UserRole %}
+        <option value="{{ r.value }}" {% if role == r.value %}selected{% endif %}>{{ r.value.replace('_', ' ').title() }}</option>
+        {% endfor %}
+      </select>
+
+      <button type="submit" class="premium-btn rounded-xl bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition-all border border-white/5">
+        Filter
+      </button>
+      
+      {% if q or role %}
+      <a href="/users" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear All</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="table-container shadow-2xl shadow-black/50">
+    <table class="min-w-full divide-y divide-white/5">
+      <thead>
+        <tr class="bg-slate-900/80 backdrop-blur-md">
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">User Profile</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden sm:table-cell">Username</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Role</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden md:table-cell">Positions</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
+          <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for item in pagination.items %}
+        <tr class="table-row-hover transition-colors">
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center gap-x-4">
+               <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-cyan-500/20 p-0.5 border border-white/10 flex-shrink-0">
+                 <div class="h-full w-full rounded-[9px] bg-slate-900 flex items-center justify-center">
+                   <span class="text-indigo-400 text-xs font-bold">{{ item.full_name[0].upper() }}</span>
+                 </div>
+              </div>
+              <div>
+                <div class="text-sm font-semibold text-white">{{ item.full_name }}</div>
+                <div class="text-[10px] text-slate-500 font-medium">{{ item.email }}</div>
+              </div>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+             <span class="inline-flex items-center rounded-md bg-slate-900 px-2 py-1 text-xs font-mono text-slate-400 border border-white/5">
+              {{ item.username }}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold tracking-wider uppercase
+                         {% if item.role.value == 'admin' %}bg-rose-500/10 text-rose-400 border border-rose-500/20
+                         {% elif item.role.value == 'territory_manager' %}bg-amber-500/10 text-amber-400 border border-amber-500/20
+                         {% elif item.role.value == 'vendor_admin' %}bg-purple-500/10 text-purple-400 border border-purple-500/20
+                         {% elif item.role.value == 'vendor_technician' %}bg-cyan-500/10 text-cyan-400 border border-cyan-500/20
+                         {% elif item.role.value == 'qc_manager' %}bg-orange-500/10 text-orange-400 border border-orange-500/20
+                         {% else %}bg-blue-500/10 text-blue-400 border border-blue-500/20{% endif %}">
+              {{ item.role.value.replace('_', ' ').title() }}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-sm text-slate-400 hidden md:table-cell font-medium">{{ item.position_names() }}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            {% if item.is_active %}
+            <span class="inline-flex items-center gap-x-1.5 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span>
+              Active
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-x-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+              <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
+              Inactive
+            </span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-xs font-medium">
+            <div class="flex items-center justify-end gap-x-3">
+              <a href="/users/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
+              {% if item.is_active %}
+              {% if item.id != current_user.id %}
+              <form method="post" action="/users/{{ item.id }}/delete" class="inline"
+                    onsubmit="return confirm('Deactivate {{ item.full_name }}?')">
+                <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">Deactivate</button>
+              </form>
+              {% endif %}
+              <form method="post" action="/users/{{ item.id }}/activation-code" class="inline">
+                <button type="submit" class="text-amber-400 hover:text-amber-300 transition-colors">Activation Code</button>
+              </form>
+              {% if not item.is_registered %}
+              <form method="post" action="/users/{{ item.id }}/register" class="inline">
+                <button type="submit" class="text-emerald-400 hover:text-emerald-300 transition-colors">Register</button>
+              </form>
+              {% endif %}
+              {% else %}
+              <form method="post" action="/users/{{ item.id }}/activate" class="inline">
+                <button type="submit" class="text-emerald-400 hover:text-emerald-300 transition-colors">Activate</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="px-6 py-20 text-center">
+             <div class="flex flex-col items-center">
+               <div class="h-12 w-12 rounded-full bg-slate-900 flex items-center justify-center mb-4 border border-white/5">
+                 <svg class="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                 </svg>
+               </div>
+               <p class="text-slate-400 font-medium">No users found.</p>
+               <a href="/users/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Create New User &rarr;</a>
+             </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if pagination.pages > 1 %}
+    <div class="bg-slate-900/50 px-6 py-4 border-t border-white/5">
+      {% set qs = "q=" ~ q ~ "&role=" ~ role %}
+      {{ paginate(pagination, "/users?" ~ qs) }}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

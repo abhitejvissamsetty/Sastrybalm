@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Vendors{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Vendors</h1>
+      <p class="mt-1 text-sm text-slate-400">Manage CMMS partner vendors and technicians.</p>
+    </div>
+    {% if current_user.role.value == 'admin' %}
+    <div class="flex gap-x-3">
+      <a href="/vendors/new"
+         class="inline-flex items-center gap-x-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors duration-100">
+        <svg class="-ml-0.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        New Vendor
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Filters -->
+  <div class="rounded-xl border border-slate-700/60 bg-slate-800/30 p-4">
+    <form method="get" class="flex flex-col sm:flex-row gap-4">
+      <div class="flex-1 sm:max-w-xs">
+        <label class="sr-only">Search</label>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search by name or mobile..."
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+      <div class="flex-1 sm:max-w-xs">
+        <label class="sr-only">Status</label>
+        <select name="status" onchange="this.form.submit()"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Statuses</option>
+          {% for s in VendorStatus %}
+          <option value="{{ s.value }}" {% if status == s.value %}selected{% endif %}>{{ s.value.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="hidden sm:inline-flex rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-600 transition-colors">Filter</button>
+    </form>
+  </div>
+
+  <!-- Table -->
+  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50 shadow-sm glass">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-700/80">
+        <thead>
+          <tr class="bg-slate-800/50">
+            <th class="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Contact Person</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Contact Info</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+            <th class="px-3 py-3.5 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-3 py-3.5 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700/50">
+          {% for item in pagination.items %}
+          <tr class="hover:bg-slate-700/30 transition-colors duration-100">
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-white">
+              {{ item.name }}
+              {% if item.cmms_supplier_ref %}
+              <span class="ml-2 inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-slate-400 border border-slate-700">CMMS: {{ item.cmms_supplier_ref }}</span>
+              {% endif %}
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-slate-300">{{ item.contact_person or '—' }}</td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-slate-300">
+              <div class="flex flex-col gap-y-1">
+                {% if item.mobile %}<span>{{ item.mobile }}</span>{% endif %}
+                {% if item.email %}<span class="text-xs text-slate-500">{{ item.email }}</span>{% endif %}
+              </div>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-slate-300">{{ item.category or '—' }}</td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-center">
+              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ 'bg-emerald-900/50 text-emerald-300' if item.status.value == 'active' else 'bg-slate-700 text-slate-300' }}">
+                {{ item.status.value.title() }}
+              </span>
+            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
+              <div class="flex justify-end gap-x-3">
+                <a href="/vendors/{{ item.id }}/employees" class="text-slate-400 hover:text-white" title="Manage Employees">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+                </a>
+                <a href="/vendors/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300">Edit</a>
+                <form method="post" action="/vendors/{{ item.id }}/toggle" class="inline">
+                  <button type="submit" class="{{ 'text-amber-500 hover:text-amber-400' if item.status.value == 'active' else 'text-emerald-500 hover:text-emerald-400' }}">
+                    {{ 'Deactivate' if item.status.value == 'active' else 'Activate' }}
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="px-3 py-8 text-center text-sm text-slate-500">
+              No vendors found matching criteria.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if pagination.pages > 1 %}
+    <div class="border-t border-slate-700/80 bg-slate-800/30 px-4 py-3 sm:px-6">
+      <div class="flex items-center justify-between">
+        <div class="text-sm text-slate-400">
+          Page <span class="font-medium text-white">{{ pagination.page }}</span> of <span class="font-medium text-white">{{ pagination.pages }}</span>
+        </div>
+        <div class="flex gap-x-2">
+          {% if pagination.has_prev %}
+          <a href="?page={{ pagination.page - 1 }}&status={{ status }}&q={{ q }}" class="rounded-md bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600 transition-colors">Previous</a>
+          {% endif %}
+          {% if pagination.has_next %}
+          <a href="?page={{ pagination.page + 1 }}&status={{ status }}&q={{ q }}" class="rounded-md bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600 transition-colors">Next</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

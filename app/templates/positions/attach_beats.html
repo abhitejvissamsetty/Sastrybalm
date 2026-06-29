@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block title %}Attach Beats - {{ item.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/positions" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">Attach Beats to Position</h1>
+      <p class="mt-1 text-sm text-slate-400">Map active beat routes to this sales position</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Left details pane -->
+    <div class="lg:col-span-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6 h-fit space-y-4 shadow-xl">
+      <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700 pb-2">Position details</h2>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Name</label>
+          <div class="text-sm font-semibold text-white mt-0.5">{{ item.name }}</div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Code</label>
+          <div class="text-sm font-mono text-indigo-400 mt-0.5">{{ item.code }}</div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Level</label>
+          <div class="text-sm font-semibold text-white mt-0.5">
+            <span class="inline-flex items-center rounded-full bg-indigo-900/50 px-2.5 py-0.5 text-xs font-semibold text-indigo-300 border border-indigo-700/30">
+              {{ item.level.value }}
+            </span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Reports To</label>
+          <div class="text-sm text-slate-300 mt-0.5">
+            {% if item.reporting_to %}
+              {{ item.reporting_to.name }} <span class="font-mono text-xs text-slate-500">({{ item.reporting_to.code }})</span>
+            {% else %}
+              <span class="text-slate-500 italic">None (Top-Level)</span>
+            {% endif %}
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Assigned Employee</label>
+          <div class="text-sm mt-0.5">
+            {% if item.users %}
+              <span class="inline-flex items-center rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-xs font-semibold text-emerald-300 border border-emerald-700/30">
+                {{ item.attached_users_display }}
+              </span>
+            {% else %}
+              <span class="inline-flex items-center rounded-full bg-amber-900/50 px-2.5 py-0.5 text-xs font-semibold text-amber-300 border border-amber-700/30">
+                Vacant
+              </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right form pane -->
+    <div class="lg:col-span-8">
+      <form method="post" id="attach-beats-form" class="space-y-6 rounded-xl border border-slate-700 bg-slate-800/50 p-6 shadow-xl">
+        <div id="assigned-beats-inputs-container">
+          <!-- Hidden inputs for selected beat IDs will be dynamically populated here -->
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+
+          <!-- Available Beats Column -->
+          <div class="md:col-span-5 flex flex-col h-[400px]">
+            <label class="block text-sm font-semibold text-slate-300 mb-2">Available Beats</label>
+            <div class="mb-2">
+              <input type="text" id="available-search" placeholder="Search available beats..."
+                     class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-1.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <!-- Territory Autocomplete Filter -->
+            <div class="mb-2 relative" id="territory-autocomplete">
+              <input type="text" id="territory-search" placeholder="Filter by territory..." autocomplete="off"
+                     class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-1.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <input type="hidden" id="territory-id" value="">
+              <div id="territory-suggestions" class="suggestions-list absolute z-10 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg bg-slate-900 border border-slate-700 text-white hidden">
+                <div class="suggestion-item px-3 py-1.5 text-xs hover:bg-indigo-600 cursor-pointer text-slate-400 border-b border-white/5" data-id="" data-name="All Territories">
+                  All Territories
+                </div>
+                {% for t in territories %}
+                <div class="suggestion-item px-3 py-1.5 text-xs hover:bg-indigo-600 cursor-pointer" data-id="{{ t.id }}" data-name="{{ t.name }}">
+                  {{ t.name }}
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            <div id="available-beats-list" class="flex-1 overflow-y-auto rounded-lg bg-slate-900 border border-slate-700 p-2 space-y-1 scrollbar-thin scrollbar-thumb-slate-700">
+              {% for b in all_beats %}
+                {% if b.id not in assigned_beat_ids %}
+                <div data-id="{{ b.id }}" data-name="{{ b.name }}" data-code="{{ b.code }}" data-territory-id="{{ b.territory_id if b.territory_id else '' }}"
+                     class="beat-item flex items-center justify-between rounded px-3 py-2 text-sm text-slate-300 bg-slate-800/40 border border-slate-700/50 hover:bg-slate-700/60 hover:text-white cursor-pointer select-none transition-colors">
+                  <span>{{ b.name }} <span class="text-xs font-mono text-slate-400">({{ b.code }})</span></span>
+                  <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                  </svg>
+                </div>
+                {% endif %}
+              {% endfor %}
+              <div id="no-available-message" class="text-xs text-slate-500 text-center py-8 hidden">No available beats match search.</div>
+            </div>
+          </div>
+
+          <!-- Arrow Controls (Visual Separator / Hint) -->
+          <div class="md:col-span-2 flex flex-col items-center justify-center gap-2">
+            <span class="text-xs text-slate-500 text-center hidden md:block">Click beat to move</span>
+            <div class="flex md:flex-col gap-4 text-slate-500">
+              <svg class="h-6 w-6 transform rotate-90 md:rotate-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5M16.5 3 21 7.5m0 0-4.5 4.5M21 7.5H7.5" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Assigned Beats Column -->
+          <div class="md:col-span-5 flex flex-col h-[400px]">
+            <label class="block text-sm font-semibold text-emerald-400 mb-2">Assigned Beats</label>
+            <div class="mb-2">
+              <input type="text" id="assigned-search" placeholder="Search assigned beats..."
+                     class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-1.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div id="assigned-beats-list" class="flex-1 overflow-y-auto rounded-lg bg-slate-900 border border-slate-700 p-2 space-y-1 scrollbar-thin scrollbar-thumb-slate-700 border-dashed border-emerald-800/40">
+              {% for b in all_beats %}
+                {% if b.id in assigned_beat_ids %}
+                <div data-id="{{ b.id }}" data-name="{{ b.name }}" data-code="{{ b.code }}" data-territory-id="{{ b.territory_id if b.territory_id else '' }}"
+                     class="beat-item flex items-center justify-between rounded px-3 py-2 text-sm text-emerald-300 bg-emerald-950/20 border border-emerald-800/30 hover:bg-emerald-900/30 hover:text-emerald-200 cursor-pointer select-none transition-colors">
+                  <span>{{ b.name }} <span class="text-xs font-mono text-emerald-500">({{ b.code }})</span></span>
+                  <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                {% endif %}
+              {% endfor %}
+              <div id="no-assigned-message" class="text-xs text-slate-500 text-center py-8 hidden">No beats assigned yet.</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="flex items-center justify-end gap-x-3 pt-4 border-t border-slate-700">
+          <a href="/positions" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+          <button type="submit"
+                  class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+            Save Beat Mappings
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('attach-beats-form');
+  const availableList = document.getElementById('available-beats-list');
+  const assignedList = document.getElementById('assigned-beats-list');
+  const availableSearch = document.getElementById('available-search');
+  const assignedSearch = document.getElementById('assigned-search');
+  const inputsContainer = document.getElementById('assigned-beats-inputs-container');
+
+  function updateHiddenInputs() {
+    inputsContainer.innerHTML = '';
+    const assignedItems = assignedList.querySelectorAll('.beat-item');
+    assignedItems.forEach(item => {
+      const id = item.getAttribute('data-id');
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'beat_ids';
+      input.value = id;
+      inputsContainer.appendChild(input);
+    });
+  }
+
+  function handleMove(item, toAssigned) {
+    if (toAssigned) {
+      // Style as assigned
+      item.classList.remove('text-slate-300', 'bg-slate-800/40', 'border-slate-700/50', 'hover:bg-slate-700/60', 'hover:text-white');
+      item.classList.add('text-emerald-300', 'bg-emerald-950/20', 'border-emerald-800/30', 'hover:bg-emerald-900/30', 'hover:text-emerald-200');
+      
+      const icon = item.querySelector('svg');
+      icon.className.baseVal = 'h-4 w-4 text-emerald-600';
+      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />';
+
+      // Move code element formatting
+      const codeSpan = item.querySelector('span span');
+      codeSpan.className = 'text-xs font-mono text-emerald-500';
+
+      assignedList.appendChild(item);
+    } else {
+      // Style as available
+      item.classList.remove('text-emerald-300', 'bg-emerald-950/20', 'border-emerald-800/30', 'hover:bg-emerald-900/30', 'hover:text-emerald-200');
+      item.classList.add('text-slate-300', 'bg-slate-800/40', 'border-slate-700/50', 'hover:bg-slate-700/60', 'hover:text-white');
+
+      const icon = item.querySelector('svg');
+      icon.className.baseVal = 'h-4 w-4 text-slate-500';
+      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />';
+
+      const codeSpan = item.querySelector('span span');
+      codeSpan.className = 'text-xs font-mono text-slate-400';
+
+      availableList.appendChild(item);
+    }
+    updateHiddenInputs();
+    filterLists();
+  }
+
+  // Click events for items using event delegation
+  availableList.addEventListener('click', function(e) {
+    const item = e.target.closest('.beat-item');
+    if (item) handleMove(item, true);
+  });
+
+  assignedList.addEventListener('click', function(e) {
+    const item = e.target.closest('.beat-item');
+    if (item) handleMove(item, false);
+  });
+
+  // Territory Autocomplete
+  const territoryContainer = document.getElementById('territory-autocomplete');
+  const territorySearch = document.getElementById('territory-search');
+  const territoryId = document.getElementById('territory-id');
+  const territorySuggestions = document.getElementById('territory-suggestions');
+  const territoryItems = territorySuggestions.querySelectorAll('.suggestion-item');
+
+  territorySearch.addEventListener('focus', function() {
+    filterTerritorySuggestions();
+    territorySuggestions.classList.remove('hidden');
+  });
+
+  territorySearch.addEventListener('input', function() {
+    filterTerritorySuggestions();
+    territorySuggestions.classList.remove('hidden');
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#territory-autocomplete')) {
+      territorySuggestions.classList.add('hidden');
+    }
+  });
+
+  territoryItems.forEach(item => {
+    item.addEventListener('click', function() {
+      const id = item.getAttribute('data-id');
+      const name = item.getAttribute('data-name');
+      
+      territorySearch.value = id ? name : '';
+      territoryId.value = id;
+      territorySuggestions.classList.add('hidden');
+      filterLists();
+    });
+  });
+
+  function filterTerritorySuggestions() {
+    const filter = territorySearch.value.toLowerCase();
+    territoryItems.forEach(item => {
+      const text = item.innerText.toLowerCase();
+      if (text.includes(filter) || !filter) {
+        item.classList.remove('hidden');
+      } else {
+        item.classList.add('hidden');
+      }
+    });
+  }
+
+  // Search filter
+  function filterLists() {
+    const availQuery = availableSearch.value.toLowerCase();
+    const assignQuery = assignedSearch.value.toLowerCase();
+    const selectedTerritoryId = territoryId.value;
+
+    let availCount = 0;
+    availableList.querySelectorAll('.beat-item').forEach(item => {
+      const name = item.getAttribute('data-name').toLowerCase();
+      const code = item.getAttribute('data-code').toLowerCase();
+      const beatTerritoryId = item.getAttribute('data-territory-id');
+
+      const matchesSearch = name.includes(availQuery) || code.includes(availQuery);
+      const matchesTerritory = !selectedTerritoryId || beatTerritoryId === selectedTerritoryId;
+
+      if (matchesSearch && matchesTerritory) {
+        item.classList.remove('hidden');
+        availCount++;
+      } else {
+        item.classList.add('hidden');
+      }
+    });
+    document.getElementById('no-available-message').classList.toggle('hidden', availCount > 0);
+
+    let assignCount = 0;
+    assignedList.querySelectorAll('.beat-item').forEach(item => {
+      const name = item.getAttribute('data-name').toLowerCase();
+      const code = item.getAttribute('data-code').toLowerCase();
+      if (name.includes(assignQuery) || code.includes(assignQuery)) {
+        item.classList.remove('hidden');
+        assignCount++;
+      } else {
+        item.classList.add('hidden');
+      }
+    });
+    document.getElementById('no-assigned-message').classList.toggle('hidden', assignCount > 0);
+  }
+
+  availableSearch.addEventListener('input', filterLists);
+  assignedSearch.addEventListener('input', filterLists);
+
+  // Initialize hidden inputs
+  updateHiddenInputs();
+  filterLists();
+});
+</script>
+{% endblock %}

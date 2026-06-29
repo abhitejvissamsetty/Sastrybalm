@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Record Payment{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/payments" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">Record Payment</h1>
+      <p class="mt-1 text-sm text-slate-400">
+        {% if selected_order %}Linked to order {{ selected_order.order_number }}{% else %}Log a collection{% endif %}
+      </p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" class="space-y-5 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+
+    {% if selected_order %}
+    <input type="hidden" name="order_id" value="{{ selected_order.id }}">
+    <div class="rounded-lg bg-indigo-900/30 border border-indigo-700/50 px-4 py-3 flex items-center justify-between">
+      <div>
+        <p class="text-xs text-indigo-400 uppercase tracking-wider">Linked Order</p>
+        <p class="text-sm font-mono font-semibold text-white mt-0.5">{{ selected_order.order_number }}</p>
+      </div>
+      <p class="text-lg font-bold text-white">₹{{ "%.2f"|format(selected_order.total_amount) }}</p>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Outlet <span class="text-red-400">*</span></label>
+        <select name="outlet_id" id="payment-outlet-id" required
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">Select outlet…</option>
+          {% for o in outlets %}
+          <option value="{{ o.id }}" {% if selected_order and selected_order.outlet_id == o.id %}selected{% endif %}>
+            {{ o.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if not selected_order %}
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Link ZAP Invoice <span class="text-slate-500 font-normal">(Optional)</span></label>
+        <select name="order_id" id="payment-order-id"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">None (Auto-link to oldest unpaid invoice)</option>
+          {% for o in unpaid_orders %}
+          <option value="{{ o.id }}" data-outlet-id="{{ o.outlet_id }}" data-amount="{{ o.balance_due }}" style="display: none;">
+            {{ o.order_number }} (Due: ₹{{ "%.2f"|format(o.balance_due) }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Amount (₹) <span class="text-red-400">*</span></label>
+        <input type="number" name="amount" id="payment-amount" step="0.01" min="0.01" required
+               value="{{ "%.2f"|format(selected_order.total_amount) if selected_order else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Payment Method <span class="text-red-400">*</span></label>
+        <select name="method" id="payment-method" required
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          {% for m in PaymentMethod %}
+          <option value="{{ m.value }}">{{ m.value.upper() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Transaction Ref <span class="text-slate-500 font-normal">(UPI/NEFT)</span></label>
+        <input type="text" name="transaction_ref"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="UPI txn ID or cheque no.">
+      </div>
+    </div>
+
+    <!-- Cash denominations (shown when method=cash) -->
+    <div id="denomination-section" class="hidden rounded-lg border border-slate-700 p-4 space-y-3">
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cash Denomination Breakdown</p>
+      <div class="grid grid-cols-3 gap-3">
+        {% for denom in [500, 200, 100, 50, 20, 10] %}
+        <div class="flex items-center gap-x-2">
+          <span class="text-sm text-slate-400 w-12">₹{{ denom }}</span>
+          <input type="number" name="denom_{{ denom }}" min="0" value="0"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-x-3 pt-2 border-t border-slate-700">
+      <a href="/payments" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+      <button type="submit"
+              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        Record Payment
+      </button>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  const methodSel = document.getElementById('payment-method');
+  const denomSec = document.getElementById('denomination-section');
+  function toggleDenom() {
+    denomSec.classList.toggle('hidden', methodSel.value !== 'cash');
+  }
+  methodSel.addEventListener('change', toggleDenom);
+  toggleDenom();
+
+  const outletSel = document.getElementById('payment-outlet-id');
+  const orderSel = document.getElementById('payment-order-id');
+  const amountInput = document.getElementById('payment-amount');
+
+  if (outletSel && orderSel) {
+    function filterOrders() {
+      const selectedOutletId = outletSel.value;
+      orderSel.value = '';
+      
+      Array.from(orderSel.options).forEach((opt, idx) => {
+        if (idx === 0) return; // keep "None" option
+        const outletId = opt.getAttribute('data-outlet-id');
+        if (outletId === selectedOutletId) {
+          opt.style.display = '';
+        } else {
+          opt.style.display = 'none';
+        }
+      });
+    }
+
+    outletSel.addEventListener('change', filterOrders);
+    
+    orderSel.addEventListener('change', function() {
+      const selectedOpt = orderSel.options[orderSel.selectedIndex];
+      if (selectedOpt && selectedOpt.value) {
+        const amount = selectedOpt.getAttribute('data-amount');
+        if (amount) {
+          amountInput.value = parseFloat(amount).toFixed(2);
+        }
+      }
+    });
+
+    if (outletSel.value) {
+      filterOrders();
+    }
+  }
+</script>
+{% endblock %}

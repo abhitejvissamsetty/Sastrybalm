@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}GPS Map View{% endblock %}
+
+{% block head %}
+<style>
+  #map { height: 100%; width: 100%; border-radius: 0.75rem; }
+  .leaflet-popup-content-wrapper {
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  }
+  .leaflet-popup-tip { background: #1e293b; }
+  .leaflet-popup-content { margin: 12px 14px; font-size: 13px; line-height: 1.6; }
+  .popup-title { font-weight: 700; color: #f1f5f9; font-size: 14px; margin-bottom: 4px; }
+  .popup-row { display: flex; gap: 6px; }
+  .popup-label { color: #64748b; min-width: 64px; }
+  .popup-val { color: #cbd5e1; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: rgba(16,185,129,0.15); color: #34d399; }
+  .badge-red   { background: rgba(239,68,68,0.15);  color: #f87171; }
+  .badge-blue  { background: rgba(99,102,241,0.15); color: #818cf8; }
+  .legend { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; font-size: 12px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: #94a3b8; }
+  .legend-row:last-child { margin-bottom: 0; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full space-y-4" style="height: calc(100vh - 6rem);">
+
+  <!-- Header + filters -->
+  <div class="flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+    <div>
+      <h1 class="text-2xl font-bold text-white">GPS Map View</h1>
+      <p class="mt-0.5 text-sm text-slate-400">Field rep locations — check-ins, visits and outlets</p>
+    </div>
+    <form method="get" class="flex flex-wrap gap-2">
+      <input type="date" name="map_date" value="{{ selected_date }}"
+             class="rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <select name="user_id"
+              class="rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">All Reps</option>
+        {% for rep in reps %}
+        <option value="{{ rep.id }}" {% if user_id == rep.id|string %}selected{% endif %}>{{ rep.full_name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit"
+              class="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-600 transition-colors">
+        Apply
+      </button>
+    </form>
+  </div>
+
+  <!-- Layer toggle pills -->
+  <div class="flex gap-2 flex-shrink-0" id="layer-toggles">
+    <button data-layer="checkins" onclick="toggleLayer('checkins', this)"
+            class="layer-btn active rounded-full px-3 py-1 text-xs font-semibold border border-indigo-500 bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 transition-colors">
+      Check-ins
+    </button>
+    <button data-layer="visits" onclick="toggleLayer('visits', this)"
+            class="layer-btn active rounded-full px-3 py-1 text-xs font-semibold border border-emerald-500 bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600/50 transition-colors">
+      Visit Records
+    </button>
+    <button data-layer="outlets" onclick="toggleLayer('outlets', this)"
+            class="layer-btn active rounded-full px-3 py-1 text-xs font-semibold border border-slate-500 bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors">
+      Outlets
+    </button>
+  </div>
+
+  <!-- Map + legend row -->
+  <div class="flex gap-4 flex-1 min-h-0">
+    <!-- Map -->
+    <div class="flex-1 rounded-xl border border-slate-700 overflow-hidden">
+      <div id="map"></div>
+    </div>
+
+    <!-- Legend + stats sidebar -->
+    <div class="w-56 flex flex-col gap-4 flex-shrink-0">
+      <div class="legend">
+        <p class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3">Legend</p>
+        <div class="legend-row"><div class="dot" style="background:#6366f1"></div>Check-in location</div>
+        <div class="legend-row"><div class="dot" style="background:#f59e0b"></div>Check-out location</div>
+        <div class="legend-row"><div class="dot" style="background:#10b981"></div>Visit (≤ 200 m)</div>
+        <div class="legend-row"><div class="dot" style="background:#ef4444"></div>Visit (&gt; 200 m)</div>
+        <div class="legend-row"><div class="dot" style="background:#94a3b8"></div>Outlet (no visit)</div>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4 space-y-3">
+        <p class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Summary</p>
+        <div class="flex justify-between text-sm"><span class="text-slate-400">Check-ins</span><span id="stat-checkins" class="font-bold text-white">—</span></div>
+        <div class="flex justify-between text-sm"><span class="text-slate-400">Visits</span><span id="stat-visits" class="font-bold text-white">—</span></div>
+        <div class="flex justify-between text-sm"><span class="text-slate-400">Out-of-range</span><span id="stat-oor" class="font-bold text-red-400">—</span></div>
+        <div class="flex justify-between text-sm"><span class="text-slate-400">Outlets</span><span id="stat-outlets" class="font-bold text-white">—</span></div>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4 flex-1 overflow-y-auto">
+        <p class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3">Active Reps</p>
+        <ul id="rep-list" class="space-y-2 text-sm text-slate-400">
+          <li class="text-slate-600 text-xs">Loading…</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MAP_DATE = "{{ selected_date }}";
+const USER_ID  = "{{ user_id }}";
+
+const map = L.map("map", { zoomControl: true }).setView([20.5937, 78.9629], 5);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap contributors",
+  maxZoom: 19,
+}).addTo(map);
+
+// Layer groups
+const layers = {
+  checkins: L.layerGroup().addTo(map),
+  visits:   L.layerGroup().addTo(map),
+  outlets:  L.layerGroup().addTo(map),
+};
+
+function makeIcon(color, size = 12) {
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.8);box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -(size/2 + 4)],
+  });
+}
+
+function popupRow(label, val) {
+  return `<div class="popup-row"><span class="popup-label">${label}</span><span class="popup-val">${val}</span></div>`;
+}
+
+function toggleLayer(name, btn) {
+  const isActive = btn.classList.contains("active");
+  if (isActive) {
+    map.removeLayer(layers[name]);
+    btn.classList.remove("active");
+    btn.style.opacity = "0.45";
+  } else {
+    map.addLayer(layers[name]);
+    btn.classList.add("active");
+    btn.style.opacity = "";
+  }
+}
+
+async function loadData() {
+  const url = `/tracking/map/data?map_date=${MAP_DATE}&user_id=${USER_ID}`;
+  const res  = await fetch(url);
+  const data = await res.json();
+
+  const { checkins, visits, outlets } = data;
+  const repSet = {};
+
+  // --- Check-in markers ---
+  checkins.forEach(c => {
+    repSet[c.rep] = (repSet[c.rep] || 0) + 1;
+
+    const popup = `
+      <div class="popup-title">🟣 Check-in — ${c.rep}</div>
+      ${popupRow("Date", MAP_DATE)}
+      ${popupRow("Time", c.time)}
+      ${c.address ? popupRow("Address", c.address) : ""}
+      ${c.hours ? popupRow("Hours", c.hours + "h") : ""}
+      <div style="margin-top:6px">
+        <a href="/timesheets/${c.id}" style="color:#818cf8;font-size:12px">View Timesheet →</a>
+      </div>`;
+
+    L.marker([c.lat, c.lng], { icon: makeIcon("#6366f1", 14) })
+      .bindPopup(popup)
+      .addTo(layers.checkins);
+
+    if (c.checkout_lat && c.checkout_lng) {
+      const coPopup = `
+        <div class="popup-title">🟡 Check-out — ${c.rep}</div>
+        ${popupRow("Time", c.checkout_time)}
+        ${c.hours ? popupRow("Hours worked", c.hours + "h") : ""}`;
+
+      L.marker([c.checkout_lat, c.checkout_lng], { icon: makeIcon("#f59e0b", 14) })
+        .bindPopup(coPopup)
+        .addTo(layers.checkins);
+
+      // Dashed line between check-in and check-out
+      L.polyline([[c.lat, c.lng], [c.checkout_lat, c.checkout_lng]], {
+        color: "#6366f1", weight: 2, dashArray: "5 6", opacity: 0.6,
+      }).addTo(layers.checkins);
+    }
+  });
+
+  // --- Visit markers ---
+  visits.forEach(v => {
+    const color = v.compliant ? "#10b981" : "#ef4444";
+    const distStr = v.distance !== null ? `${Math.round(v.distance)}m` : "—";
+    const badge = v.compliant
+      ? `<span class="badge badge-green">In range</span>`
+      : `<span class="badge badge-red">Out of range (${distStr})</span>`;
+
+    const popup = `
+      <div class="popup-title">📍 Visit — ${v.outlet}</div>
+      ${popupRow("Rep", v.rep)}
+      ${popupRow("Time", v.time)}
+      ${popupRow("Purpose", v.purpose)}
+      ${popupRow("Distance", distStr)}
+      <div style="margin-top:6px">${badge}</div>`;
+
+    L.marker([v.lat, v.lng], { icon: makeIcon(color, 12) })
+      .bindPopup(popup)
+      .addTo(layers.visits);
+  });
+
+  // --- Outlet markers ---
+  outlets.forEach(o => {
+    const popup = `
+      <div class="popup-title">🏪 ${o.name}</div>
+      ${o.code ? popupRow("Code", o.code) : ""}
+      ${o.channel ? popupRow("Channel", o.channel) : ""}
+      <div style="margin-top:6px">
+        <a href="/outlets/${o.id}" style="color:#818cf8;font-size:12px">View Outlet →</a>
+      </div>`;
+
+    L.circleMarker([o.lat, o.lng], {
+      radius: 5,
+      fillColor: "#94a3b8",
+      color: "#475569",
+      weight: 1,
+      fillOpacity: 0.7,
+    }).bindPopup(popup).addTo(layers.outlets);
+  });
+
+  // --- Stats ---
+  document.getElementById("stat-checkins").textContent = checkins.length;
+  document.getElementById("stat-visits").textContent   = visits.length;
+  document.getElementById("stat-oor").textContent      = visits.filter(v => !v.compliant).length;
+  document.getElementById("stat-outlets").textContent  = outlets.length;
+
+  // --- Rep list ---
+  const repList = document.getElementById("rep-list");
+  const repKeys = Object.keys(repSet);
+  if (repKeys.length === 0) {
+    repList.innerHTML = '<li class="text-slate-600 text-xs">No check-ins for this date.</li>';
+  } else {
+    repList.innerHTML = repKeys.map(r =>
+      `<li class="flex justify-between"><span>${r}</span><span class="text-indigo-400 font-semibold">${repSet[r]} check-in</span></li>`
+    ).join("");
+  }
+
+  // Auto-fit bounds if we have any markers
+  const allPoints = [
+    ...checkins.map(c => [c.lat, c.lng]),
+    ...visits.map(v => [v.lat, v.lng]),
+  ];
+  if (allPoints.length > 0) {
+    map.fitBounds(allPoints, { padding: [40, 40] });
+  } else if (outlets.length > 0) {
+    map.fitBounds(outlets.map(o => [o.lat, o.lng]), { padding: [40, 40] });
+  }
+}
+
+loadData();
+</script>
+{% endblock %}

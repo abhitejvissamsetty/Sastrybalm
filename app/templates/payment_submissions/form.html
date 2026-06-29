@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}New Payment Submission{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/payment-submissions" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">New Submission</h1>
+      <p class="mt-1 text-sm text-slate-400">Batch payments to submit for approval</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" class="space-y-6" id="submission-form">
+
+    <!-- Overview -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Submission Details</h2>
+
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Target Account</label>
+          <input type="text" name="target_account" value="Cash - Default"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <p class="mt-1 text-xs text-slate-500">The destination account for Journal Entry in ZAP.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Notes</label>
+          <input type="text" name="notes" placeholder="Optional comments..."
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+      </div>
+    </div>
+
+    <!-- Payments -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-0 overflow-hidden">
+      <div class="p-6 border-b border-slate-700/80 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Unsubmitted Payments</h2>
+        <div class="text-sm font-medium text-slate-300">
+          Selected: <span id="sel-count" class="text-indigo-400">0</span> &nbsp;|&nbsp; 
+          Total: <span id="sel-total" class="text-white">₹0.00</span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-700/80">
+          <thead>
+            <tr class="bg-slate-800/50">
+              <th class="py-3 pl-4 pr-3 text-left">
+                <input type="checkbox" id="select-all" class="h-4 w-4 rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+              </th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Ref</th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Outlet</th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Method</th>
+              <th class="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-700/50">
+            {% for p in payments %}
+            <tr class="hover:bg-slate-700/30">
+              <td class="py-4 pl-4 pr-3">
+                <input type="checkbox" name="payment_ids[]" value="{{ p.id }}" data-amount="{{ p.amount }}"
+                       class="payment-checkbox h-4 w-4 rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+              </td>
+              <td class="px-3 py-4 text-sm font-mono text-white">{{ p.payment_ref }}</td>
+              <td class="px-3 py-4 text-sm text-slate-300">{{ p.outlet.name if p.outlet else '—' }}</td>
+              <td class="px-3 py-4 text-sm text-slate-300">{{ p.method.value.title() }}</td>
+              <td class="px-3 py-4 text-sm font-medium text-white text-right">₹{{ "%.2f"|format(p.amount) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" class="px-3 py-8 text-center text-sm text-slate-500">
+                No pending payments available for submission.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-x-3">
+      <a href="/payment-submissions" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+      <button type="submit" id="submit-btn" disabled
+              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        Submit Payments
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const selectAll = document.getElementById('select-all');
+  const checkboxes = document.querySelectorAll('.payment-checkbox');
+  const countEl = document.getElementById('sel-count');
+  const totalEl = document.getElementById('sel-total');
+  const submitBtn = document.getElementById('submit-btn');
+
+  function updateTotals() {
+    let count = 0;
+    let total = 0;
+    checkboxes.forEach(cb => {
+      if (cb.checked) {
+        count++;
+        total += parseFloat(cb.dataset.amount);
+      }
+    });
+    countEl.textContent = count;
+    totalEl.textContent = '₹' + total.toFixed(2);
+    submitBtn.disabled = count === 0;
+  }
+
+  if (selectAll) {
+    selectAll.addEventListener('change', e => {
+      checkboxes.forEach(cb => cb.checked = e.target.checked);
+      updateTotals();
+    });
+  }
+
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', updateTotals);
+  });
+});
+</script>
+{% endblock %}

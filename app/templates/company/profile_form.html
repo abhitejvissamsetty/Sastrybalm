@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if item else 'New' }} Company Profile{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/company/profiles" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">{{ 'Edit Company Profile' if item else 'New Company Profile' }}</h1>
+      <p class="mt-1 text-sm text-slate-400">{{ item.name if item else 'Configure integration credentials for a company' }}</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" class="space-y-6">
+
+    <!-- Basic -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Basic Info</h2>
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Company Name <span class="text-red-400">*</span></label>
+          <input type="text" name="name" required value="{{ item.name if item else '' }}"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Code <span class="text-red-400">*</span></label>
+          <input type="text" name="code" required value="{{ item.code if item else '' }}"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono uppercase placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                 placeholder="e.g. SBL">
+        </div>
+      </div>
+      {% if item and item.is_active %}
+      <input type="hidden" name="is_active" value="on">
+      {% endif %}
+    </div>
+
+    <!-- ZAP -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-x-3">
+          <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">ZAP Integration</h2>
+          {% if item %}
+            {% if item.has_tag("ZAP-ERROR") %}
+            <span class="inline-flex items-center gap-x-1 rounded bg-red-900/50 px-2 py-0.5 text-xs font-semibold text-red-400 border border-red-700/50 animate-pulse">
+              <svg class="h-2 w-2 fill-red-400" viewBox="0 0 6 6">
+                <circle cx="3" cy="3" r="3" />
+              </svg>
+              Connection Failed
+            </span>
+            {% elif item.has_tag("ZAP-READY") %}
+            <span class="inline-flex items-center gap-x-1 rounded bg-emerald-900/50 px-2 py-0.5 text-xs font-semibold text-emerald-400 border border-emerald-700/50">
+              <svg class="h-2 w-2 fill-emerald-400" viewBox="0 0 6 6">
+                <circle cx="3" cy="3" r="3" />
+              </svg>
+              Connected
+            </span>
+            {% endif %}
+          {% endif %}
+        </div>
+        <button type="button" onclick="testZapConnection({{ item.id if item else 'null' }})" id="test-zap-btn"
+                class="inline-flex items-center gap-x-1.5 rounded bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-300 hover:bg-slate-600 transition-colors">
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
+          </svg>
+          Test Connection
+        </button>
+      </div>
+      
+      {% if item and item.has_tag("ZAP-ERROR") %}
+      <div class="rounded-lg bg-red-950/40 border border-red-900/50 px-4 py-3 text-xs text-red-400 flex items-start gap-x-2">
+        <svg class="h-4 w-4 text-red-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+        </svg>
+        <div>
+          <span class="font-semibold">Credentials not working.</span> The last connection attempt to the ZAP backend failed. Please verify the API Key, Base URL, and Backend Company values below and run 'Test Connection' again.
+        </div>
+      </div>
+      {% endif %}
+
+      <div id="zap-test-result" class="hidden rounded-lg px-4 py-3 text-sm"></div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Base URL</label>
+        <input type="url" name="zap_base_url" value="{{ item.zap_base_url if item and item.zap_base_url else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="https://zap.example.com/api">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">API Key
+          {% if item and item.zap_api_key_encrypted %}
+          <span class="text-slate-500 font-normal">(currently set — enter new value to replace)</span>
+          {% endif %}
+        </label>
+        <input type="password" name="zap_api_key"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="{{ zap_api_key_hint if zap_api_key_hint else 'Enter API key' }}">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Backend Company</label>
+        <input type="text" name="zap_backend_company" value="{{ item.zap_backend_company if item and item.zap_backend_company else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="e.g. comp_zap">
+      </div>
+    </div>
+
+    <!-- CMMS -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-x-3">
+          <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">CMMS Integration</h2>
+          {% if item %}
+            {% if item.has_tag("CMMS-ERROR") %}
+            <span class="inline-flex items-center gap-x-1 rounded bg-red-900/50 px-2 py-0.5 text-xs font-semibold text-red-400 border border-red-700/50 animate-pulse">
+              <svg class="h-2 w-2 fill-red-400" viewBox="0 0 6 6">
+                <circle cx="3" cy="3" r="3" />
+              </svg>
+              Connection Failed
+            </span>
+            {% elif item.has_tag("CMMS-READY") %}
+            <span class="inline-flex items-center gap-x-1 rounded bg-emerald-900/50 px-2 py-0.5 text-xs font-semibold text-emerald-400 border border-emerald-700/50">
+              <svg class="h-2 w-2 fill-emerald-400" viewBox="0 0 6 6">
+                <circle cx="3" cy="3" r="3" />
+              </svg>
+              Connected
+            </span>
+            {% endif %}
+          {% endif %}
+        </div>
+        <button type="button" onclick="testCmmsConnection({{ item.id if item else 'null' }})" id="test-cmms-btn"
+                class="inline-flex items-center gap-x-1.5 rounded bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-300 hover:bg-slate-600 transition-colors">
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
+          </svg>
+          Test Connection
+        </button>
+      </div>
+      
+      {% if item and item.has_tag("CMMS-ERROR") %}
+      <div class="rounded-lg bg-red-950/40 border border-red-900/50 px-4 py-3 text-xs text-red-400 flex items-start gap-x-2">
+        <svg class="h-4 w-4 text-red-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+        </svg>
+        <div>
+          <span class="font-semibold">Credentials not working.</span> The last connection attempt to the CMMS backend failed. Please verify the API Key and Base URL values below and run 'Test Connection' again.
+        </div>
+      </div>
+      {% endif %}
+
+      <div id="cmms-test-result" class="hidden rounded-lg px-4 py-3 text-sm"></div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Base URL</label>
+        <input type="url" name="cmms_base_url" value="{{ item.cmms_base_url if item and item.cmms_base_url else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="https://cmms.example.com/api">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">API Key
+          {% if item and item.cmms_api_key_encrypted %}
+          <span class="text-slate-500 font-normal">(currently set — enter new value to replace)</span>
+          {% endif %}
+        </label>
+        <input type="password" name="cmms_api_key"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="{{ cmms_api_key_hint if cmms_api_key_hint else 'Enter API key' }}">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Backend Company</label>
+        <input type="text" name="cmms_backend_company" value="{{ item.cmms_backend_company if item and item.cmms_backend_company else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="e.g. comp_cmms">
+      </div>
+    </div>
+
+    <!-- CONNECT -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-x-3">
+          <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">CONNECT Integration</h2>
+          {% if item %}
+            {% if item.has_tag("CONNECT-ERROR") %}
+            <span class="inline-flex items-center gap-x-1 rounded bg-red-900/50 px-2 py-0.5 text-xs font-semibold text-red-400 border border-red-700/50 animate-pulse">
+              <svg class="h-2 w-2 fill-red-400" viewBox="0 0 6 6">
+                <circle cx="3" cy="3" r="3" />
+              </svg>
+              Connection Failed
+            </span>
+            {% elif item.has_tag("CONNECT-READY") %}
+            <span class="inline-flex items-center gap-x-1 rounded bg-emerald-900/50 px-2 py-0.5 text-xs font-semibold text-emerald-400 border border-emerald-700/50">
+              <svg class="h-2 w-2 fill-emerald-400" viewBox="0 0 6 6">
+                <circle cx="3" cy="3" r="3" />
+              </svg>
+              Connected
+            </span>
+            {% endif %}
+          {% endif %}
+        </div>
+        <button type="button" onclick="testConnectConnection({{ item.id if item else 'null' }})" id="test-connect-btn"
+                class="inline-flex items-center gap-x-1.5 rounded bg-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-300 hover:bg-slate-600 transition-colors">
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
+          </svg>
+          Test Connection
+        </button>
+      </div>
+      
+      {% if item and item.has_tag("CONNECT-ERROR") %}
+      <div class="rounded-lg bg-red-950/40 border border-red-900/50 px-4 py-3 text-xs text-red-400 flex items-start gap-x-2">
+        <svg class="h-4 w-4 text-red-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+        </svg>
+        <div>
+          <span class="font-semibold">Credentials not working.</span> The last connection attempt to the CONNECT backend failed. Please verify the API Key and Base URL values below and run 'Test Connection' again.
+        </div>
+      </div>
+      {% endif %}
+
+      <div id="connect-test-result" class="hidden rounded-lg px-4 py-3 text-sm"></div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Base URL</label>
+        <input type="url" name="connect_base_url" value="{{ item.connect_base_url if item and item.connect_base_url else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="https://connect.example.com/api">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">API Key
+          {% if item and item.connect_api_key_encrypted %}
+          <span class="text-slate-500 font-normal">(currently set — enter new value to replace)</span>
+          {% endif %}
+        </label>
+        <input type="password" name="connect_api_key"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="{{ connect_api_key_hint if connect_api_key_hint else 'Enter API key' }}">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Backend Company</label>
+        <input type="text" name="connect_backend_company" value="{{ item.connect_backend_company if item and item.connect_backend_company else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="e.g. comp_connect">
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-x-3">
+      <a href="/company/profiles" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+      <button type="submit"
+              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        {{ 'Save Changes' if item else 'Create Profile' }}
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function testZapConnection(profileId) {
+  const btn = document.getElementById('test-zap-btn');
+  const resultDiv = document.getElementById('zap-test-result');
+  const baseUrl = document.getElementsByName('zap_base_url')[0].value;
+  const apiKey = document.getElementsByName('zap_api_key')[0].value;
+  const backendCompany = document.getElementsByName('zap_backend_company')[0].value;
+
+  if (!baseUrl) {
+    alert("Base URL is required to test connection.");
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 text-white inline mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Testing...`;
+  
+  resultDiv.className = 'hidden';
+  resultDiv.innerHTML = '';
+  
+  const formData = new FormData();
+  formData.append('base_url', baseUrl);
+  formData.append('api_key', apiKey);
+  formData.append('backend_company', backendCompany);
+  if (profileId) formData.append('profile_id', profileId);
+  
+  try {
+    const response = await fetch(`/company/profiles/test-zap-direct`, { method: 'POST', body: formData });
+    const data = await response.json();
+    
+    resultDiv.classList.remove('hidden');
+    if (data.connected) {
+      resultDiv.className = 'rounded-lg bg-emerald-900/40 border border-emerald-700 px-4 py-3 text-sm text-emerald-300 space-y-1';
+      let html = `<strong>✅ Success!</strong> ${data.message}`;
+      if (data.products_found !== undefined) {
+        html += `<br><span class="text-xs text-emerald-400">Products/Items successfully transferred: <strong>${data.products_found} found</strong></span>`;
+      }
+      resultDiv.innerHTML = html;
+    } else {
+      resultDiv.className = 'rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300';
+      resultDiv.innerHTML = `<strong>❌ Connection Failed!</strong><br>${data.error}`;
+    }
+  } catch (err) {
+    resultDiv.classList.remove('hidden');
+    resultDiv.className = 'rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300';
+    resultDiv.innerHTML = `<strong>❌ Error!</strong> Could not communicate with Sastrybalm server.`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" /></svg> Test Connection`;
+  }
+}
+
+async function testCmmsConnection(profileId) {
+  const btn = document.getElementById('test-cmms-btn');
+  const resultDiv = document.getElementById('cmms-test-result');
+  const baseUrl = document.getElementsByName('cmms_base_url')[0].value;
+  const apiKey = document.getElementsByName('cmms_api_key')[0].value;
+  const backendCompany = document.getElementsByName('cmms_backend_company')[0].value;
+
+  if (!baseUrl) {
+    alert("Base URL is required to test connection.");
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 text-white inline mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Testing...`;
+  
+  resultDiv.className = 'hidden';
+  resultDiv.innerHTML = '';
+  
+  const formData = new FormData();
+  formData.append('base_url', baseUrl);
+  formData.append('api_key', apiKey);
+  formData.append('backend_company', backendCompany);
+  if (profileId) formData.append('profile_id', profileId);
+  
+  try {
+    const response = await fetch(`/company/profiles/test-cmms-direct`, { method: 'POST', body: formData });
+    const data = await response.json();
+    
+    resultDiv.classList.remove('hidden');
+    if (data.connected) {
+      resultDiv.className = 'rounded-lg bg-emerald-900/40 border border-emerald-700 px-4 py-3 text-sm text-emerald-300';
+      resultDiv.innerHTML = `<strong>✅ Success!</strong> ${data.message}`;
+    } else {
+      resultDiv.className = 'rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300';
+      resultDiv.innerHTML = `<strong>❌ Connection Failed!</strong><br>${data.error}`;
+    }
+  } catch (err) {
+    resultDiv.classList.remove('hidden');
+    resultDiv.className = 'rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300';
+    resultDiv.innerHTML = `<strong>❌ Error!</strong> Could not communicate with Sastrybalm server.`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" /></svg> Test Connection`;
+  }
+}
+
+async function testConnectConnection(profileId) {
+  const btn = document.getElementById('test-connect-btn');
+  const resultDiv = document.getElementById('connect-test-result');
+  const baseUrl = document.getElementsByName('connect_base_url')[0].value;
+  const apiKey = document.getElementsByName('connect_api_key')[0].value;
+  const backendCompany = document.getElementsByName('connect_backend_company')[0].value;
+
+  if (!baseUrl) {
+    alert("Base URL is required to test connection.");
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 text-white inline mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Testing...`;
+  
+  resultDiv.className = 'hidden';
+  resultDiv.innerHTML = '';
+  
+  const formData = new FormData();
+  formData.append('base_url', baseUrl);
+  formData.append('api_key', apiKey);
+  formData.append('backend_company', backendCompany);
+  if (profileId) formData.append('profile_id', profileId);
+  
+  try {
+    const response = await fetch(`/company/profiles/test-connect-direct`, { method: 'POST', body: formData });
+    const data = await response.json();
+    
+    resultDiv.classList.remove('hidden');
+    if (data.connected) {
+      resultDiv.className = 'rounded-lg bg-emerald-900/40 border border-emerald-700 px-4 py-3 text-sm text-emerald-300';
+      resultDiv.innerHTML = `<strong>✅ Success!</strong> ${data.message}`;
+    } else {
+      resultDiv.className = 'rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300';
+      resultDiv.innerHTML = `<strong>❌ Connection Failed!</strong><br>${data.error}`;
+    }
+  } catch (err) {
+    resultDiv.classList.remove('hidden');
+    resultDiv.className = 'rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300';
+    resultDiv.innerHTML = `<strong>❌ Error!</strong> Could not communicate with Sastrybalm server.`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" /></svg> Test Connection`;
+  }
+}
+</script>
+{% endblock %}

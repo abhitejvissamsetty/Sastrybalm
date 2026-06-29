@@ -1,0 +1,1512 @@
+{
+  "info": {
+    "_postman_id": "1e3e07f8-14f9-459b-ac73-67c49e872abd",
+    "name": "Mobile Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "2819739"
+  },
+  "item": [
+    {
+      "name": "ZAP Integration Testing",
+      "item": [
+        {
+          "name": "Fetch APIs",
+          "item": [
+            {
+              "name": "User Permission",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/User%20Permission?fields=[\"*\"]&filters=[[\"user\",\"=\",\"{{sample_user}}\"]]",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "User%20Permission"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    },
+                    {
+                      "key": "filters",
+                      "value": "[[\"POS Profile User\",\"user\",\"=\",\"{{sample_user}}\"],[\"company\",\"=\",\"{{zap_company}}\"]]",
+                      "disabled": true
+                    },
+                    {
+                      "key": "filters",
+                      "value": "[[\"user\",\"=\",\"{{sample_user}}\"]]"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "POS Profile with Child Table",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/POS%20Profile/{{variable_pos_profile}}",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "POS%20Profile",
+                    "{{variable_pos_profile}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "filters",
+                      "value": "[[\"Item Default\",\"company\",\"=\",\"Sravi Enterprises - Kolapakkam\"], [\"has_variants\",\"=\",0], [\"item_group\",\"=\",\"Products\"]]",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "- While \"POS Profile\" is the ultimate truth of \"Combination of Users\", \"Products to be Sold\", \"Pricelist to be applied\", \"Customer Groups\", \"How the Products, Discounts, Writeoffs, Stock, User role in organising all these\""
+              },
+              "response": []
+            },
+            {
+              "name": "Product with Child Table",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/Item/SASB-1.7%20ML",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Item",
+                    "SASB-1.7%20ML"
+                  ],
+                  "query": [
+                    {
+                      "key": "filters",
+                      "value": "[[\"Item Default\",\"company\",\"=\",\"Sravi Enterprises - Kolapakkam\"], [\"has_variants\",\"=\",0], [\"item_group\",\"=\",\"Products\"]]",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Employee with Email Filter",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/Employee?filters=[[\"user_id\",\"=\",\"{{sample_user}}\"]]&fields=[\"name\"]",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Employee"
+                  ],
+                  "query": [
+                    {
+                      "key": "filters",
+                      "value": "[[\"user_id\",\"=\",\"{{sample_user}}\"]]"
+                    },
+                    {
+                      "key": "fields",
+                      "value": "[\"name\"]"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Logged in User",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/method/frappe.auth.get_logged_user",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "method",
+                    "frappe.auth.get_logged_user"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Company Doc",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/Company?fields=[\"*\"]",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Company"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    }
+                  ]
+                },
+                "description": "- There are <u>insufficient previliges</u> for even the  \n    \"System Manager\" to read \"Company\" Doc"
+              },
+              "response": []
+            },
+            {
+              "name": "Customer Group",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/Customer%20Group/{{variable_customer_group}}",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Customer%20Group",
+                    "{{variable_customer_group}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "- This is used to get \"Credit Limits\" on each \"Customer Group\" seen in \"POS Profile\""
+              },
+              "response": []
+            },
+            {
+              "name": "Cost Center",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/Cost%20Center/{{variable_cost_center}}",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Cost%20Center",
+                    "{{variable_cost_center}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "- This is used to get \"Credit Limits\" on each \"Customer Group\" seen in \"POS Profile\""
+              },
+              "response": []
+            },
+            {
+              "name": "Mode of Payment",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/Mode%20of%20Payment/{{variable_mode_of_payment}}",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Mode%20of%20Payment",
+                    "{{variable_mode_of_payment}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "- After reading \"POS Profile\", we need to map proper backend \"Chart of Accounts\" to record the Payments to. We have \"Company\" wise \"Account\" mapping"
+              },
+              "response": []
+            },
+            {
+              "name": "Project",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/Project/{{variable_project_id}}",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Project",
+                    "{{variable_project_id}}"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "- After reading \"POS Profile\", we need to map proper backend \"Chart of Accounts\" to record the Payments to. We have \"Company\" wise \"Account\" mapping"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Metadata APIs",
+          "item": [
+            {
+              "name": "Sales Invoice Meta",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/v2/doctype/Sales%20Invoice/meta",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v2",
+                    "doctype",
+                    "Sales%20Invoice",
+                    "meta"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Customer Meta",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/v2/doctype/Customer/meta",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v2",
+                    "doctype",
+                    "Customer",
+                    "meta"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Expense Claim Meta",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/v2/doctype/Expense%20Claim/meta",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v2",
+                    "doctype",
+                    "Expense%20Claim",
+                    "meta"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Payment Entry Meta",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/v2/doctype/Payment%20Entry/meta",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v2",
+                    "doctype",
+                    "Payment%20Entry",
+                    "meta"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Timesheet Meta",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/v2/doctype/Timesheet/meta",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v2",
+                    "doctype",
+                    "Timesheet",
+                    "meta"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Fetch List APIs",
+          "item": [
+            {
+              "name": "User",
+              "item": [
+                {
+                  "name": "POS Profile List",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                        "type": "text",
+                        "disabled": true
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{zap_backend_url}}/api/resource/POS%20Profile?fields=[\"*\"]&filters=[[\"POS Profile User\",\"user\",\"=\",\"{{sample_user}}\"],[\"company\",\"=\",\"{{zap_company}}\"]]",
+                      "host": [
+                        "{{zap_backend_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "resource",
+                        "POS%20Profile"
+                      ],
+                      "query": [
+                        {
+                          "key": "fields",
+                          "value": "[\"*\"]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "",
+                          "type": "text",
+                          "disabled": true
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"POS Profile User\",\"user\",\"=\",\"{{sample_user}}\"],[\"company\",\"=\",\"{{zap_company}}\"]]"
+                        }
+                      ]
+                    },
+                    "description": "- While \"POS Profile\" is the ultimate truth of \"Combination of Users\", \"Products to be Sold\", \"Pricelist to be applied\", \"Customer Groups\", \"How the Products, Discounts, Writeoffs, Stock, User role in organising all these\""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Project List",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                        "type": "text",
+                        "disabled": true
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{zap_backend_url}}/api/resource/Project?fields=[\"*\"]&filters=[[\"Project User\",\"user\",\"=\",\"{{sample_user}}\"]]",
+                      "host": [
+                        "{{zap_backend_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "resource",
+                        "Project"
+                      ],
+                      "query": [
+                        {
+                          "key": "fields",
+                          "value": "[\"*\"]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"Project User\",\"user\",\"=\",\"{{sample_user}}\"]]"
+                        }
+                      ]
+                    },
+                    "description": "- After reading \"POS Profile\", we need to map proper backend \"Chart of Accounts\" to record the Payments to. We have \"Company\" wise \"Account\" mapping"
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Timesheet List",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{zap_backend_url}}/api/resource/Timesheet?fields=[\"*\"]&filters=[[\"employee\",\"=\",\"{{variable_employee_id}}\"],[\"start_date\",\"between\",[\"2026-04-01\",\"2026-04-30\"]]]",
+                      "host": [
+                        "{{zap_backend_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "resource",
+                        "Timesheet"
+                      ],
+                      "query": [
+                        {
+                          "key": "fields",
+                          "value": "[\"*\"]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"employee\",\"=\",\"{{variable_employee_id}}\"],[\"start_date\",\"between\",[\"2026-04-01\",\"2026-04-30\"]]]"
+                        }
+                      ]
+                    },
+                    "description": "This is a request to list the Timesheets of an Employee between a Time Frame usually \"This Month\""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Approved Timesheet List",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{zap_backend_url}}/api/resource/Timesheet?fields=[\"*\"]&filters=[[\"employee\",\"=\",\"{{variable_employee_id}}\"],[\"start_date\",\"between\",[\"2026-04-01\",\"2026-04-30\"]],[\"workflow_state\",\"=\",\"Approved\"]]",
+                      "host": [
+                        "{{zap_backend_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "resource",
+                        "Timesheet"
+                      ],
+                      "query": [
+                        {
+                          "key": "fields",
+                          "value": "[\"*\"]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"employee\",\"=\",\"{{variable_employee_id}}\"],[\"start_date\",\"between\",[\"2026-04-01\",\"2026-04-30\"]],[\"workflow_state\",\"=\",\"Approved\"]]"
+                        }
+                      ]
+                    },
+                    "description": "This is a request to list the Timesheets of an Employee between a Time Frame usually \"This Month\""
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Expense List",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{zap_backend_url}}/api/resource/Expense%20Claim?fields=[\"*\"]&filters=[[\"employee\",\"=\",\"{{variable_employee_id}}\"],[\"Expense Claim Detail\",\"expense_date\",\"between\",[\"2026-04-01\",\"2026-04-30\"]]]",
+                      "host": [
+                        "{{zap_backend_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "resource",
+                        "Expense%20Claim"
+                      ],
+                      "query": [
+                        {
+                          "key": "fields",
+                          "value": "[\"*\"]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"employee\",\"=\",\"{{variable_employee_id}}\"],[\"Expense Claim Detail\",\"expense_date\",\"between\",[\"2026-04-01\",\"2026-04-30\"]]]"
+                        }
+                      ]
+                    },
+                    "description": "This is a request to list the Expenses of an Employee between a Time Frame usually \"This Month\"\n\n- Exapense Claims `approval_status` can be in any of \\[\"Draft\",\"Approved\",\"Rejected\",\"Cancelled\"\\]"
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Paid Expense List",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{zap_backend_url}}/api/resource/Expense%20Claim?fields=[\"*\"]&filters=[[\"employee\",\"=\",\"{{variable_employee_id}}\"],[\"Expense Claim Detail\",\"expense_date\",\"between\",[\"2026-04-01\",\"2026-04-30\"]],[\"approval_status\",\"=\",\"Approved\"],[\"status\",\"=\",\"Paid\"]]",
+                      "host": [
+                        "{{zap_backend_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "resource",
+                        "Expense%20Claim"
+                      ],
+                      "query": [
+                        {
+                          "key": "fields",
+                          "value": "[\"*\"]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"employee\",\"=\",\"{{variable_employee_id}}\"],[\"Expense Claim Detail\",\"expense_date\",\"between\",[\"2026-04-01\",\"2026-04-30\"]],[\"approval_status\",\"=\",\"Approved\"],[\"status\",\"=\",\"Paid\"]]"
+                        }
+                      ]
+                    },
+                    "description": "This is a request to list the Expenses of an Employee between a Time Frame usually \"This Month\"\n\n- Exapense Claims `approval_status` can be in any of \\[\"Draft\",\"Approved\",\"Rejected\",\"Cancelled\"\\]"
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Sales Invoice List",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{zap_backend_url}}/api/resource/Sales%20Invoice?fields=[\"*\"]&filters=[[\"custom_sales_person\",\"=\",\"{{sample_user}}\"],[\"posting_date\",\"=\",\"2026-05-07\"]]",
+                      "host": [
+                        "{{zap_backend_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "resource",
+                        "Sales%20Invoice"
+                      ],
+                      "query": [
+                        {
+                          "key": "fields",
+                          "value": "[\"*\"]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"custom_sales_person\",\"=\",\"{{sample_user}}\"],[\"posting_date\",\"=\",\"2026-05-07\"]]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"posting_date\",\"=\",\"2026-05-07\"]]",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "This is a request to list the Expenses of an Employee between a Time Frame usually \"This Month\"\n\n- Exapense Claims `approval_status` can be in any of \\[\"Draft\",\"Approved\",\"Rejected\",\"Cancelled\"\\]"
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Paid Sales Invoice List",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{zap_backend_url}}/api/resource/Sales%20Invoice?fields=[\"*\"]&filters=[[\"custom_sales_person\",\"=\",\"{{sample_user}}\"],[\"posting_date\",\"=\",\"2026-05-07\"],[\"status\",\"=\",\"Paid\"]]",
+                      "host": [
+                        "{{zap_backend_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "resource",
+                        "Sales%20Invoice"
+                      ],
+                      "query": [
+                        {
+                          "key": "fields",
+                          "value": "[\"*\"]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"custom_sales_person\",\"=\",\"{{sample_user}}\"],[\"posting_date\",\"=\",\"2026-05-07\"],[\"status\",\"=\",\"Paid\"]]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"posting_date\",\"=\",\"2026-05-07\"],[\"status\",\"=\",\"Paid\"]]",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "This is a request to list the Expenses of an Employee between a Time Frame usually \"This Month\"\n\n- Exapense Claims `approval_status` can be in any of \\[\"Draft\",\"Approved\",\"Rejected\",\"Cancelled\"\\]"
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Payment Entry List",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{zap_backend_url}}/api/resource/Payment%20Entry?fields=[\"*\"]&filters=[[\"custom_collection_agent\",\"=\",\"{{sample_user}}\"],[\"posting_date\",\"=\",\"2026-05-07\"]]",
+                      "host": [
+                        "{{zap_backend_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "resource",
+                        "Payment%20Entry"
+                      ],
+                      "query": [
+                        {
+                          "key": "fields",
+                          "value": "[\"*\"]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"custom_collection_agent\",\"=\",\"{{sample_user}}\"],[\"posting_date\",\"=\",\"2026-05-07\"]]"
+                        },
+                        {
+                          "key": "filters",
+                          "value": "[[\"posting_date\",\"=\",\"2026-05-07\"]]",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "This is a request to list the Expenses of an Employee between a Time Frame usually \"This Month\"\n\n- Exapense Claims `approval_status` can be in any of \\[\"Draft\",\"Approved\",\"Rejected\",\"Cancelled\"\\]"
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "Customer List",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/Customer?fields=[\"*\"]&filters=[[\"customer_group\",\"=\",\"{{variable_customer_group}}\"],[\"custom_beat_id_1\",\"=\",\"{{variable_customer_id}}\"]]",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Customer"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    },
+                    {
+                      "key": "filters",
+                      "value": "[[\"customer_group\",\"=\",\"{{variable_customer_group}}\"],[\"custom_beat_id_1\",\"=\",\"{{variable_customer_id}}\"]]"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Products List",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+                    "type": "text",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{zap_backend_url}}/api/resource/Item?fields=[\"*\"]&filters=[[\"Item Default\",\"company\",\"=\",\"{{zap_company}}\"], [\"has_variants\",\"=\",0], [\"item_group\",\"=\",\"Products\"]]",
+                  "host": [
+                    "{{zap_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Item"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    },
+                    {
+                      "key": "filters",
+                      "value": "[[\"Item Default\",\"company\",\"=\",\"{{zap_company}}\"], [\"has_variants\",\"=\",0], [\"item_group\",\"=\",\"Products\"]]"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Create and Update APIs",
+          "item": []
+        }
+      ],
+      "auth": {
+        "type": "apikey",
+        "apikey": [
+          {
+            "key": "value",
+            "value": "token {{zap_api_key}}:{{zap_api_secret}}",
+            "type": "string"
+          },
+          {
+            "key": "key",
+            "value": "Authorization",
+            "type": "string"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {},
+            "exec": [
+              ""
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {},
+            "exec": [
+              ""
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "CMMS Integration Testing",
+      "item": [
+        {
+          "name": "Fetch APIs",
+          "item": [
+            {
+              "name": "Asset Products List",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/resource/Item?fields=[\"*\"]&filters=[[\"Item Default\",\"company\",\"=\",\"{{cmms_company}}\"], [\"is_fixed_asset\",\"=\",1]]",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Item"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    },
+                    {
+                      "key": "filters",
+                      "value": "[[\"Item Default\",\"company\",\"=\",\"{{cmms_company}}\"], [\"is_fixed_asset\",\"=\",1]]"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Normal Products List",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/resource/Item?fields=[\"*\"]&filters=[[\"Item Default\",\"company\",\"=\",\"{{cmms_company}}\"], [\"is_stock_item\",\"=\",1]]",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Item"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    },
+                    {
+                      "key": "filters",
+                      "value": "[[\"Item Default\",\"company\",\"=\",\"{{cmms_company}}\"], [\"is_stock_item\",\"=\",1]]"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Logged in User",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/method/frappe.auth.get_logged_user",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "method",
+                    "frappe.auth.get_logged_user"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Company Doc",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/resource/Company?fields=[\"*\"]",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Company"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    }
+                  ]
+                },
+                "description": "- There are <u>insufficient previliges</u> for even the  \n    \"System Manager\" to read \"Company\" Doc"
+              },
+              "response": []
+            },
+            {
+              "name": "Locations List",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/resource/Location?fields=[\"*\"]&filters=[[\"custom_beat_id\",\"=\",\"sample-beat-id\"]]",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Location"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    },
+                    {
+                      "key": "filters",
+                      "value": "[[\"custom_beat_id\",\"=\",\"sample-beat-id\"]]"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Material Request List",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/resource/Material Request?fields=[\"*\"]&filters=[[\"name\",\"IN\",[\"MAT-MR-2026-00001\"]]]",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Material Request"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    },
+                    {
+                      "key": "filters",
+                      "value": "[[\"name\",\"IN\",[\"MAT-MR-2026-00001\"]]]"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "User Permission List",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/resource/User Permission?fields=[\"*\"]&filters=[[\"user\",\"=\",\"gandjcdisplaysolutions@gmail.com\"],[\"allow\", \"IN\", [\"Supplier\", \"Warehouse\"]]]",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "User Permission"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    },
+                    {
+                      "key": "filters",
+                      "value": "[[\"user\",\"=\",\"gandjcdisplaysolutions@gmail.com\"],[\"allow\", \"IN\", [\"Supplier\", \"Warehouse\"]]]"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "RFQ List",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token 7f09bc9d6a5567e:5f83b86201ec2bb"
+                  },
+                  {
+                    "key": "Cookie",
+                    "value": "full_name=Guest; sid=Guest; system_user=no; user_id=Guest; user_lang=en",
+                    "disabled": true
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "type": "text",
+                      "key": "fields",
+                      "value": "[\"*\"]",
+                      "disabled": true
+                    },
+                    {
+                      "type": "text",
+                      "key": "filters",
+                      "value": "[[\"Request for Quotation Supplier\", \"supplier\", \"=\", \"G %26 JC Display Solutions %2D Chennai\"], [\"custom_recce_status\", \"=\", \"Not Recced\"]]",
+                      "disabled": true
+                    },
+                    {
+                      "type": "text",
+                      "key": " JC Display Solutions - Chennai\"], [\"custom_recce_status\", \"",
+                      "value": "\", \"Not Recced\"]]",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/resource/Request for Quotation?fields=[\"*\"]&filters=[[\"Request for Quotation Supplier\", \"supplier\", \"=\", \"{{cmms_variable_supplier}}\"], [\"custom_recce_status\", \"=\", \"Validated\"]]",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Request for Quotation"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    },
+                    {
+                      "key": "filters",
+                      "value": "[[\"Request for Quotation Supplier\", \"supplier\", \"=\", \"{{cmms_variable_supplier}}\"], [\"custom_recce_status\", \"=\", \"Validated\"]]"
+                    }
+                  ]
+                },
+                "description": "Generated from cURL: curl --location --request GET 'cmms.staging.sravie.in/api/resource/Request for Quotation' \\\n\n--header 'Authorization: token 7f09bc9d6a5567e:5f83b86201ec2bb' \\\n\n--header 'Cookie: full_name=Guest; sid=Guest; system_user=no; user_id=Guest; user_lang=en' \\\n\n--data-urlencode 'fields=[\"*\"]' \\\n\n--data-urlencode 'filters=[[\"Request for Quotation Supplier\", \"supplier\", \"=\", \"G & JC Display Solutions - Chennai\"], [\"custom_recce_status\", \"=\", \"Not Recced\"]]'"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Metadata APIs",
+          "item": [
+            {
+              "name": "Location Doctype",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/v2/doctype/Location/meta",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v2",
+                    "doctype",
+                    "Location",
+                    "meta"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "RFQ Doctype",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/v2/doctype/Request for Quotation/meta",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v2",
+                    "doctype",
+                    "Request for Quotation",
+                    "meta"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Create APIs",
+          "item": [
+            {
+              "name": "Location Doc",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/resource/Location",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Location"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Supplier Doc",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{cmms_api_key}}:{{cmms_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cmms_backend_url}}/api/resource/Location",
+                  "host": [
+                    "{{cmms_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Location"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Connect Integration Testing",
+      "item": [
+        {
+          "name": "Fetch APIs",
+          "item": [
+            {
+              "name": "Logged in User",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{connect_api_key}}:{{connect_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{connect_backend_url}}/api/method/frappe.auth.get_logged_user",
+                  "host": [
+                    "{{connect_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "method",
+                    "frappe.auth.get_logged_user"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Company Doc",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "token {{connect_api_key}}:{{connect_api_secret}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{connect_backend_url}}/api/resource/Company?fields=[\"*\"]",
+                  "host": [
+                    "{{connect_backend_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "resource",
+                    "Company"
+                  ],
+                  "query": [
+                    {
+                      "key": "fields",
+                      "value": "[\"*\"]"
+                    }
+                  ]
+                },
+                "description": "- There are <u>insufficient previliges</u> for even the  \n    \"System Manager\" to read \"Company\" Doc"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Create APIs",
+          "item": []
+        },
+        {
+          "name": "Metadata APIs",
+          "item": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "zap_api_key",
+      "value": ""
+    },
+    {
+      "key": "zap_api_secret",
+      "value": ""
+    },
+    {
+      "key": "zap_company",
+      "value": ""
+    },
+    {
+      "key": "zap_backend_url",
+      "value": ""
+    },
+    {
+      "key": "sample_user",
+      "value": ""
+    },
+    {
+      "key": "variable_customer_group",
+      "value": ""
+    },
+    {
+      "key": "variable_customer_id",
+      "value": ""
+    },
+    {
+      "key": "variable_pos_profile",
+      "value": ""
+    },
+    {
+      "key": "variable_cost_center",
+      "value": ""
+    },
+    {
+      "key": "variable_mode_of_payment",
+      "value": ""
+    },
+    {
+      "key": "variable_project_id",
+      "value": ""
+    },
+    {
+      "key": "variable_employee_id",
+      "value": ""
+    },
+    {
+      "key": "cmms_api_key",
+      "value": ""
+    },
+    {
+      "key": "cmms_api_secret",
+      "value": ""
+    },
+    {
+      "key": "cmms_company",
+      "value": ""
+    },
+    {
+      "key": "cmms_backend_url",
+      "value": ""
+    },
+    {
+      "key": "cmms_variable_supplier",
+      "value": ""
+    },
+    {
+      "key": "connect_api_key",
+      "value": ""
+    },
+    {
+      "key": "connect_api_secret",
+      "value": ""
+    },
+    {
+      "key": "connect_company",
+      "value": ""
+    },
+    {
+      "key": "connect_backend_url",
+      "value": ""
+    }
+  ]
+}

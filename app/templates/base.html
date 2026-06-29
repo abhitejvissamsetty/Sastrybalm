@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{% endblock %}{% if self.title() %} — {% endif %}Sastrybalm SFA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3, .font-display {
+      font-family: 'Outfit', sans-serif;
+    }
+    .glass {
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .premium-btn {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .premium-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
+      transform: translateX(-100%);
+      transition: transform 0.5s;
+    }
+    .premium-btn:hover::after {
+      transform: translateX(100%);
+    }
+    .premium-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+    .premium-btn:active {
+      transform: translateY(0);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #020617;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    .table-container {
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 1rem;
+      overflow: hidden;
+    }
+    .table-row-hover:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="h-full bg-slate-950 text-slate-200">
+
+<div class="flex h-full overflow-hidden">
+
+  <!-- Mobile sidebar overlay -->
+  <div id="mobile-sidebar" class="relative z-50 lg:hidden hidden" role="dialog" aria-modal="true">
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"></div>
+    <div class="fixed inset-0 flex">
+      <div class="relative mr-16 flex w-full max-w-xs flex-1">
+        <div class="absolute left-full top-0 flex w-16 justify-center pt-5">
+          <button id="close-sidebar" type="button" class="-m-2.5 p-2.5">
+            <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        {% include "shared/sidebar.html" %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop sidebar (fixed) -->
+  <div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col border-r border-white/5">
+    {% include "shared/sidebar.html" %}
+  </div>
+
+  <!-- Main area -->
+  <div class="lg:pl-64 flex flex-col flex-1 min-h-0 overflow-hidden">
+
+    <!-- Top bar (Glassmorphism) -->
+    <div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 glass px-4 sm:gap-x-6 sm:px-6 lg:px-8 border-b border-white/5">
+      <!-- Mobile menu button -->
+      <button id="open-sidebar" type="button" class="-m-2.5 p-2.5 text-slate-400 hover:text-white lg:hidden">
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+      </button>
+      <div class="h-6 w-px bg-white/10 lg:hidden"></div>
+
+      <div class="flex flex-1 items-center gap-x-4 self-stretch">
+        <!-- Page title -->
+        <h1 class="text-sm font-semibold tracking-tight text-white flex-1 uppercase">
+          {% block page_title %}{% endblock %}
+        </h1>
+        <!-- Top-right actions slot -->
+        <div class="flex items-center gap-x-3">
+          {% block top_actions %}{% endblock %}
+          <!-- Notification bell -->
+          <a href="/analytics/alerts" class="relative p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/5 transition-all inline-flex items-center justify-center border border-transparent hover:border-white/10">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+            </svg>
+            <span id="alert-badge"
+                  class="hidden absolute top-1.5 right-1.5 h-4 w-4 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center leading-none border-2 border-slate-900">
+            </span>
+          </a>
+          <!-- User avatar badge (top bar) -->
+          <div class="flex items-center gap-x-3 pl-4 border-l border-white/10">
+            <div class="flex flex-col items-end hidden sm:flex">
+              <span class="text-xs font-semibold text-white leading-none">{{ current_user.full_name }}</span>
+              <span class="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-bold">{{ current_user.role.value }}</span>
+            </div>
+            <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500 p-0.5 flex-shrink-0">
+               <div class="h-full w-full rounded-[10px] bg-slate-900 flex items-center justify-center">
+                 <span class="text-white text-xs font-bold">{{ current_user.full_name[0].upper() }}</span>
+               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flash messages -->
+    {% set f_error = flash_error or (request.session.pop('_flash_error', None) if (request.session is defined and request.session) else None) %}
+    {% if f_error %}
+    <div class="px-4 sm:px-6 lg:px-8 pt-6">
+      <div class="rounded-xl bg-red-500/10 border border-red-500/20 p-4 flex items-start gap-x-3 backdrop-blur-md">
+        <svg class="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z" clip-rule="evenodd"/>
+        </svg>
+        <p class="text-sm text-red-200 font-medium">{{ f_error }}</p>
+      </div>
+    </div>
+    {% endif %}
+    {% set f_success = flash_success or (request.session.pop('_flash_success', None) if (request.session is defined and request.session) else None) %}
+    {% if f_success %}
+    <div class="px-4 sm:px-6 lg:px-8 pt-6">
+      <div class="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4 flex items-start gap-x-3 backdrop-blur-md">
+        <svg class="h-5 w-5 text-emerald-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/>
+        </svg>
+        <p class="text-sm text-emerald-200 font-medium">{{ f_success }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Page content -->
+    <main class="flex-1 overflow-y-auto py-8 px-4 sm:px-6 lg:px-8 bg-slate-950">
+      <div class="max-w-7xl mx-auto">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script>
+  const openBtn = document.getElementById('open-sidebar');
+  const closeBtn = document.getElementById('close-sidebar');
+  const mobileSidebar = document.getElementById('mobile-sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+
+  openBtn?.addEventListener('click', () => mobileSidebar.classList.remove('hidden'));
+  closeBtn?.addEventListener('click', () => mobileSidebar.classList.add('hidden'));
+  backdrop?.addEventListener('click', () => mobileSidebar.classList.add('hidden'));
+
+  // Live unread alert badge
+  (async function() {
+    try {
+      const res = await fetch('/analytics/alerts/unread-count');
+      if (!res.ok) return;
+      const { count } = await res.json();
+      const badge = document.getElementById('alert-badge');
+      if (badge && count > 0) {
+        badge.textContent = count > 9 ? '9+' : count;
+        badge.classList.remove('hidden');
+      }
+    } catch (_) {}
+  })();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

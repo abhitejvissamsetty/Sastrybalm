@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if item else 'New' }} User{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/users" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">{{ 'Edit User' if item else 'New User' }}</h1>
+      <p class="mt-1 text-sm text-slate-400">{{ item.full_name if item else 'Create a new user account' }}</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" class="space-y-6">
+
+    <!-- Identity -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Identity</h2>
+
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Full Name <span class="text-red-400">*</span></label>
+          <input type="text" name="full_name" required value="{{ item.full_name if item else '' }}"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Email <span class="text-red-400">*</span></label>
+          <input type="email" name="email" required value="{{ item.email if item else '' }}"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+      </div>
+
+      {% if not item %}
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Username <span class="text-red-400">*</span></label>
+          <input type="text" name="username" required
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Password <span class="text-red-400">*</span></label>
+          <input type="password" name="password" required
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+      </div>
+      {% else %}
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">New Password <span class="text-slate-500 font-normal">(leave blank to keep current)</span></label>
+        <input type="password" name="new_password"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="••••••••">
+      </div>
+      {% endif %}
+
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Employee ID</label>
+          <input type="text" name="employee_id" value="{{ item.employee_id if item and item.employee_id else '' }}"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Phone <span class="text-red-400">*</span></label>
+          <input type="text" name="phone" required value="{{ item.phone if item and item.phone else '' }}"
+                 pattern="[0-9]{10}" maxlength="10" placeholder="e.g. 9876543210" title="Phone number must be exactly 10 digits"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+      </div>
+    </div>
+
+    <!-- Role & Assignment -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Role &amp; Assignment</h2>
+
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Role <span class="text-red-400">*</span></label>
+          <select name="role" required
+                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            {% for r in UserRole %}
+            <option value="{{ r.value }}" {% if item and item.role == r %}selected{% elif not item and r.value == 'field_rep' %}selected{% endif %}>
+              {{ r.value.replace('_', ' ').title() }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Company Profile <span class="text-red-400" id="company-profile-asterisk">*</span></label>
+          <select name="company_profile_id" id="company-profile-id"
+                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="" data-tags="">None</option>
+            {% for c in companies %}
+            <option value="{{ c.id }}" data-tags="{{ c.get_tags()|join(',') }}" {% if item and item.company_profile_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Positions (Multiple allowed)</label>
+          <select name="position_ids" multiple size="4"
+                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            {% set user_pos_ids = item.positions|map(attribute='id')|list if item else [] %}
+            {% for p in positions %}
+            <option value="{{ p.id }}" {% if p.id in user_pos_ids %}selected{% endif %}>{{ p.name }} ({{ p.code }})</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      {% if item %}
+      <div class="flex items-center gap-x-3">
+        <input type="checkbox" name="is_active" id="is_active" value="on" {% if item.is_active %}checked{% endif %}
+               class="h-4 w-4 rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+        <label for="is_active" class="text-sm font-medium text-slate-300">Active</label>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Module Access -->
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-4">
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Module Access</h2>
+      <p class="text-xs text-slate-500">Select which modules this user can access on the mobile app.</p>
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {% set active_mods = item.active_modules() if item else [] %}
+        {% for mod in ModuleName %}
+        <label class="flex items-center gap-x-2.5 cursor-pointer module-checkbox-wrapper" data-module="{{ mod.value }}">
+          <input type="checkbox" name="modules" value="{{ mod.value }}"
+                 {% if mod.value in active_mods %}checked{% endif %}
+                 class="h-4 w-4 rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+          <span class="text-sm text-slate-300">{{ mod.value.replace('_', ' ').title() }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-x-3">
+      <a href="/users" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+      <button type="submit"
+              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        {{ 'Save Changes' if item else 'Create User' }}
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const companySelect = document.getElementById('company-profile-id');
+  const roleSelect = document.getElementsByName('role')[0];
+  const companyAsterisk = document.getElementById('company-profile-asterisk');
+  const moduleWrappers = document.querySelectorAll('.module-checkbox-wrapper');
+
+  function updateFormState() {
+    const selectedRole = roleSelect.value;
+    const selectedOpt = companySelect.options[companySelect.selectedIndex];
+    
+    // Toggle company profile asterisk
+    if (selectedRole === 'admin') {
+      companyAsterisk.classList.add('hidden');
+      companySelect.required = false;
+    } else {
+      companyAsterisk.classList.remove('hidden');
+      companySelect.required = true;
+    }
+
+    // Get tags of selected company
+    let tags = [];
+    if (selectedOpt && selectedOpt.getAttribute('data-tags')) {
+      const dataTagsAttr = selectedOpt.getAttribute('data-tags').trim();
+      tags = dataTagsAttr ? dataTagsAttr.split(',') : [];
+    }
+
+    // Filter modules
+    moduleWrappers.forEach(wrapper => {
+      const mod = wrapper.getAttribute('data-module');
+      let visible = false;
+      if (tags.includes('ZAP-READY') && ['invoicing', 'payments', 'timesheets'].includes(mod)) {
+        visible = true;
+      }
+      if (tags.includes('CMMS-READY') && ['cmms_retail', 'cmms_vendor'].includes(mod)) {
+        visible = true;
+      }
+      if (tags.includes('CONNECT-READY') && ['connect'].includes(mod)) {
+        visible = true;
+      }
+      
+      // If role is admin, show all modules regardless of tags
+      if (selectedRole === 'admin') {
+        visible = true;
+      }
+
+      if (visible) {
+        wrapper.classList.remove('hidden');
+      } else {
+        wrapper.classList.add('hidden');
+        // Uncheck if hidden
+        const checkbox = wrapper.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = false;
+      }
+    });
+  }
+
+  companySelect.addEventListener('change', updateFormState);
+  roleSelect.addEventListener('change', updateFormState);
+  updateFormState();
+});
+</script>
+{% endblock %}

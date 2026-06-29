@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if item else 'New' }} Position{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/positions" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">{{ 'Edit Position' if item else 'New Position' }}</h1>
+      <p class="mt-1 text-sm text-slate-400">{{ item.name if item else 'Define a role in the sales hierarchy' }}</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" class="space-y-5 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Name <span class="text-red-400">*</span></label>
+        <input type="text" name="name" required value="{{ item.name if item else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Code <span class="text-red-400">*</span></label>
+        <input type="text" name="code" required value="{{ item.code if item else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="e.g. ASM, RSM, ZSM">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Level <span class="text-red-400">*</span></label>
+        <select name="level" id="position-level" required
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">Select level…</option>
+          {% for lv in PositionLevel %}
+          <option value="{{ lv.value }}" {% if item and item.level == lv %}selected{% endif %}>{{ lv.value }} (Level {{ lv.value[1] }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Reports To <span class="text-red-400" id="reports-to-asterisk">*</span></label>
+        <select name="reporting_to_id" id="position-reports-to"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">None (top-level)</option>
+          {% for m in managers %}
+          <option value="{{ m.id }}" data-level="{{ m.level.value }}" {% if item and item.reporting_to_id == m.id %}selected{% endif %}>{{ m.name }} ({{ m.code }}) [{{ m.level.value }}]</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    
+
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Attached Employee</label>
+      <select name="attached_user_id"
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">None (Vacant)</option>
+        {% set attached_user_ids = item.users|map(attribute='id')|list if item else [] %}
+        {% for u in users %}
+        <option value="{{ u.id }}" {% if u.id in attached_user_ids %}selected{% endif %}>{{ u.full_name }} ({{ u.username }}) [{{ u.role.value }}]</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="flex items-center justify-end gap-x-3 pt-2 border-t border-slate-700">
+      <a href="/positions" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+      <button type="submit"
+              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        {{ 'Save Changes' if item else 'Create Position' }}
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const levelSelect = document.getElementById('position-level');
+  const reportsToSelect = document.getElementById('position-reports-to');
+  const reportsToAsterisk = document.getElementById('reports-to-asterisk');
+  // Clone all options before any DOM manipulation
+  const allReportsToOptions = Array.from(reportsToSelect.options).map(o => o.cloneNode(true));
+
+  function filterReportsTo() {
+    const selectedLevel = levelSelect.value;
+    const currentVal = reportsToSelect.value;
+
+    // Rebuild dropdown from original clones
+    reportsToSelect.innerHTML = '';
+
+    if (!selectedLevel) {
+      reportsToSelect.appendChild(allReportsToOptions[0].cloneNode(true));
+      reportsToSelect.disabled = true;
+      reportsToSelect.required = false;
+      reportsToAsterisk.classList.add('hidden');
+      return;
+    }
+
+    if (selectedLevel === 'L4') {
+      // L4 is top-level, reports to is disabled/not required
+      reportsToSelect.appendChild(allReportsToOptions[0].cloneNode(true));
+      reportsToSelect.disabled = true;
+      reportsToSelect.value = '';
+      reportsToSelect.required = false;
+      reportsToAsterisk.classList.add('hidden');
+    } else {
+      reportsToSelect.disabled = false;
+      reportsToAsterisk.classList.remove('hidden');
+      reportsToSelect.required = true;
+
+      // L3 → L4, L2 → L3, L1 → L2
+      const targetLevel = selectedLevel === 'L3' ? 'L4' : (selectedLevel === 'L2' ? 'L3' : (selectedLevel === 'L1' ? 'L2' : ''));
+
+      reportsToSelect.appendChild(allReportsToOptions[0].cloneNode(true));
+      allReportsToOptions.slice(1).forEach(opt => {
+        if (opt.getAttribute('data-level') === targetLevel) {
+          reportsToSelect.appendChild(opt.cloneNode(true));
+        }
+      });
+      if (currentVal) reportsToSelect.value = currentVal;
+    }
+  }
+
+  levelSelect.addEventListener('change', filterReportsTo);
+  // Always run on page load
+  filterReportsTo();
+});
+</script>
+{% endblock %}

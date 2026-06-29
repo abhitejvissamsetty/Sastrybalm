@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item.mr_number }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/material-requests" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div class="flex-1 min-w-0">
+      <div class="flex flex-wrap items-center gap-3">
+        <h1 class="text-2xl font-bold text-white font-mono">{{ item.mr_number }}</h1>
+        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ item.status_badge_cls() }}">
+          {{ item.status.value.replace('_',' ').title() }}
+        </span>
+        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ item.sync_badge_cls() }}">
+          Sync: {{ item.sync_status.value.replace('_',' ').title() }}
+        </span>
+      </div>
+      <p class="mt-1 text-sm text-slate-400">
+        {{ item.user.full_name if item.user else '—' }} &middot;
+        {{ item.outlet.name if item.outlet else '—' }}
+      </p>
+    </div>
+    <div class="flex items-center gap-x-2 flex-wrap">
+      {% if current_user.role.value in ['admin', 'territory_manager'] and item.status.value not in ['completed', 'cancelled'] %}
+      <form method="post" action="/material-requests/{{ item.id }}/status" class="flex items-center gap-x-2">
+        <select name="new_status"
+                class="rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          {% for s in MRStatus %}
+          <option value="{{ s.value }}" {% if item.status == s %}selected{% endif %}>
+            {{ s.value.replace('_',' ').title() }}
+          </option>
+          {% endfor %}
+        </select>
+        <button type="submit"
+                class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+          Update
+        </button>
+      </form>
+      {% endif %}
+
+      {% if current_user.role.value in ['admin', 'territory_manager'] and item.status.value in ['submitted', 'acknowledged'] %}
+      <form method="post" action="/material-requests/{{ item.id }}/sync-cmms" class="inline">
+        <button type="submit"
+                class="inline-flex items-center gap-x-1.5 rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-600 transition-colors"
+                title="Submit to CMMS">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+          </svg>
+          {% if item.sync_status.value == 'failed' %}Retry CMMS{% else %}Sync to CMMS{% endif %}
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Detail cards -->
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Field Rep</p>
+      <p class="mt-1 text-sm font-medium text-white">{{ item.user.full_name if item.user else '—' }}</p>
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Outlet</p>
+      <p class="mt-1 text-sm font-medium text-white">
+        <a href="/outlets/{{ item.outlet_id }}" class="hover:text-indigo-400 transition-colors">
+          {{ item.outlet.name if item.outlet else '—' }}
+        </a>
+      </p>
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Category</p>
+      <p class="mt-1 text-sm font-medium text-white">{{ item.category or '—' }}</p>
+    </div>
+  </div>
+
+  <!-- Description -->
+  <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
+    <p class="text-xs text-slate-500 uppercase tracking-wider mb-2">Description</p>
+    <p class="text-sm text-slate-300 whitespace-pre-wrap">{{ item.description }}</p>
+  </div>
+
+  <!-- Timestamps -->
+  <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Created</p>
+      <p class="mt-1 text-sm text-white">{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Submitted</p>
+      <p class="mt-1 text-sm text-white">
+        {{ item.submitted_at.strftime('%Y-%m-%d %H:%M') if item.submitted_at else '—' }}
+      </p>
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Last Updated</p>
+      <p class="mt-1 text-sm text-white">{{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+    </div>
+  </div>
+
+  <!-- CMMS Integration Status -->
+  <div class="rounded-xl border border-{% if item.sync_status.value == 'synced' %}emerald{% elif item.sync_status.value == 'failed' %}red{% else %}indigo{% endif %}-700/40 bg-{% if item.sync_status.value == 'synced' %}emerald{% elif item.sync_status.value == 'failed' %}red{% else %}indigo{% endif %}-900/10 p-5 space-y-3">
+    <div class="flex items-center justify-between">
+      <p class="text-xs text-{% if item.sync_status.value == 'synced' %}emerald{% elif item.sync_status.value == 'failed' %}red{% else %}indigo{% endif %}-400 uppercase tracking-wider font-semibold">CMMS Integration</p>
+      <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ item.sync_badge_cls() }}">
+        {{ item.sync_status.value.replace('_',' ').title() }}
+      </span>
+    </div>
+    {% if item.cmms_ref %}
+    <div>
+      <p class="text-xs text-slate-500 mb-0.5">Reference #</p>
+      <p class="text-sm font-mono text-white">{{ item.cmms_ref }}</p>
+    </div>
+    {% endif %}
+    {% if item.sync_error %}
+    <div>
+      <p class="text-xs text-red-400 mb-0.5">Last Error</p>
+      <p class="text-sm text-red-300 font-mono whitespace-pre-wrap">{{ item.sync_error }}</p>
+    </div>
+    {% endif %}
+    {% if item.sync_retries > 0 %}
+    <div>
+      <p class="text-xs text-slate-500 mb-0.5">Retry Count</p>
+      <p class="text-sm text-white">{{ item.sync_retries }}</p>
+    </div>
+    {% endif %}
+    {% if item.cmms_response %}
+    <div>
+      <p class="text-xs text-slate-500 mb-0.5">Response</p>
+      <p class="text-sm text-slate-300 whitespace-pre-wrap">{{ item.cmms_response }}</p>
+    </div>
+    {% endif %}
+    {% if not item.cmms_ref and item.sync_status.value == 'not_applicable' %}
+    <p class="text-sm text-slate-500 italic">Not yet synced to CMMS. Use the "Sync to CMMS" button above to submit.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

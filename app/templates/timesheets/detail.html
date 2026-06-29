@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Timesheet {{ item.work_date }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/timesheets" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">{{ item.work_date }}</h1>
+      <p class="mt-1 text-sm text-slate-400">{{ item.user.full_name if item.user else '—' }}</p>
+    </div>
+    {% if item.status.value == 'open' %}
+    <span class="inline-flex items-center rounded-full bg-amber-900/50 px-2.5 py-0.5 text-xs font-semibold text-amber-300">Open</span>
+    {% else %}
+    <span class="inline-flex items-center rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">Closed</span>
+    {% endif %}
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Check-in</p>
+      <p class="mt-1 text-lg font-bold text-white">{{ item.checkin_time.strftime('%H:%M') if item.checkin_time else '—' }}</p>
+      {% if item.checkin_address %}<p class="text-xs text-slate-500 mt-0.5 truncate">{{ item.checkin_address }}</p>{% endif %}
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Check-out</p>
+      <p class="mt-1 text-lg font-bold text-white">{{ item.checkout_time.strftime('%H:%M') if item.checkout_time else '—' }}</p>
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Hours</p>
+      <p class="mt-1 text-lg font-bold text-white">{{ item.hours_worked ~ 'h' if item.hours_worked else '—' }}</p>
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+      <p class="text-xs text-slate-500 uppercase tracking-wider">Visits</p>
+      <p class="mt-1 text-lg font-bold text-white">{{ item.visit_count }}</p>
+    </div>
+  </div>
+
+  <!-- Visit Records -->
+  {% if item.visits %}
+  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
+    <div class="px-5 py-4 border-b border-slate-700">
+      <h2 class="text-sm font-semibold text-slate-300">Visit Records</h2>
+    </div>
+    <table class="min-w-full divide-y divide-slate-700">
+      <thead>
+        <tr class="bg-slate-800">
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Time</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Outlet</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Purpose</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Distance</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Order</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700/50">
+        {% for v in item.visits %}
+        <tr class="hover:bg-slate-800/60">
+          <td class="px-4 py-3 text-sm text-slate-300">{{ v.visit_time.strftime('%H:%M') }}</td>
+          <td class="px-4 py-3 text-sm font-medium text-white">{{ v.outlet.name if v.outlet else '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-400 hidden sm:table-cell">{{ v.purpose or '—' }}</td>
+          <td class="px-4 py-3 text-sm hidden md:table-cell">
+            {% if v.distance_from_outlet is not none %}
+            <span class="{% if v.distance_from_outlet > 200 %}text-red-400{% else %}text-emerald-400{% endif %}">
+              {{ v.distance_from_outlet|int }}m
+            </span>
+            {% else %}
+            <span class="text-slate-600">—</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-sm hidden md:table-cell">
+            {% if v.order %}
+            <a href="/orders/{{ v.order.id }}" class="font-mono text-indigo-400 hover:text-indigo-300 text-xs">{{ v.order.order_number }}</a>
+            {% else %}
+            <span class="text-slate-600">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="rounded-xl border border-slate-700/50 border-dashed p-8 text-center">
+    <p class="text-sm text-slate-500">No visits recorded for this day.</p>
+  </div>
+  {% endif %}
+
+  {% if item.notes %}
+  <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+    <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Notes</p>
+    <p class="text-sm text-slate-300">{{ item.notes }}</p>
+  </div>
+  {% endif %}
+
+  {% if item.checkin_lat and item.checkin_lng %}
+  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
+    <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-slate-300">GPS Track</h2>
+      <span class="text-xs text-slate-500">Check-in
+        {% if item.checkout_lat and item.checkout_lng %}→ Check-out{% endif %}
+      </span>
+    </div>
+    <div id="ts-map" style="height:320px"></div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if item.checkin_lat and item.checkin_lng %}
+<script>
+(function() {
+  const checkinLat  = {{ item.checkin_lat }};
+  const checkinLng  = {{ item.checkin_lng }};
+  {% if item.checkout_lat and item.checkout_lng %}
+  const checkoutLat = {{ item.checkout_lat }};
+  const checkoutLng = {{ item.checkout_lng }};
+  const hasCheckout = true;
+  {% else %}
+  const hasCheckout = false;
+  {% endif %}
+
+  const map = L.map("ts-map", { zoomControl: true }).setView([checkinLat, checkinLng], 14);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors", maxZoom: 19,
+  }).addTo(map);
+
+  function pinIcon(color) {
+    return L.divIcon({
+      className: "",
+      html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2.5px solid rgba(255,255,255,0.9);box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>`,
+      iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -10],
+    });
+  }
+
+  L.marker([checkinLat, checkinLng], { icon: pinIcon("#6366f1") })
+    .bindPopup(`<b>Check-in</b><br>{{ item.checkin_time.strftime('%H:%M') if item.checkin_time else '' }}<br>{{ item.checkin_address or '' }}`)
+    .addTo(map);
+
+  {% for v in item.visits %}
+  {% if v.gps_lat and v.gps_lng %}
+  L.marker([{{ v.gps_lat }}, {{ v.gps_lng }}], {
+    icon: pinIcon({{ '"#10b981"' if v.distance_from_outlet is none or v.distance_from_outlet <= 200 else '"#ef4444"' }})
+  }).bindPopup(`<b>Visit</b> — {{ v.outlet.name if v.outlet else '—' }}<br>{{ v.visit_time.strftime('%H:%M') }}<br>{{ v.purpose or '' }}`).addTo(map);
+  {% endif %}
+  {% endfor %}
+
+  if (hasCheckout) {
+    L.marker([checkoutLat, checkoutLng], { icon: pinIcon("#f59e0b") })
+      .bindPopup(`<b>Check-out</b><br>{{ item.checkout_time.strftime('%H:%M') if item.checkout_time else '' }}`)
+      .addTo(map);
+    L.polyline([[checkinLat, checkinLng], [checkoutLat, checkoutLng]], {
+      color: "#6366f1", weight: 2, dashArray: "5 6", opacity: 0.6,
+    }).addTo(map);
+    map.fitBounds([[checkinLat, checkinLng], [checkoutLat, checkoutLng]], { padding: [30, 30] });
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

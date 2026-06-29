@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Auto-Flags{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-white">System Flags</h1>
+      <p class="mt-1 text-sm text-slate-400">Review and rate automatically flagged suspicious activities.</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="rounded-xl border border-slate-700/60 bg-slate-800/30 p-4">
+    <form method="get" class="flex flex-col sm:flex-row gap-4">
+      <div class="flex-1 sm:max-w-xs">
+        <label class="sr-only">Status</label>
+        <select name="status" onchange="this.form.submit()"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Statuses</option>
+          {% for s in FlagStatus %}
+          <option value="{{ s.value }}" {% if status == s.value %}selected{% endif %}>{{ s.value.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex-1 sm:max-w-xs">
+        <label class="sr-only">Type</label>
+        <select name="flag_type" onchange="this.form.submit()"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Types</option>
+          {% for t in FlagType %}
+          <option value="{{ t.value }}" {% if flag_type == t.value %}selected{% endif %}>{{ t.value.replace('_', ' ').title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex-1 sm:max-w-xs">
+        <label class="sr-only">Severity</label>
+        <select name="severity" onchange="this.form.submit()"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Severities</option>
+          {% for s in FlagSeverity %}
+          <option value="{{ s.value }}" {% if severity == s.value %}selected{% endif %}>{{ s.value.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+
+  <!-- Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for item in pagination.items %}
+    <div class="rounded-xl border {{ 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.1)]' if item.severity.value in ['high', 'critical'] and item.status.value == 'open' else 'border-slate-700' }} bg-slate-800/50 flex flex-col overflow-hidden">
+      
+      <!-- Card Header -->
+      <div class="p-5 border-b border-slate-700/80 bg-slate-800 flex justify-between items-start gap-4">
+        <div>
+          <h3 class="font-bold text-white text-base leading-tight">{{ item.title }}</h3>
+          <div class="text-xs text-slate-400 mt-1.5 flex items-center gap-x-2">
+            <span>{{ item.created_at.strftime('%b %d, %H:%M') }}</span>
+            <span>•</span>
+            <span class="text-indigo-300 font-medium">{{ item.user.full_name if item.user else 'Unknown' }}</span>
+          </div>
+        </div>
+        <div class="flex flex-col gap-y-2 items-end shrink-0">
+          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider {{ item.severity_badge_cls() }}">
+            {{ item.severity.value }}
+          </span>
+          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider {{ item.status_badge_cls() }}">
+            {{ item.status.value }}
+          </span>
+        </div>
+      </div>
+      
+      <!-- Card Body -->
+      <div class="p-5 flex-1 flex flex-col">
+        <p class="text-sm text-slate-300 mb-4">{{ item.description }}</p>
+        
+        {% if item.metric_value %}
+        <div class="mb-4 rounded-lg bg-slate-900/50 p-3 border border-slate-700/50 flex justify-between items-center text-sm">
+          <span class="text-slate-400">Recorded Value</span>
+          <span class="font-mono text-white">{{ "%.1f"|format(item.metric_value) }}</span>
+        </div>
+        {% endif %}
+        
+        <!-- Entity Link -->
+        <div class="mb-4 text-sm">
+          {% if item.entity_type == 'visit_record' %}
+            <a href="/tracking/visits?q={{ item.entity_id }}" class="text-indigo-400 hover:text-indigo-300 flex items-center gap-x-1">
+              View Visit Details
+              <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+            </a>
+          {% elif item.entity_type == 'payment' %}
+            <a href="/payments/{{ item.entity_id }}" class="text-indigo-400 hover:text-indigo-300 flex items-center gap-x-1">
+              View Payment Details
+              <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+            </a>
+          {% endif %}
+        </div>
+        
+        <div class="mt-auto">
+          {% if item.status.value == 'open' %}
+          <button type="button" onclick="openReviewModal({{ item.id }})" 
+                  class="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+            Review & Rate
+          </button>
+          {% else %}
+          <div class="rounded-lg bg-slate-900/80 p-3 border border-slate-700 text-sm">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-slate-400 text-xs uppercase tracking-wider font-semibold">Admin Rating</span>
+              <div class="flex text-amber-400 gap-x-0.5">
+                {% for i in range(1, 6) %}
+                  <svg class="h-4 w-4 {{ 'fill-current' if item.admin_rating and item.admin_rating >= i else 'text-slate-600' }}" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                {% endfor %}
+              </div>
+            </div>
+            {% if item.review_notes %}
+            <p class="text-slate-300 text-xs">"{{ item.review_notes }}"</p>
+            {% endif %}
+            <div class="text-[10px] text-slate-500 mt-2 text-right">By {{ item.reviewed_by.full_name if item.reviewed_by else 'Admin' }} on {{ item.reviewed_at.strftime('%b %d') if item.reviewed_at else '' }}</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-span-full py-12 text-center border border-slate-700/50 border-dashed rounded-xl bg-slate-800/20">
+      <svg class="mx-auto h-12 w-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+      <h3 class="mt-2 text-sm font-semibold text-white">No flags found</h3>
+      <p class="mt-1 text-sm text-slate-500">No activities matching these criteria have been flagged.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if pagination.pages > 1 %}
+  <div class="border-t border-slate-700/80 mt-6 pt-6">
+    <div class="flex items-center justify-between">
+      <div class="text-sm text-slate-400">
+        Page <span class="font-medium text-white">{{ pagination.page }}</span> of <span class="font-medium text-white">{{ pagination.pages }}</span>
+      </div>
+      <div class="flex gap-x-2">
+        {% if pagination.has_prev %}
+        <a href="?page={{ pagination.page - 1 }}&status={{ status }}&severity={{ severity }}&flag_type={{ flag_type }}" class="rounded-md bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600 transition-colors">Previous</a>
+        {% endif %}
+        {% if pagination.has_next %}
+        <a href="?page={{ pagination.page + 1 }}&status={{ status }}&severity={{ severity }}&flag_type={{ flag_type }}" class="rounded-md bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600 transition-colors">Next</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Review Modal -->
+<div id="review-modal" class="hidden relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity"></div>
+  <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+      <div class="relative transform overflow-hidden rounded-xl border border-slate-700 bg-slate-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md">
+        <form method="post" id="review-form">
+          <div class="px-4 pb-4 pt-5 sm:p-6 sm:pb-4 space-y-5">
+            <h3 class="text-lg font-semibold leading-6 text-white" id="modal-title">Review Flag</h3>
+            
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1.5">Action <span class="text-red-400">*</span></label>
+              <select name="new_status" required class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="reviewed">Mark as Reviewed (Resolved)</option>
+                <option value="dismissed">Dismiss (False Positive)</option>
+                <option value="escalated">Escalate (Requires Investigation)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1.5">Severity Rating (1-5) <span class="text-red-400">*</span></label>
+              <div class="flex items-center gap-x-4">
+                <input type="range" name="admin_rating" min="1" max="5" value="3" class="w-full" oninput="document.getElementById('rating-val').textContent = this.value">
+                <span id="rating-val" class="font-mono text-lg font-bold text-amber-400">3</span>
+              </div>
+              <p class="mt-1 text-xs text-slate-500">1 = Trivial, 5 = Severe Violation</p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1.5">Review Notes</label>
+              <textarea name="review_notes" rows="3" class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Optional comments on this decision..."></textarea>
+            </div>
+
+          </div>
+          <div class="bg-slate-800/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 border-t border-slate-700 gap-x-3">
+            <button type="submit" class="inline-flex w-full justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 sm:w-auto">Submit Review</button>
+            <button type="button" onclick="closeReviewModal()" class="mt-3 inline-flex w-full justify-center rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-600 sm:mt-0 sm:w-auto">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openReviewModal(flagId) {
+  document.getElementById('review-form').action = `/flags/${flagId}/review`;
+  document.getElementById('review-modal').classList.remove('hidden');
+}
+function closeReviewModal() {
+  document.getElementById('review-modal').classList.add('hidden');
+}
+</script>
+{% endblock %}

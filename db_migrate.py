@@ -1,0 +1,160 @@
+import os
+from sqlalchemy import text
+from app.database import engine
+from app.models.base import Base
+
+# Ensure all models are imported so Base.metadata is fully populated
+from app.models import *
+
+def add_column_safely(conn, table, column, definition):
+    try:
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
+        print(f"Added column {column} to {table}")
+    except Exception as e:
+        if "1060" in str(e) or "Duplicate column" in str(e):
+            # Already exists, ignore
+            pass
+        else:
+            print(f"Error adding {column} to {table}: {e}")
+
+def run_migrations():
+    print("Running database migrations...")
+    
+    with engine.begin() as conn:
+        # 1. Update existing tables
+        
+        # Outlets
+        try:
+            # First change the enum type or use VARCHAR
+            conn.execute(text("ALTER TABLE outlets MODIFY COLUMN status VARCHAR(50) DEFAULT 'active'"))
+            conn.execute(text("UPDATE outlets SET status = 'active' WHERE status = 'approved'"))
+            conn.execute(text("UPDATE outlets SET status = 'inactive' WHERE status IN ('draft', 'rejected')"))
+        except Exception as e:
+            print(f"Outlet base migration error: {e}")
+            
+        add_column_safely(conn, "outlets", "gstin", "VARCHAR(15) NULL")
+        add_column_safely(conn, "outlets", "pincode", "VARCHAR(6) NULL")
+        add_column_safely(conn, "outlets", "shop_type", "VARCHAR(50) NULL")
+        add_column_safely(conn, "outlets", "external_id", "VARCHAR(100) NULL")
+        add_column_safely(conn, "outlets", "channel", "VARCHAR(50) NULL")
+        add_column_safely(conn, "outlets", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+            
+        # Users
+        try:
+            # Drop foreign keys if they exist
+            try:
+                conn.execute(text("ALTER TABLE users DROP FOREIGN KEY fk_user_position"))
+            except Exception: pass
+            try:
+                conn.execute(text("ALTER TABLE users DROP FOREIGN KEY fk_user_zone"))
+            except Exception: pass
+            
+            # Drop old columns
+            try:
+                conn.execute(text("ALTER TABLE users DROP COLUMN position_id"))
+            except Exception: pass
+            try:
+                conn.execute(text("ALTER TABLE users DROP COLUMN zone_id"))
+            except Exception: pass
+        except Exception as e:
+            print(f"Users pre-migration error: {e}")
+            
+        add_column_safely(conn, "users", "employee_id", "VARCHAR(100) NULL")
+        add_column_safely(conn, "users", "phone", "VARCHAR(20) NULL")
+        add_column_safely(conn, "users", "imei", "VARCHAR(50) NULL")
+        add_column_safely(conn, "users", "payment_mode", "VARCHAR(50) NULL")
+        add_column_safely(conn, "users", "denomination_mandatory", "BOOLEAN NOT NULL DEFAULT 0")
+        add_column_safely(conn, "users", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+            
+        # Orders
+        add_column_safely(conn, "orders", "payment_settlement", "VARCHAR(50) NOT NULL DEFAULT 'unpaid'")
+        add_column_safely(conn, "orders", "connect_ref", "VARCHAR(100) NULL")
+            
+        # Order Items
+        add_column_safely(conn, "order_items", "gst_rate", "DECIMAL(5, 2) NOT NULL DEFAULT 0")
+        add_column_safely(conn, "order_items", "discount_pct", "DECIMAL(5, 2) NOT NULL DEFAULT 0")
+            
+        # Payments
+        add_column_safely(conn, "payments", "payment_type", "VARCHAR(50) NOT NULL DEFAULT 'invoice_payment'")
+        add_column_safely(conn, "payments", "denom_2000", "INT NOT NULL DEFAULT 0")
+        add_column_safely(conn, "payments", "submission_id", "INT NULL")
+        try:
+            conn.execute(text("ALTER TABLE payments ADD CONSTRAINT fk_payment_submission FOREIGN KEY (submission_id) REFERENCES payment_submissions(id) ON DELETE SET NULL"))
+        except Exception: pass
+
+        # Beats
+        add_column_safely(conn, "beats", "beat_type", "VARCHAR(50) NOT NULL DEFAULT 'GT'")
+        add_column_safely(conn, "beats", "beat_grade", "VARCHAR(50) NULL")
+        add_column_safely(conn, "beats", "erp_id", "VARCHAR(100) NULL")
+        add_column_safely(conn, "beats", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+            
+        # Positions
+        add_column_safely(conn, "positions", "level", "VARCHAR(50) NOT NULL DEFAULT 'L1'")
+        add_column_safely(conn, "positions", "reporting_to_id", "INT NULL")
+        add_column_safely(conn, "positions", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+        try:
+            conn.execute(text("ALTER TABLE positions ADD CONSTRAINT fk_position_reporting FOREIGN KEY (reporting_to_id) REFERENCES positions(id) ON DELETE SET NULL"))
+        except Exception: pass
+            
+        # Company Profiles
+        add_column_safely(conn, "company_profiles", "zap_base_url", "VARCHAR(500) NULL")
+        add_column_safely(conn, "company_profiles", "zap_api_key_encrypted", "TEXT NULL")
+        add_column_safely(conn, "company_profiles", "zap_backend_company", "VARCHAR(255) NULL")
+        add_column_safely(conn, "company_profiles", "cmms_base_url", "VARCHAR(500) NULL")
+        add_column_safely(conn, "company_profiles", "cmms_api_key_encrypted", "TEXT NULL")
+        add_column_safely(conn, "company_profiles", "cmms_backend_company", "VARCHAR(255) NULL")
+        add_column_safely(conn, "company_profiles", "connect_base_url", "VARCHAR(500) NULL")
+        add_column_safely(conn, "company_profiles", "connect_api_key_encrypted", "TEXT NULL")
+        add_column_safely(conn, "company_profiles", "connect_backend_company", "VARCHAR(255) NULL")
+        add_column_safely(conn, "company_profiles", "tags", "TEXT NULL")
+        add_column_safely(conn, "company_profiles", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+
+        # Products & Geographies
+        add_column_safely(conn, "products", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+        add_column_safely(conn, "products", "company_profile_id", "INT NULL")
+        try:
+            conn.execute(text("ALTER TABLE products ADD CONSTRAINT fk_product_company FOREIGN KEY (company_profile_id) REFERENCES company_profiles(id) ON DELETE SET NULL"))
+        except Exception: pass
+        add_column_safely(conn, "geographies", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+
+        # Product Alias Maps
+        add_column_safely(conn, "product_alias_maps", "conversion_factor", "DECIMAL(10, 5) NOT NULL DEFAULT 1.0")
+            
+        # System Configuration
+        add_column_safely(conn, "system_configuration", "zap_fetch_interval_minutes", "INT NOT NULL DEFAULT 60")
+        add_column_safely(conn, "system_configuration", "cmms_post_interval_minutes", "INT NOT NULL DEFAULT 30")
+        add_column_safely(conn, "system_configuration", "connect_sync_interval_minutes", "INT NOT NULL DEFAULT 30")
+        add_column_safely(conn, "system_configuration", "flag_gps_distance_metres", "INT NOT NULL DEFAULT 100")
+        add_column_safely(conn, "system_configuration", "flag_min_visit_seconds", "INT NOT NULL DEFAULT 120")
+        add_column_safely(conn, "system_configuration", "payment_mode", "VARCHAR(50) NULL DEFAULT 'cash_only'")
+        add_column_safely(conn, "system_configuration", "denomination_mandatory", "BOOLEAN NOT NULL DEFAULT 0")
+        
+        # Users - Activation and registration fields
+        add_column_safely(conn, "users", "activation_code", "VARCHAR(10) NULL")
+        add_column_safely(conn, "users", "is_registered", "BOOLEAN NOT NULL DEFAULT 0")
+
+        # Timesheets
+        add_column_safely(conn, "timesheets", "attendance_id", "INT NULL")
+        add_column_safely(conn, "timesheets", "approval_status", "VARCHAR(50) NOT NULL DEFAULT 'pending'")
+        add_column_safely(conn, "timesheets", "approved_by_id", "INT NULL")
+        add_column_safely(conn, "timesheets", "approved_at", "DATETIME NULL")
+        add_column_safely(conn, "timesheets", "rejection_reason", "TEXT NULL")
+        add_column_safely(conn, "timesheets", "activity_type", "VARCHAR(100) NULL")
+        try:
+            conn.execute(text("ALTER TABLE timesheets ADD CONSTRAINT fk_timesheet_attendance FOREIGN KEY (attendance_id) REFERENCES attendance(id) ON DELETE SET NULL"))
+        except Exception: pass
+        try:
+            conn.execute(text("ALTER TABLE timesheets ADD CONSTRAINT fk_timesheet_approved_by FOREIGN KEY (approved_by_id) REFERENCES users(id) ON DELETE SET NULL"))
+        except Exception: pass
+
+        # Visit Records
+        add_column_safely(conn, "visit_records", "checkout_time", "DATETIME NULL")
+        add_column_safely(conn, "visit_records", "visit_type", "VARCHAR(30) NULL")
+            
+    print("Updates applied. Now running create_all to create missing tables...")
+    # This will create any tables that don't exist yet (attendance, vendors, payment_submissions, etc.)
+    Base.metadata.create_all(bind=engine)
+    print("Database migrations completed successfully!")
+
+if __name__ == "__main__":
+    run_migrations()

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if item else 'New' }} Beat{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/beats" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">{{ 'Edit Beat' if item else 'New Beat' }}</h1>
+      <p class="mt-1 text-sm text-slate-400">{{ item.name if item else 'Create a beat route' }}</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" class="space-y-5 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Name <span class="text-red-400">*</span></label>
+        <input type="text" name="name" required value="{{ item.name if item else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Code <span class="text-red-400">*</span></label>
+        <input type="text" name="code" required value="{{ item.code if item else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="e.g. HYD-GT-01">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Beat Type <span class="text-red-400">*</span></label>
+        <select name="beat_type" required
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">Select type…</option>
+          {% for bt in BeatType %}
+          <option value="{{ bt.value }}" {% if item and item.beat_type == bt %}selected{% endif %}>
+            {{ bt.value.replace('_', ' ').title() }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Beat Grade</label>
+        <select name="beat_grade"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">Select grade…</option>
+          {% for bg in BeatGrade %}
+          <option value="{{ bg.value }}" {% if item and item.beat_grade == bg %}selected{% endif %}>
+            {{ bg.value }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Territory</label>
+      <select name="territory_id"
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">None</option>
+        {% for t in territories %}
+        <option value="{{ t.id }}" {% if item and item.territory_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">ERP ID</label>
+      <input type="text" name="erp_id" value="{{ item.erp_id if item and item.erp_id else '' }}"
+             class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+             placeholder="Optional ERP reference">
+    </div>
+
+    {% if item and item.is_active %}
+    <input type="hidden" name="is_active" value="on">
+    {% endif %}
+
+    <div class="flex items-center justify-end gap-x-3 pt-2 border-t border-slate-700">
+      <a href="/beats" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+      <button type="submit"
+              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        {{ 'Save Changes' if item else 'Create Beat' }}
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

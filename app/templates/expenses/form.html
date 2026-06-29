@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Log Expense{% endblock %}
+
+{% block content %}
+<div class="max-w-xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/expenses" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">Log Expense</h1>
+      <p class="mt-1 text-sm text-slate-400">Submit an expense claim</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="space-y-5 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Category <span class="text-red-400">*</span></label>
+        <select name="category" required
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">Select category…</option>
+          {% for c in ExpenseCategory %}
+          <option value="{{ c.value }}" {% if item and item.category == c %}selected{% endif %}>{{ c.value.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Amount (₹) <span class="text-red-400">*</span></label>
+        <input type="number" name="amount" step="0.01" min="0.01" required
+               value="{{ item.amount if item else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Date <span class="text-red-400">*</span></label>
+      <input type="date" name="expense_date" required
+             value="{{ item.expense_date if item else '' }}"
+             class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Description</label>
+      <textarea name="description" rows="3"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                placeholder="Details about this expense…">{{ item.description if item and item.description else '' }}</textarea>
+    </div>
+
+    <!-- Receipt Upload -->
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Receipt Image</label>
+      <div class="flex items-center gap-x-3">
+        <label class="cursor-pointer flex items-center gap-x-2 rounded-lg border border-dashed border-slate-600 bg-slate-900/50 px-4 py-3 text-sm text-slate-400 hover:border-indigo-500 hover:text-indigo-400 transition-colors w-full">
+          <svg class="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+          </svg>
+          <span id="file-label">Choose receipt file (JPG, PNG, PDF — max 5MB)</span>
+          <input type="file" name="receipt" accept=".jpg,.jpeg,.png,.pdf" class="hidden" onchange="document.getElementById('file-label').textContent = this.files[0]?.name || 'Choose receipt file'">
+        </label>
+      </div>
+      {% if item and item.receipt_url %}
+      <div class="mt-2 flex items-center gap-x-2 text-sm text-emerald-400">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <a href="{{ item.receipt_url }}" target="_blank" class="hover:underline">View existing receipt</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="flex items-center justify-end gap-x-3 pt-2 border-t border-slate-700">
+      <a href="/expenses" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+      <button type="submit"
+              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        Submit Expense
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

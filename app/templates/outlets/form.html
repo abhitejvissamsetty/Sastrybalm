@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if item else 'New' }} Outlet{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/outlets" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">{{ 'Edit Outlet' if item else 'New Outlet' }}</h1>
+      <p class="mt-1 text-sm text-slate-400">{{ item.name if item else 'Register a retail outlet' }}</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" id="outlet-form" class="space-y-5 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Outlet Name <span class="text-red-400">*</span></label>
+        <input type="text" name="name" required value="{{ item.name if item else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Code</label>
+        <input type="text" name="code" value="{{ item.code if item and item.code else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono uppercase placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="Auto-assigned if blank">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Owner Name</label>
+        <input type="text" name="owner_name" value="{{ item.owner_name if item and item.owner_name else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Mobile</label>
+        <input type="text" name="mobile" value="{{ item.mobile if item and item.mobile else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <!-- Autocomplete for Territory & Beat -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Territory <span class="text-red-400">*</span></label>
+        <div class="relative" id="territory-autocomplete">
+          <input type="text" id="territory-search" placeholder="Search territory..." autocomplete="off"
+                 value="{{ item.territory.name if item and item.territory else '' }}"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <input type="hidden" name="territory_id" id="territory-id" value="{{ item.territory_id if item and item.territory_id else '' }}">
+          <div id="territory-suggestions" class="suggestions-list absolute z-10 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg bg-slate-900 border border-slate-700 text-white hidden">
+            {% for t in territories %}
+            <div class="suggestion-item px-3 py-2 text-sm hover:bg-indigo-600 cursor-pointer" data-id="{{ t.id }}" data-name="{{ t.name }}">
+              {{ t.name }}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Beat <span class="text-red-400">*</span></label>
+        <div class="relative" id="beat-autocomplete">
+          <input type="text" id="beat-search" placeholder="Search beat..." autocomplete="off"
+                 value="{{ item.beat.name if item and item.beat else '' }}"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <input type="hidden" name="beat_id" id="beat-id" value="{{ item.beat_id if item and item.beat_id else '' }}">
+          <div id="beat-suggestions" class="suggestions-list absolute z-10 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg bg-slate-900 border border-slate-700 text-white hidden">
+            {% for b in beats %}
+            <div class="suggestion-item px-3 py-2 text-sm hover:bg-indigo-600 cursor-pointer" data-id="{{ b.id }}" data-name="{{ b.name }}" data-territory-id="{{ b.territory_id }}" data-territory-name="{{ b.territory.name if b.territory else '' }}">
+              {{ b.name }} ({{ b.code }})
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Channel & Shop Type Dropdowns -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Channel</label>
+        <select name="channel" class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">Select Channel...</option>
+          {% for ch in ChannelType %}
+          <option value="{{ ch.value }}" {% if item and item.channel == ch %}selected{% endif %}>{{ ch.value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Shop Type</label>
+        <select name="shop_type" class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">Select Shop Type...</option>
+          {% for st in ShopType %}
+          <option value="{{ st.value }}" {% if item and item.shop_type == st %}selected{% endif %}>{{ st.value.replace('_', ' ').title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- GSTIN, Pincode & External ID -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">GSTIN</label>
+        <input type="text" name="gstin" maxlength="15" value="{{ item.gstin if item and item.gstin else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm uppercase placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="e.g. 22AAAAA0000A1Z5">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Pincode <span class="text-red-400">*</span></label>
+        <input type="text" name="pincode" required pattern="\d{6}" maxlength="6" value="{{ item.pincode if item and item.pincode else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="6 digit PIN">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">External ID (Fieldassist)</label>
+        <input type="text" name="external_id" value="{{ item.external_id if item and item.external_id else '' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <!-- Address (OSM Nominatim Geocoder integration) -->
+    <div>
+      <div class="flex items-center justify-between mb-1.5">
+        <label class="block text-sm font-medium text-slate-300">Address</label>
+        <button type="button" id="geocode-btn" onclick="fetchAddressFromGPS()"
+                class="inline-flex items-center gap-x-1 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25g3 3 0 1 1 15 10.5Z" />
+          </svg>
+          Fetch from GPS Coordinates
+        </button>
+      </div>
+      <textarea name="address" rows="2" required
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none">{{ item.address if item and item.address else '' }}</textarea>
+    </div>
+
+    <!-- Readonly GPS Coordinates -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-400 mb-1.5">GPS Latitude (Read-only)</label>
+        <input type="number" step="any" name="gps_lat" readonly value="{{ item.gps_lat if item and item.gps_lat else '17.3850' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-800 text-slate-500 px-3 py-2 text-sm focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-400 mb-1.5">GPS Longitude (Read-only)</label>
+        <input type="number" step="any" name="gps_lng" readonly value="{{ item.gps_lng if item and item.gps_lng else '78.4867' }}"
+               class="w-full rounded-lg bg-slate-900 border border-slate-800 text-slate-500 px-3 py-2 text-sm focus:outline-none">
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-x-3 pt-2 border-t border-slate-700">
+      <a href="/outlets" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+      <button type="submit"
+              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        {{ 'Save Changes' if item else 'Submit' }}
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  setupAutocomplete('territory-autocomplete', 'territory-search', 'territory-id', 'territory-suggestions', handleTerritorySelection);
+  setupAutocomplete('beat-autocomplete', 'beat-search', 'beat-id', 'beat-suggestions', handleBeatSelection);
+
+  function setupAutocomplete(containerId, searchInputId, hiddenInputId, suggestionsId, onSelectCallback) {
+    const searchInput = document.getElementById(searchInputId);
+    const hiddenInput = document.getElementById(hiddenInputId);
+    const suggestionsDiv = document.getElementById(suggestionsId);
+    const items = suggestionsDiv.querySelectorAll('.suggestion-item');
+
+    searchInput.addEventListener('focus', function() {
+      filterSuggestions();
+      suggestionsDiv.classList.remove('hidden');
+    });
+
+    searchInput.addEventListener('input', function() {
+      filterSuggestions();
+      suggestionsDiv.classList.remove('hidden');
+    });
+
+    // Handle clicking outside to close suggestions
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#' + containerId)) {
+        suggestionsDiv.classList.add('hidden');
+      }
+    });
+
+    items.forEach(item => {
+      item.addEventListener('click', function() {
+        const id = item.getAttribute('data-id');
+        const name = item.getAttribute('data-name');
+        
+        searchInput.value = name;
+        hiddenInput.value = id;
+        suggestionsDiv.classList.add('hidden');
+
+        if (onSelectCallback) {
+          onSelectCallback(id, name, item);
+        }
+      });
+    });
+
+    function filterSuggestions() {
+      const filter = searchInput.value.toLowerCase();
+      items.forEach(item => {
+        const text = item.innerText.toLowerCase();
+        
+        // Custom attribute filtering check based on Territory selection (for Beats)
+        let isTerritoryMatch = true;
+        if (containerId === 'beat-autocomplete') {
+          const selectedTerritoryId = document.getElementById('territory-id').value;
+          const beatTerritoryId = item.getAttribute('data-territory-id');
+          if (selectedTerritoryId && beatTerritoryId !== selectedTerritoryId) {
+            isTerritoryMatch = false;
+          }
+        }
+
+        if (text.includes(filter) && isTerritoryMatch) {
+          item.classList.remove('hidden');
+        } else {
+          item.classList.add('hidden');
+        }
+      });
+    }
+  }
+
+  function handleTerritorySelection(id, name, item) {
+    // If territory is selected, check if the current beat is linked to it.
+    // If not, clear the beat selection.
+    const beatIdInput = document.getElementById('beat-id');
+    const beatSearchInput = document.getElementById('beat-search');
+    const selectedBeatItem = document.querySelector(`#beat-suggestions .suggestion-item[data-id="${beatIdInput.value}"]`);
+    
+    if (selectedBeatItem) {
+      const beatTerritoryId = selectedBeatItem.getAttribute('data-territory-id');
+      if (beatTerritoryId !== id) {
+        beatIdInput.value = '';
+        beatSearchInput.value = '';
+      }
+    }
+  }
+
+  function handleBeatSelection(id, name, item) {
+    // If beat is selected first, auto-populate the territory field.
+    const beatTerritoryId = item.getAttribute('data-territory-id');
+    const beatTerritoryName = item.getAttribute('data-territory-name');
+
+    if (beatTerritoryId) {
+      document.getElementById('territory-id').value = beatTerritoryId;
+      document.getElementById('territory-search').value = beatTerritoryName;
+    }
+  }
+});
+
+function fetchAddressFromGPS() {
+  const lat = document.querySelector('input[name="gps_lat"]').value;
+  const lng = document.querySelector('input[name="gps_lng"]').value;
+  if (!lat || !lng) {
+    alert('Please enter GPS Latitude and Longitude first.');
+    return;
+  }
+  const btn = document.getElementById('geocode-btn');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = 'Fetching...';
+  btn.disabled = true;
+  
+  fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+    .then(response => response.json())
+    .then(data => {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+      if (data && data.address) {
+        document.querySelector('textarea[name="address"]').value = data.display_name || '';
+        if (data.address.postcode) {
+          document.querySelector('input[name="pincode"]').value = data.address.postcode;
+        }
+      } else {
+        alert('Address not found for these coordinates.');
+      }
+    })
+    .catch(error => {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+      console.error(error);
+      alert('Error fetching address from OSM: ' + error.message);
+    });
+}
+</script>
+{% endblock %}

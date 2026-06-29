@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Attendance & Timesheets</h1>
+      <p class="mt-1 text-sm text-slate-400">Review daily attendance logs and related activities.</p>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="rounded-xl border border-slate-700/60 bg-slate-800/30 p-4">
+    <form method="get" class="flex flex-col sm:flex-row gap-4">
+      <div class="flex-1 sm:max-w-xs">
+        <label class="sr-only">Approval Status</label>
+        <select name="approval" onchange="this.form.submit()"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Approval Statuses</option>
+          {% for s in ApprovalStatus %}
+          <option value="{{ s.value }}" {% if approval == s.value %}selected{% endif %}>{{ s.value.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex-1 sm:max-w-xs">
+        <label class="sr-only">Attendance Type</label>
+        <select name="att_type" onchange="this.form.submit()"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Attendance Types</option>
+          {% for t in AttendanceType %}
+          <option value="{{ t.value }}" {% if att_type == t.value %}selected{% endif %}>{{ t.value.replace('_', ' ').title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+
+  <!-- Table -->
+  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50 shadow-sm glass">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-700/80">
+        <thead>
+          <tr class="bg-slate-800/50">
+            <th class="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Rep</th>
+            <th class="px-3 py-3.5 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Punch In</th>
+            <th class="px-3 py-3.5 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Punch Out</th>
+            <th class="px-3 py-3.5 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+            <th class="px-3 py-3.5 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+            <th class="px-3 py-3.5 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700/50">
+          {% for item in pagination.items %}
+          <tr class="hover:bg-slate-700/30 transition-colors duration-100">
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-white">{{ item.date.strftime('%B %d, %Y') }}</td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-slate-300">{{ item.user.full_name if item.user else '—' }}</td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-center text-slate-300">{{ item.punch_in.strftime('%H:%M') if item.punch_in else '—' }}</td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-center text-slate-300">{{ item.punch_out.strftime('%H:%M') if item.punch_out else '—' }}</td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-center">
+              <span class="inline-flex items-center rounded-full bg-slate-900 px-2.5 py-0.5 text-xs font-medium text-slate-400 border border-slate-700">
+                {{ item.type_display }}
+              </span>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-center">
+              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ item.approval_badge_cls() }}">
+                {{ item.approval_status.value.title() }}
+              </span>
+            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
+              <a href="/attendance/{{ item.id }}" class="text-indigo-400 hover:text-indigo-300">Review</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="px-3 py-8 text-center text-sm text-slate-500">
+              No attendance records found matching criteria.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if pagination.pages > 1 %}
+    <div class="border-t border-slate-700/80 bg-slate-800/30 px-4 py-3 sm:px-6">
+      <div class="flex items-center justify-between">
+        <div class="text-sm text-slate-400">
+          Page <span class="font-medium text-white">{{ pagination.page }}</span> of <span class="font-medium text-white">{{ pagination.pages }}</span>
+        </div>
+        <div class="flex gap-x-2">
+          {% if pagination.has_prev %}
+          <a href="?page={{ pagination.page - 1 }}&approval={{ approval }}&att_type={{ att_type }}" class="rounded-md bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600 transition-colors">Previous</a>
+          {% endif %}
+          {% if pagination.has_next %}
+          <a href="?page={{ pagination.page + 1 }}&approval={{ approval }}&att_type={{ att_type }}" class="rounded-md bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600 transition-colors">Next</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

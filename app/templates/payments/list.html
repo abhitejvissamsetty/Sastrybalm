@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "shared/pagination.html" import render as paginate %}
+
+{% block title %}Payments{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Payments</h1>
+      <p class="mt-1 text-sm text-slate-400">Cash and online collections from outlets</p>
+    </div>
+    <a href="/payments/new"
+       class="inline-flex items-center gap-x-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      Record Payment
+    </a>
+  </div>
+
+  <form method="get" class="flex flex-wrap gap-3">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search ref…"
+           class="rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48">
+    <select name="status"
+            class="rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <option value="">All Statuses</option>
+      {% for s in PaymentStatus %}
+      <option value="{{ s.value }}" {% if status == s.value %}selected{% endif %}>{{ s.value.title() }}</option>
+      {% endfor %}
+    </select>
+    <select name="method"
+            class="rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <option value="">All Methods</option>
+      {% for m in PaymentMethod %}
+      <option value="{{ m.value }}" {% if method == m.value %}selected{% endif %}>{{ m.value.upper() }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-600 transition-colors">Filter</button>
+    {% if q or status or method %}
+    <a href="/payments" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
+    {% endif %}
+  </form>
+
+  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
+    <table class="min-w-full divide-y divide-slate-700">
+      <thead>
+        <tr class="bg-slate-800">
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Ref</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Outlet</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Order</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Method</th>
+          <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+          {% if current_user.role.value in ['admin', 'territory_manager'] %}
+          <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-700/50">
+        {% for item in pagination.items %}
+        <tr class="hover:bg-slate-800/60 transition-colors">
+          <td class="px-4 py-3 text-sm font-mono text-white">{{ item.payment_ref }}</td>
+          <td class="px-4 py-3 text-sm text-slate-300 hidden sm:table-cell">{{ item.outlet.name if item.outlet else '—' }}</td>
+          <td class="px-4 py-3 text-sm hidden md:table-cell">
+            {% if item.order %}
+            <a href="/orders/{{ item.order.id }}" class="font-mono text-indigo-400 hover:text-indigo-300">{{ item.order.order_number }}</a>
+            {% else %}
+            <span class="text-slate-600">—</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-sm">
+            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold
+                         {% if item.method.value == 'cash' %}bg-amber-900/50 text-amber-300
+                         {% elif item.method.value == 'upi' %}bg-blue-900/50 text-blue-300
+                         {% else %}bg-slate-700 text-slate-300{% endif %}">
+              {{ item.method.value.upper() }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-sm font-bold text-white text-right">₹{{ item.amount }}</td>
+          <td class="px-4 py-3 text-sm">
+            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ item.status_badge_cls() }}">
+              {{ item.status.value.title() }}
+            </span>
+          </td>
+          {% if current_user.role.value in ['admin', 'territory_manager'] %}
+          <td class="px-4 py-3 text-right text-sm whitespace-nowrap">
+            {% if item.status.value == 'collected' %}
+            <form method="post" action="/payments/{{ item.id }}/verify" class="inline">
+              <button type="submit" class="text-emerald-400 hover:text-emerald-300 font-medium transition-colors">Verify</button>
+            </form>
+            <form method="post" action="/payments/{{ item.id }}/reject" class="inline ml-3">
+              <button type="submit" class="text-red-400 hover:text-red-300 font-medium transition-colors">Reject</button>
+            </form>
+            {% else %}
+            <span class="text-slate-600 text-xs">—</span>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="px-4 py-12 text-center text-sm text-slate-500">
+            No payments recorded yet.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% set qs = "q=" ~ q ~ "&status=" ~ status ~ "&method=" ~ method %}
+    {{ paginate(pagination, "/payments?" ~ qs) }}
+  </div>
+
+</div>
+{% endblock %}

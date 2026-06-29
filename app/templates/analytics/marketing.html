@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Marketing Performance{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Marketing Performance</h1>
+      <p class="mt-1 text-sm text-slate-400">Analyze material requests and asset deployments over the last {{ days }} days.</p>
+    </div>
+    
+    <!-- Time Filter -->
+    <div class="flex items-center gap-x-2 bg-slate-800/80 rounded-lg p-1 border border-slate-700/50">
+      {% for d in [7, 30, 90, 365] %}
+      <a href="?days={{ d }}" class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors {% if days == d %}bg-indigo-600 text-white shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-slate-700/50{% endif %}">
+        {{ d }}D
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="rounded-xl border border-slate-700/80 bg-slate-800/40 p-6 flex flex-col justify-center">
+      <div class="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">Total Assets Deployed</div>
+      <div class="text-4xl font-bold text-white font-mono">{{ total_assets }}</div>
+      <div class="mt-2 text-xs text-indigo-400 font-medium">Successfully deployed via CMMS</div>
+    </div>
+    
+    <div class="rounded-xl border border-slate-700/80 bg-slate-800/40 p-6 flex flex-col justify-center">
+      <div class="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">Pending Material Requests</div>
+      <div class="text-4xl font-bold text-amber-400 font-mono">{{ pending_mrs }}</div>
+      <div class="mt-2 text-xs text-amber-400/80 font-medium">Awaiting vendor processing</div>
+    </div>
+    
+    <div class="rounded-xl border border-slate-700/80 bg-slate-800/40 p-6 flex flex-col justify-center">
+      <div class="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">Total Material Requests</div>
+      <div class="text-4xl font-bold text-white font-mono">{{ total_mrs }}</div>
+      <div class="mt-2 text-xs text-slate-500 font-medium">Over the last {{ days }} days</div>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    
+    <!-- Top Assets Bar Chart -->
+    <div class="rounded-xl border border-slate-700/80 bg-slate-800/40 p-6">
+      <h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-6">Top Deployed Assets</h3>
+      <div class="h-72 w-full">
+        <canvas id="topAssetsChart"></canvas>
+      </div>
+    </div>
+    
+    <!-- MR Status Doughnut Chart -->
+    <div class="rounded-xl border border-slate-700/80 bg-slate-800/40 p-6">
+      <h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-6">Material Requests Status</h3>
+      <div class="h-72 w-full flex justify-center">
+        <canvas id="mrsStatusChart"></canvas>
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  Chart.defaults.color = '#94a3b8';
+  Chart.defaults.font.family = 'Inter, sans-serif';
+  
+  try {
+    const response = await fetch(`/analytics/marketing/data?days={{ days }}`);
+    const data = await response.json();
+    
+    // Top Assets Chart
+    if (data.top_assets.labels.length > 0) {
+      new Chart(document.getElementById('topAssetsChart'), {
+        type: 'bar',
+        data: {
+          labels: data.top_assets.labels,
+          datasets: [{
+            label: 'Quantity Deployed',
+            data: data.top_assets.quantity,
+            backgroundColor: '#6366f1',
+            borderRadius: 4,
+            maxBarThickness: 40
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: '#334155' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    } else {
+      document.getElementById('topAssetsChart').parentElement.innerHTML = '<div class="h-full flex items-center justify-center text-sm text-slate-500">No assets deployed in this period</div>';
+    }
+    
+    // MRs Status Chart
+    const statusLabels = Object.keys(data.mrs_by_status).map(l => l.replace('_', ' ').toUpperCase());
+    const statusData = Object.values(data.mrs_by_status);
+    
+    const statusColors = {
+      'SUBMITTED': '#94a3b8',
+      'ACKNOWLEDGED': '#eab308',
+      'IN PROGRESS': '#3b82f6',
+      'COMPLETED': '#10b981',
+      'REJECTED': '#ef4444'
+    };
+    
+    const bgColors = Object.keys(data.mrs_by_status).map(l => statusColors[l.replace('_', ' ').toUpperCase()] || '#6366f1');
+    
+    if (statusData.length > 0) {
+      new Chart(document.getElementById('mrsStatusChart'), {
+        type: 'doughnut',
+        data: {
+          labels: statusLabels,
+          datasets: [{
+            data: statusData,
+            backgroundColor: bgColors,
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '70%',
+          plugins: {
+            legend: { position: 'right', labels: { boxWidth: 12, padding: 20 } }
+          }
+        }
+      });
+    } else {
+      document.getElementById('mrsStatusChart').parentElement.innerHTML = '<div class="h-full flex items-center justify-center text-sm text-slate-500">No material requests in this period</div>';
+    }
+    
+  } catch (error) {
+    console.error("Error loading marketing chart data:", error);
+  }
+});
+</script>
+{% endblock %}

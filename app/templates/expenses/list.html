@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% from "shared/pagination.html" import render as paginate %}
+
+{% block title %}Expenses{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-white tracking-tight">Expenses</h1>
+      <p class="mt-2 text-sm text-slate-400 font-medium">Monitor and process field expenditure claims and reimbursements</p>
+    </div>
+    <a href="/expenses/new"
+       class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      Log Expense
+    </a>
+  </div>
+
+  <div class="glass rounded-2xl p-6 border border-white/5">
+    <form method="get" class="flex flex-wrap items-center gap-4">
+      <select name="status"
+              class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[160px]">
+        <option value="">All Statuses</option>
+        {% for s in ExpenseStatus %}
+        <option value="{{ s.value }}" {% if status == s.value %}selected{% endif %}>{{ s.value.title() }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="category"
+              class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[160px]">
+        <option value="">All Categories</option>
+        {% for c in ExpenseCategory %}
+        <option value="{{ c.value }}" {% if category == c.value %}selected{% endif %}>{{ c.value.title() }}</option>
+        {% endfor %}
+      </select>
+
+      <button type="submit" class="premium-btn rounded-xl bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition-all border border-white/5">
+        Filter Claims
+      </button>
+      
+      {% if status or category %}
+      <a href="/expenses" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear Filters</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="table-container shadow-2xl shadow-black/50">
+    <table class="min-w-full divide-y divide-white/5">
+      <thead>
+        <tr class="bg-slate-900/80 backdrop-blur-md">
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Date</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden sm:table-cell">Representative</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Category</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden md:table-cell">Description</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Amount</th>
+          <th class="px-6 py-4 text-center text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Receipt</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
+          {% if current_user.role.value in ['admin', 'territory_manager'] %}
+          <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for item in pagination.items %}
+        <tr class="table-row-hover transition-colors">
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400 font-medium">{{ item.expense_date }}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-200 hidden sm:table-cell font-semibold">{{ item.user.full_name if item.user else '—' }}</td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-400 border border-white/5">
+              {{ item.category.value.title() }}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 hidden md:table-cell max-w-xs truncate italic">"{{ item.description or '—' }}"</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white text-right">₹{{ item.amount }}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-center">
+            {% if item.receipt_url %}
+            <a href="{{ item.receipt_url }}" target="_blank" class="inline-flex items-center h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 justify-center hover:bg-emerald-500/20 transition-all" title="View receipt">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+              </svg>
+            </a>
+            {% else %}
+            <span class="inline-flex items-center h-8 w-8 rounded-lg bg-slate-900 text-slate-700 border border-white/5 justify-center" title="No receipt">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+              </svg>
+            </span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold tracking-wider uppercase {{ item.status_badge_cls() }}">
+              {{ item.status.value.title() }}
+            </span>
+          </td>
+          {% if current_user.role.value in ['admin', 'territory_manager'] %}
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <div class="flex items-center justify-end gap-x-3">
+              {% if item.status.value == 'submitted' %}
+              <form method="post" action="/expenses/{{ item.id }}/approve" class="inline">
+                <button type="submit" class="text-emerald-400 hover:text-emerald-300 transition-colors">Approve</button>
+              </form>
+              <form method="post" action="/expenses/{{ item.id }}/reject" class="inline">
+                <button type="submit" class="text-rose-400 hover:text-rose-300 transition-colors">Reject</button>
+              </form>
+              {% else %}
+              <span class="text-slate-700 text-xs tracking-widest font-bold uppercase">Locked</span>
+              {% endif %}
+            </div>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" class="px-6 py-20 text-center">
+             <div class="flex flex-col items-center">
+               <div class="h-12 w-12 rounded-full bg-slate-900 flex items-center justify-center mb-4 border border-white/5">
+                 <svg class="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                 </svg>
+               </div>
+               <p class="text-slate-400 font-medium">No expense claims found.</p>
+               <a href="/expenses/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Log New Expense &rarr;</a>
+             </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if pagination.pages > 1 %}
+    <div class="bg-slate-900/50 px-6 py-4 border-t border-white/5">
+      {% set qs = "status=" ~ status ~ "&category=" ~ category %}
+      {{ paginate(pagination, "/expenses?" ~ qs) }}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
