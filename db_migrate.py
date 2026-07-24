@@ -20,8 +20,12 @@ def add_column_safely(conn, table, column, definition):
 def run_migrations():
     print("Running database migrations...")
     
+    # 1. Ensure all tables defined in models exist
+    print("Ensuring all database tables exist...")
+    Base.metadata.create_all(bind=engine)
+    
     with engine.begin() as conn:
-        # 1. Update existing tables
+        # 2. Update existing tables with alter statements
         
         # Outlets
         try:
