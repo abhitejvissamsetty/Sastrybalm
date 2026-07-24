@@ -1,263 +1,154 @@
-# Sastrybalm SFA — Deployment Guide
+# Sastrybalm SFA — Deployment & Operations Guide
 
-This guide covers two deployment methods for the **Sastrybalm SFA** FastAPI application:
-
-1. **[Docker Compose (Recommended)](#option-1-docker-compose)** — Fully containerized, portable, one-command deploy.
-2. **[CloudPanel VPS (Manual)](#option-2-cloudpanel-vps)** — Traditional systemd + reverse-proxy deployment.
+This guide covers deployment and local execution options for the **Sastrybalm SFA** FastAPI application.
 
 ---
 
-## Option 1: Docker Compose
+## 1. Quick Start — Local Development
+
+### Prerequisites
+- Python 3.9+ installed
+- MySQL Database running locally (e.g. MAMP on port `8889` or Docker MySQL on port `3308`)
+
+### Setup & Run
+```bash
+# 1. Clone the repository and enter directory
+cd Sastrybalm
+
+# 2. Configure environment variables (.env)
+cp .env.example .env
+# Ensure DB_PORT, DB_USER, DB_PASSWORD, DB_NAME match your MySQL instance
+
+# 3. Run database migrations & seed initial data
+python3 db_migrate.py
+
+# 4. Start the application server
+./start_sastrybalm.sh
+# OR manually run:
+python3 run.py
+```
+
+The application will be accessible at:
+- **Web App / Admin Portal**: [http://localhost:8090](http://localhost:8090)
+- **Login Page**: [http://localhost:8090/login](http://localhost:8090/login)
+- **Interactive API Docs**: [http://localhost:8090/api/docs](http://localhost:8090/api/docs)
+
+---
+
+## 2. Option 1: Docker Compose (Recommended for Production)
 
 ### Architecture
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  Host Machine                                        │
-│                                                      │
-│  ┌───────────┐    ┌───────────────┐    ┌──────────┐  │
-│  │   Nginx   │───▶│  FastAPI App  │───▶│  MySQL   │  │
-│  │  :80/:443 │    │     :8002     │    │  :3306   │  │
-│  └───────────┘    └───────────────┘    └──────────┘  │
-│                                                      │
-│   ── sastrybalm-net (bridge) ──────────────────────  │
-└──────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Host Machine                                               │
+│                                                             │
+│  ┌───────────────┐    ┌─────────────────┐    ┌───────────┐  │
+│  │     Nginx     │───▶│   FastAPI App   │───▶│   MySQL   │  │
+│  │  :8080 / :443 │    │      :8090      │    │   :3306   │  │
+│  └───────────────┘    └─────────────────┘    └───────────┘  │
+│                                                             │
+│   ── sastrybalm-net (bridge network) ────────────────────  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Three containers orchestrated via Docker Compose:
-- **`db`** — MySQL 8.0 with persistent volume and health checks.
-- **`app`** — Python 3.12 slim image running Gunicorn + Uvicorn workers. Auto-runs `db_migrate.py` on startup.
-- **`nginx`** — Alpine Nginx reverse proxy forwarding traffic to the app.
+Containers orchestrated via `docker-compose.yml`:
+- **`db`** — MySQL 8.0 with persistent data volume and health checks.
+- **`app`** — Python container running FastAPI with Gunicorn + Uvicorn workers. Auto-runs `db_migrate.py` on container start.
+- **`nginx`** — Alpine Nginx reverse proxy forwarding public traffic.
+- **`adminer`** — Web-based Database Manager available at `http://localhost:8081`.
 
-### Prerequisites
-
-- Docker Engine ≥ 24.x and Docker Compose ≥ 2.x installed on your server.
-- A domain name pointed to your server's IP (for SSL).
-
-### Quick Start
-
+### Build & Deploy Commands
 ```bash
-# 1. Clone the repository
-git clone <your-repo-url> && cd Sastrybalm
-
-# 2. Create your production .env from the template
-cp .env.example .env
-# Edit .env and set real values (SECRET_KEY, DB_PASSWORD, etc.)
-
-# 3. Build and launch all services
+# Build and start all services in detached mode
 docker compose up -d --build
 
-# 4. Verify everything is running
+# Verify container statuses
 docker compose ps
-```
 
-The application will be available at `http://<your-server-ip>`.
-
-### File Overview
-
-| File | Purpose |
-|---|---|
-| `Dockerfile` | Multi-stage build: installs deps, copies app code, runs Gunicorn |
-| `docker-compose.yml` | Orchestrates MySQL, FastAPI app, and Nginx services |
-| `.dockerignore` | Excludes `mobile/`, `venv/`, docs, etc. from the build context |
-| `nginx/default.conf` | Nginx reverse proxy configuration |
-| `.env.example` | Template for environment variables |
-
-### Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `SECRET_KEY` | *(must change)* | App secret for JWT signing and sessions |
-| `MYSQL_ROOT_PASSWORD` | `rootpassword` | MySQL root password |
-| `DB_USER` | `sastrybalm_user` | Application database user |
-| `DB_PASSWORD` | `sastrybalm_password` | Application database password |
-| `DB_NAME` | `sastrybalm_db` | Database name |
-| `JWT_EXPIRE_MINUTES` | `10080` | JWT token expiry (7 days) |
-| `SMTP_*` | *(empty)* | Email configuration (optional) |
-| `CMMS_*` / `CONNECT_*` | *(empty)* | External API integrations |
-
-### Enabling HTTPS / SSL
-
-1. Place your SSL certificate files in `nginx/certs/`:
-   ```
-   nginx/certs/fullchain.pem
-   nginx/certs/privkey.pem
-   ```
-2. Edit `nginx/default.conf`:
-   - Uncomment the `return 301 https://...` line in the HTTP server block.
-   - Uncomment the entire HTTPS server block at the bottom.
-   - Set `server_name` to your actual domain.
-3. Restart Nginx:
-   ```bash
-   docker compose restart nginx
-   ```
-
-### Common Commands
-
-```bash
-# View logs (follow mode)
+# View application logs
 docker compose logs -f app
-
-# Rebuild only the app after code changes
-docker compose up -d --build app
-
-# Stop everything
-docker compose down
-
-# Stop and destroy all data (including database)
-docker compose down -v
-
-# Enter the running app container
-docker compose exec app bash
-
-# Access MySQL CLI
-docker compose exec db mysql -u sastrybalm_user -p sastrybalm_db
-```
-
-### Database Backups
-
-```bash
-# Dump the database
-docker compose exec db mysqldump -u root -p${MYSQL_ROOT_PASSWORD} sastrybalm_db > backup_$(date +%Y%m%d).sql
-
-# Restore from backup
-docker compose exec -T db mysql -u root -p${MYSQL_ROOT_PASSWORD} sastrybalm_db < backup_20250101.sql
 ```
 
 ---
 
-## Option 2: CloudPanel VPS
+## 3. Option 2: VPS / Systemd Manual Deployment
 
-### Prerequisites
-
-1. A VPS with **CloudPanel** installed.
-2. A domain name pointed to your VPS IP address (e.g., `api.sastrybalm.com`).
-3. SSH access to your VPS with `root` or a sudo user.
-
-### Step 1: Create a Database in CloudPanel
-
-1. Log in to your CloudPanel admin dashboard.
-2. Go to **Databases** → **Add Database**.
-3. Fill in the details:
-   - **Database Name**: `sastrybalm_db`
-   - **Database User**: `sastrybalm_user`
-   - **Password**: *Generate a secure password and save it*
-4. Click **Add Database**.
-
-### Step 2: Create a Reverse Proxy Site
-
-1. In CloudPanel, go to **Sites** → **Add Site** → **Create a Reverse Proxy Site**.
-2. Fill in:
-   - **Domain Name**: `api.sastrybalm.com`
-   - **Site User**: `clp-user`
-   - **Reverse Proxy Port**: `8002`
-3. Click **Create Site**.
-4. Go to **SSL/TLS** tab → **New Let's Encrypt Certificate**.
-
-### Step 3: Clone Code and Prepare
-
+### Step 1: Clone & Virtual Environment
 ```bash
-# SSH into VPS and navigate to the site directory
-cd /home/clp-user/htdocs/api.sastrybalm.com
-rm -rf *
-
-# Clone/copy project files here
-# Ensure run.py, alembic.ini, and the app/ folder are at the root
-chown -R clp-user:clp-user /home/clp-user/htdocs/api.sastrybalm.com
-```
-
-### Step 4: Setup Python Virtual Environment
-
-```bash
-sudo su - clp-user
-cd /home/clp-user/htdocs/api.sastrybalm.com
-
+cd /var/www/sastrybalm
 python3 -m venv venv
 source venv/bin/activate
-
 pip install --upgrade pip
 pip install -r requirements.txt
-pip install gunicorn
+pip install gunicorn uvicorn
 ```
 
-> [!NOTE]
-> If building native wheels fails, install system headers as `root`:
-> `apt-get install python3-dev default-libmysqlclient-dev build-essential`
-
-### Step 5: Environment Variables
-
-Create `.env` at `/home/clp-user/htdocs/api.sastrybalm.com/.env`:
-
-```env
-APP_NAME="Sastrybalm SFA"
-SECRET_KEY="your-random-generated-long-secret-key"
-
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_USER=sastrybalm_user
-DB_PASSWORD=your_created_db_password
-DB_NAME=sastrybalm_db
-
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=10080
-```
-
-### Step 6: Run Migrations
-
+### Step 2: Database Migration
 ```bash
-alembic upgrade head
+python3 db_migrate.py
 ```
 
-### Step 7: Configure Systemd Service
-
-As **`root`**, create `/etc/systemd/system/sastrybalm.service`:
+### Step 3: Configure Systemd Service
+Create `/etc/systemd/system/sastrybalm.service`:
 
 ```ini
 [Unit]
-Description=Sastrybalm FastAPI Daemon
+Description=Sastrybalm SFA FastAPI Daemon
 After=network.target
 
 [Service]
-User=clp-user
-Group=clp-user
-WorkingDirectory=/home/clp-user/htdocs/api.sastrybalm.com
-ExecStart=/home/clp-user/htdocs/api.sastrybalm.com/venv/bin/gunicorn \
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/sastrybalm
+ExecStart=/var/www/sastrybalm/venv/bin/gunicorn \
           --workers 4 \
           --worker-class uvicorn.workers.UvicornWorker \
-          --bind 127.0.0.1:8002 \
+          --bind 127.0.0.1:8090 \
           app.main:app
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+Enable and start the service:
 ```bash
-systemctl daemon-reload
-systemctl start sastrybalm
-systemctl enable sastrybalm
-systemctl status sastrybalm
-```
-
-### Step 8: Nginx Static Files (Optional)
-
-In the CloudPanel **Vhost** tab, add above the main location block:
-
-```nginx
-location /static/ {
-    alias /home/clp-user/htdocs/api.sastrybalm.com/app/static/;
-    expires 30d;
-    access_log off;
-}
+sudo systemctl daemon-reload
+sudo systemctl start sastrybalm
+sudo systemctl enable sastrybalm
 ```
 
 ---
 
-## Troubleshooting
+## 4. Environment Variables Reference (`.env`)
 
-| Issue | Command |
-|---|---|
-| **Docker: App logs** | `docker compose logs -f app` |
-| **Docker: DB health** | `docker compose exec db mysqladmin ping -h localhost -u root -p` |
-| **Systemd: App logs** | `journalctl -u sastrybalm.service -f` |
-| **Verify local connection** | `curl -I http://127.0.0.1:8002` |
-| **Permission errors** | `chown -R clp-user:clp-user /home/clp-user/htdocs/...` |
+| Key | Example Value | Description |
+|---|---|---|
+| `APP_NAME` | `Sastrybalm SFA` | Application Display Name |
+| `SECRET_KEY` | *(random long string)* | JWT Signing & Session Secret |
+| `DB_HOST` | `127.0.0.1` | MySQL Host IP |
+| `DB_PORT` | `8889` (MAMP) / `3308` (Docker) | MySQL Server Port |
+| `DB_USER` | `sastrybalm_user` | MySQL Database Username |
+| `DB_PASSWORD` | `sastrybalm_password` | MySQL Database Password |
+| `DB_NAME` | `sastrybalm_db` | MySQL Database Name |
+| `ADMIN_USERNAME` | `admin` | Admin Portal Username |
+| `ADMIN_PASSWORD` | `admin123` | Admin Portal Password |
+| `JWT_EXPIRE_MINUTES` | `10080` | Token Expiration (7 days) |
+
+---
+
+## 5. Maintenance & Troubleshooting Commands
+
+```bash
+# Check if port 8090 is in use
+lsof -i :8090
+
+# Stop server process running on 8090
+kill -9 $(lsof -ti:8090)
+
+# Check database connection manually
+python3 db_migrate.py
+
+# Restart app using startup script
+./start_sastrybalm.sh
+```
