@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_api_auth
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, TokenResponse, UserResponse
-from app.services.auth import authenticate_user
+from app.services.auth import (authenticate_user, generate_and_send_user_otp,
+                               verify_user_otp)
 from app.utils.security import create_access_token
 
 router = APIRouter(prefix="/api/v1", tags=["mobile-api"])
@@ -12,13 +13,10 @@ router = APIRouter(prefix="/api/v1", tags=["mobile-api"])
 
 @router.post("/auth/token", response_model=TokenResponse, summary="Mobile login — returns JWT")
 async def api_login(payload: LoginRequest, db: Session = Depends(get_db)):
-    print(f"[DEBUG AUTH] Login attempt for username/email: '{payload.username}' with password: '{payload.password}'")
     user = authenticate_user(db, payload.username, payload.password)
     if not user:
-        print(f"[DEBUG AUTH] Authentication failed for user: '{payload.username}'")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Invalid credentials. Note: Admin authenticates via .env credentials.")
 
-    from app.models.user import UserRole
     if user.role == UserRole.field_rep:
         from datetime import date
         from app.models.attendance import Attendance
@@ -32,7 +30,44 @@ async def api_login(payload: LoginRequest, db: Session = Depends(get_db)):
                 status_code=400,
                 detail="You have already logged out of this session, contact admin"
             )
-    print(f"[DEBUG AUTH] Authentication successful for user: '{payload.username}' (ID: {user.id})")
+
+    token = create_access_token({"sub": str(user.id), "role": user.role.value})
+    return TokenResponse(
+        access_token=token,
+        user_id=user.id,
+        id=user.id,
+        email=user.email,
+        username=user.username,
+        full_name=user.full_name,
+        role=user.role,
+        is_active=user.is_active,
+        employee_id=user.employee_id,
+        phone=user.phone,
+        company_profile_id=user.company_profile_id,
+    )
+
+
+@router.post("/auth/request-otp", summary="Request Email OTP for Mobile User Login")
+async def api_request_otp(email: str = Body(..., embed=True), db: Session = Depends(get_db)):
+    res = generate_and_send_user_otp(db, email)
+    if not res["success"]:
+        raise HTTPException(status_code=400, detail=res["error"])
+    return {
+        "message": f"OTP verification code sent to {res['email']}",
+        "email": res["email"],
+    }
+
+
+@router.post("/auth/verify-otp", response_model=TokenResponse, summary="Verify OTP & Return JWT Token")
+async def api_verify_otp(
+    email: str = Body(...),
+    otp_code: str = Body(...),
+    db: Session = Depends(get_db)
+):
+    user = verify_user_otp(db, email, otp_code)
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP code")
+
     token = create_access_token({"sub": str(user.id), "role": user.role.value})
     return TokenResponse(
         access_token=token,

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Position Assignment — {{ user_obj.full_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+  <div class="md:flex md:items-center md:justify-between">
+    <div class="min-w-0 flex-1">
+      <h2 class="text-2xl font-bold leading-7 text-white sm:truncate sm:text-3xl sm:tracking-tight">
+        Position Assignment & Scope
+      </h2>
+      <p class="mt-1 text-sm text-slate-400">
+        Inspect position hierarchy and attach/assign organizational positions for {{ user_obj.full_name }}.
+      </p>
+    </div>
+    <div class="mt-4 flex md:ml-4 md:mt-0">
+      <a href="/users" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+        &larr; Back to Users & Reps
+      </a>
+    </div>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+    <div class="flex items-center space-x-4 border-b border-slate-800 pb-6">
+      <div class="h-16 w-16 bg-indigo-600/20 text-indigo-400 rounded-2xl flex items-center justify-center font-bold text-2xl border border-indigo-500/30">
+        {{ user_obj.full_name[0] }}
+      </div>
+      <div>
+        <h3 class="text-xl font-bold text-white">{{ user_obj.full_name }}</h3>
+        <p class="text-sm text-slate-400">{{ user_obj.email }} &bull; Phone: {{ user_obj.phone or '—' }}</p>
+        <span class="mt-1 inline-flex items-center rounded-md bg-indigo-950 px-2 py-1 text-xs font-semibold text-indigo-300 border border-indigo-800">
+          Role: {{ user_obj.role.value }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Currently Assigned Hierarchy -->
+    <div>
+      <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Currently Assigned Positions</h3>
+      {% if user_obj.positions %}
+      <div class="space-y-4">
+        {% for pos in user_obj.positions %}
+        <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-lg font-bold text-white">{{ pos.name }}</span>
+              <span class="ml-2 text-xs font-mono px-2 py-0.5 bg-slate-800 text-slate-300 rounded border border-slate-700">{{ pos.code }}</span>
+            </div>
+            <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-900/50 text-indigo-300 border border-indigo-800">
+              Level: {{ pos.level.value if pos.level else 'L1' }}
+            </span>
+          </div>
+
+          <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-400 border-t border-slate-800/80 pt-3">
+            <div>
+              <span class="text-slate-500 block">Territory Boundary:</span>
+              <span class="text-slate-200 font-medium">{{ pos.territory.name if pos.territory else 'Unassigned' }}</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">Reports To:</span>
+              <span class="text-slate-200 font-medium">{{ pos.reporting_to.name if pos.reporting_to else 'Root / Independent' }}</span>
+            </div>
+          </div>
+
+          {% if pos.beats %}
+          <div class="mt-3 pt-2 border-t border-slate-800/60">
+            <span class="text-xs font-semibold text-slate-400 block mb-1.5">Associated Beat Coverage:</span>
+            <div class="flex flex-wrap gap-1.5">
+              {% for b in pos.beats %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                {{ b.name }} ({{ b.code }})
+              </span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-slate-500 italic text-sm bg-slate-950/40 p-4 rounded-xl border border-slate-800/60">No positions currently assigned to this user.</p>
+      {% endif %}
+    </div>
+
+    <!-- Position Assignment Form -->
+    <div class="pt-6 border-t border-slate-800">
+      <h3 class="text-base font-bold text-white mb-2">Assign / Update Position Hierarchy</h3>
+      <p class="text-xs text-slate-400 mb-4">
+        Select one or more active organizational positions to attach to {{ user_obj.full_name }}.
+        {% if user_obj.role.value == 'field_rep' %}(Filtered to Field Rep L1 positions){% endif %}
+      </p>
+
+      <form action="/users/{{ user_obj.id }}/position-view" method="post" class="space-y-4">
+        <div class="max-h-60 overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 p-4 space-y-2.5">
+          {% for pos in all_positions %}
+          <label class="flex items-center space-x-3 text-sm text-slate-300 hover:text-white cursor-pointer p-1.5 hover:bg-slate-900 rounded-lg transition-colors">
+            <input type="checkbox" name="position_ids" value="{{ pos.id }}" {% if pos.id in assigned_ids %}checked{% endif %}
+                   class="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500">
+            <div class="flex-1 min-w-0">
+              <span class="font-bold text-white">{{ pos.name }}</span>
+              <span class="ml-1.5 text-xs font-mono text-slate-400">({{ pos.code }})</span>
+              <span class="ml-2 text-xs text-slate-500">&bull; Level: {{ pos.level.value if pos.level else 'L1' }}</span>
+            </div>
+          </label>
+          {% else %}
+          <p class="text-xs text-slate-500 italic">No available active positions to assign.</p>
+          {% endfor %}
+        </div>
+
+        <div class="flex justify-end pt-2">
+          <button type="submit"
+                  class="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors">
+            Save Position Assignments
+          </button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

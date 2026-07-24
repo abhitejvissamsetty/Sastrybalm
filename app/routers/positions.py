@@ -294,19 +294,31 @@ async def position_attach_beats_get(
         
     from sqlalchemy import select
     from app.models.position import position_beats
+    from app.models.geography import Geography, GeoLevel
+
     other_mapped_beat_ids = db.scalars(
         select(position_beats.c.beat_id).where(position_beats.c.position_id != pos_id)
     ).all()
-    
-    all_beats = db.query(Beat).filter(
-        Beat.is_active == True,
-        ~Beat.id.in_(other_mapped_beat_ids) if other_mapped_beat_ids else True
-    ).order_by(Beat.name).all()
+
+    # Filter beats matching the Region resolved from Position's Territory
+    query = db.query(Beat).filter(Beat.is_active == True)
+    if other_mapped_beat_ids:
+        query = query.filter(~Beat.id.in_(other_mapped_beat_ids))
+
+    if item.territory_id:
+        pos_territory = db.query(Geography).filter(Geography.id == item.territory_id).first()
+        if pos_territory and pos_territory.parent_id:
+            # Resolved Region ID from Territory
+            resolved_region_id = pos_territory.parent_id
+            # Get all territories belonging to this Region
+            region_territory_ids = [t.id for t in db.query(Geography).filter(Geography.parent_id == resolved_region_id).all()]
+            if region_territory_ids:
+                query = query.filter(Beat.territory_id.in_(region_territory_ids))
+
+    all_beats = query.order_by(Beat.name).all()
     assigned_beat_ids = [b.id for b in item.beats]
-    
-    from app.models.geography import Geography, GeoLevel
     territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
-    
+
     return templates.TemplateResponse("positions/attach_beats.html", {
         "request": request,
         "current_user": current_user,

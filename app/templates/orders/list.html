@@ -13,17 +13,42 @@
     </div>
   </div>
 
+  {% if is_filtered_by_days %}
+  <div class="rounded-xl border border-indigo-500/30 bg-indigo-950/30 p-4 text-xs text-indigo-300 flex items-center justify-between">
+    <div>
+      <span class="font-bold">⚡ Defaulting to Last 7 Days:</span> Displaying recent orders. For historical data beyond 7 days, please use Sales Analytics or toggle below.
+    </div>
+    <a href="/orders?all_time=true" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors">
+      View All Historical Orders
+    </a>
+  </div>
+  {% endif %}
+
   <div class="glass rounded-2xl p-6 border border-white/5">
     <form method="get" class="flex flex-wrap items-center gap-4">
-      <div class="relative flex-1 min-w-[280px]">
-        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-        <input type="text" name="q" value="{{ q }}" placeholder="Search by order #, outlet or representative…"
-               class="w-full rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-slate-500 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+      <div class="relative flex-1 min-w-[200px]">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search order #..."
+               class="w-full rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-slate-500 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
       </div>
+
+      <input type="text" name="pincode" value="{{ pincode }}" placeholder="PIN Code..."
+             class="rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-slate-500 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all w-28">
+
+      <select name="partner_id"
+              class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[150px]">
+        <option value="">All Distributors</option>
+        {% for p in partners %}
+        <option value="{{ p.id }}" {% if partner_id == p.id|string %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="product_id"
+              class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[150px]">
+        <option value="">All Items</option>
+        {% for prod in products %}
+        <option value="{{ prod.id }}" {% if product_id == prod.id|string %}selected{% endif %}>{{ prod.name }}</option>
+        {% endfor %}
+      </select>
       
       <select name="status"
               class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[140px]">
@@ -34,10 +59,10 @@
       </select>
 
       <button type="submit" class="premium-btn rounded-xl bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition-all border border-white/5">
-        Filter Results
+        Filter
       </button>
       
-      {% if q or status %}
+      {% if q or status or pincode or partner_id or product_id or all_time %}
       <a href="/orders" class="text-sm font-medium text-slate-400 hover:text-white transition-colors px-2">Clear All</a>
       {% endif %}
     </form>

@@ -36,9 +36,9 @@
       
       <select name="beat_type"
               class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[140px]">
-        <option value="">All Types</option>
-        {% for bt in BeatType %}
-        <option value="{{ bt.value }}" {% if beat_type == bt.value %}selected{% endif %}>{{ bt.value }}</option>
+        <option value="">All Sales Channels</option>
+        {% for bt in beat_types %}
+        <option value="{{ bt.code }}" {% if beat_type == bt.code %}selected{% endif %}>{{ bt.name }}</option>
         {% endfor %}
       </select>
 

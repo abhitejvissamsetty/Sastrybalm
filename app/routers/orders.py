@@ -8,7 +8,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.adapters.connect import ConnectAdapter, connect_adapter
 from app.dependencies import get_db, require_web_auth, require_web_roles
 from app.models.alert import Alert, AlertSeverity, AlertType
 from app.models.company import CompanyProfile
@@ -35,8 +34,15 @@ async def order_list(
     db: Session = Depends(get_db),
     q: str = Query(default=""),
     status: str = Query(default=""),
+    pincode: str = Query(default=""),
+    partner_id: str = Query(default=""),
+    product_id: str = Query(default=""),
+    all_time: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
+    from datetime import timedelta
+    from app.models.local_distribution import LocalChannelPartner
+
     query = db.query(Order)
     if current_user.role == UserRole.field_rep:
         query = query.filter(Order.user_id == current_user.id)
@@ -44,11 +50,36 @@ async def order_list(
         query = query.filter(Order.order_number.ilike(f"%{q}%"))
     if status and status in [s.value for s in OrderStatus]:
         query = query.filter(Order.status == status)
+
+    # 7-day default cap
+    is_filtered_by_days = False
+    if not all_time and not q:
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        query = query.filter(Order.created_at >= seven_days_ago)
+        is_filtered_by_days = True
+
+    if pincode:
+        query = query.join(Outlet, Order.outlet_id == Outlet.id).filter(Outlet.pincode.ilike(f"%{pincode}%"))
+
+    if partner_id:
+        # Filter orders associated with channel partner outlets
+        query = query.join(Outlet, Order.outlet_id == Outlet.id).filter(Outlet.channel_partner_id == int(partner_id))
+
+    if product_id:
+        query = query.join(OrderItem, Order.id == OrderItem.order_id).filter(OrderItem.product_id == int(product_id))
+
     query = query.order_by(Order.created_at.desc())
     pagination = paginate(query, page)
+
+    partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
+    products = db.query(Product).filter(Product.is_active == True).order_by(Product.name).all()
+
     return templates.TemplateResponse("orders/list.html", {
         "request": request, "current_user": current_user,
         "pagination": pagination, "q": q, "status": status,
+        "pincode": pincode, "partner_id": partner_id, "product_id": product_id,
+        "all_time": all_time, "is_filtered_by_days": is_filtered_by_days,
+        "partners": partners, "products": products,
         "OrderStatus": OrderStatus, "FlowType": FlowType, "SyncStatus": SyncStatus,
         **get_flash(request),
     })
@@ -147,12 +178,76 @@ async def order_detail(
     if not item:
         set_flash_error(request, "Order not found.")
         return RedirectResponse("/orders", status_code=302)
+    from app.models.payment import Payment
+    payments = db.query(Payment).filter(Payment.order_id == order_id).order_by(Payment.created_at.desc()).all()
+    total_paid = sum(p.amount for p in payments) if payments else Decimal("0")
+
     return templates.TemplateResponse("orders/detail.html", {
         "request": request, "current_user": current_user,
-        "item": item, "OrderStatus": OrderStatus,
-        "FlowType": FlowType, "SyncStatus": SyncStatus,
+        "item": item, "payments": payments, "total_paid": total_paid,
+        "OrderStatus": OrderStatus, "FlowType": FlowType, "SyncStatus": SyncStatus,
         **get_flash(request),
     })
+
+
+@router.post("/{order_id}/record-payment")
+async def order_record_payment(
+    order_id: int, request: Request,
+    current_user: User = Depends(require_web_auth),
+    db: Session = Depends(get_db),
+    payment_mode: str = Form("cash"),
+    amount: str = Form("0"),
+    reference_no: Optional[str] = Form(default=None),
+    notes: Optional[str] = Form(default=None),
+    count_500: int = Form(default=0),
+    count_200: int = Form(default=0),
+    count_100: int = Form(default=0),
+    count_50: int = Form(default=0),
+    count_20: int = Form(default=0),
+    count_10: int = Form(default=0),
+):
+    item = db.query(Order).filter(Order.id == order_id).first()
+    if not item:
+        set_flash_error(request, "Order not found.")
+        return RedirectResponse("/orders", status_code=302)
+
+    try:
+        amt_val = Decimal(amount)
+    except Exception:
+        set_flash_error(request, "Invalid payment amount.")
+        return RedirectResponse(f"/orders/{order_id}", status_code=302)
+
+    # Denomination validation for cash
+    denom_json = None
+    if payment_mode == "cash":
+        calculated_total = (count_500 * 500) + (count_200 * 200) + (count_100 * 100) + (count_50 * 50) + (count_20 * 20) + (count_10 * 10)
+        if Decimal(calculated_total) != amt_val:
+            set_flash_error(request, f"Cash denomination total (₹{calculated_total}) does not match payment amount (₹{amt_val}).")
+            return RedirectResponse(f"/orders/{order_id}", status_code=302)
+        denom_json = json.dumps({
+            "500": count_500, "200": count_200, "100": count_100,
+            "50": count_50, "20": count_20, "10": count_10
+        })
+
+    from app.models.payment import Payment, PaymentMode
+    pm_enum = PaymentMode(payment_mode) if payment_mode in [m.value for m in PaymentMode] else PaymentMode.cash
+
+    payment = Payment(
+        order_id=item.id,
+        outlet_id=item.outlet_id,
+        user_id=current_user.id,
+        company_profile_id=item.company_profile_id,
+        amount=amt_val,
+        payment_mode=pm_enum,
+        reference_no=reference_no or None,
+        denomination_breakdown=denom_json,
+        notes=notes or None,
+    )
+    db.add(payment)
+    db.commit()
+
+    set_flash_success(request, f"Payment of ₹{amt_val} recorded for order {item.order_number}.")
+    return RedirectResponse(f"/orders/{order_id}", status_code=302)
 
 
 @router.post("/{order_id}/status")

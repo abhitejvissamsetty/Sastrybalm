@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}System Data Backup &amp; Recovery{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-white">System Data Backup &amp; Recovery</h1>
+      <p class="mt-1 text-sm text-slate-400">Generate full system database snapshots and download complete backups on demand.</p>
+    </div>
+    <form action="/settings/backup/create" method="post">
+      <button type="submit"
+              class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        Generate Instant Backup
+      </button>
+    </form>
+  </div>
+
+  {% if success %}
+  <div class="rounded-lg bg-emerald-900/40 border border-emerald-700 px-4 py-3 text-sm text-emerald-300">{{ success }}</div>
+  {% endif %}
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <!-- Info Alert -->
+  <div class="glass rounded-2xl p-5 border border-indigo-500/20 bg-indigo-950/20 flex items-start gap-4">
+    <div class="p-2 rounded-xl bg-indigo-600/20 text-indigo-400">
+      <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-9 3.75h.008v.008H12v-.008z" />
+      </svg>
+    </div>
+    <div class="text-sm">
+      <h4 class="font-bold text-white">Automated Daily Backups &amp; Data Security</h4>
+      <p class="text-slate-300 mt-1">
+        Backups include all system master data (Sales Channels, Outlets, Beat Routes, Users, Products, Warehouses) and operational transaction records (Orders, Payments, Attendance, Expenses, Visits, Inventory logs). Automated daily backups run every night at 00:00 IST.
+      </p>
+    </div>
+  </div>
+
+  <!-- Backups Table -->
+  <div class="table-container shadow-2xl shadow-black/50">
+    <table class="min-w-full divide-y divide-white/5">
+      <thead>
+        <tr class="bg-slate-900/80 backdrop-blur-md">
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Backup Archive</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Created At</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">File Size</th>
+          <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for b in backups %}
+        <tr class="table-row-hover transition-colors">
+          <td class="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-indigo-400">
+            {{ b.filename }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-300">
+            {{ b.created_at }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-xs font-mono text-slate-400">
+            {{ b.size_mb }} MB
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-xs font-medium space-x-3">
+            <a href="/settings/backup/download/{{ b.filename }}"
+               class="inline-flex items-center gap-x-1 rounded-lg bg-indigo-950 px-3 py-1 text-xs font-semibold text-indigo-300 border border-indigo-800/60 hover:bg-indigo-900 transition-colors">
+              Download ZIP
+            </a>
+            <form method="post" action="/settings/backup/delete/{{ b.filename }}" class="inline" onsubmit="return confirm('Delete backup {{ b.filename }}?')">
+              <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" class="px-6 py-12 text-center text-slate-500 text-sm">
+            No backup archives generated yet. Click "Generate Instant Backup" above.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

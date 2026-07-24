@@ -18,14 +18,87 @@ router = APIRouter(prefix="/users", tags=["users"])
 templates = Jinja2Templates(directory="app/templates")
 
 
-def _form_context(db: Session) -> dict:
+def _form_context(db: Session, for_role: str = "") -> dict:
+    positions_query = db.query(Position).filter(Position.is_active == True)
+    if for_role == UserRole.field_rep.value:
+        # Filter positions for field reps to L1 level
+        positions_query = positions_query.filter(Position.level == "L1")
     return {
-        "positions": db.query(Position).filter(Position.is_active == True).order_by(Position.name).all(),
-        "companies": db.query(CompanyProfile).filter(CompanyProfile.is_active == True).order_by(CompanyProfile.name).all(),
+        "positions": positions_query.order_by(Position.name).all(),
         "UserRole": UserRole,
         "ModuleName": ModuleName,
         "PaymentMode": PaymentMode,
     }
+
+
+@router.get("/role-matrix", response_class=HTMLResponse)
+async def user_role_matrix(
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+):
+    """Render Admin Role & Access Permissions Matrix."""
+    return templates.TemplateResponse("users/role_matrix.html", {
+        "request": request,
+        "current_user": current_user,
+        "UserRole": UserRole,
+        **get_flash(request),
+    })
+
+
+@router.get("/{user_id}/position-view", response_class=HTMLResponse)
+async def user_position_view(
+    user_id: int,
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+):
+    """View and update user position assignment & hierarchy tree."""
+    user_obj = db.query(User).filter(User.id == user_id).first()
+    if not user_obj:
+        set_flash_error(request, "User not found.")
+        return RedirectResponse("/users", status_code=302)
+
+    pos_query = db.query(Position).filter(Position.is_active == True)
+    if user_obj.role == UserRole.field_rep:
+        # Filter available positions for field reps to L1 level
+        pos_query = pos_query.filter(Position.level == "L1")
+
+    all_positions = pos_query.order_by(Position.name).all()
+    assigned_ids = [p.id for p in user_obj.positions]
+
+    return templates.TemplateResponse("users/position_view_modal.html", {
+        "request": request,
+        "current_user": current_user,
+        "user_obj": user_obj,
+        "all_positions": all_positions,
+        "assigned_ids": assigned_ids,
+        **get_flash(request),
+    })
+
+
+@router.post("/{user_id}/position-view")
+async def user_position_update(
+    user_id: int,
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+    position_ids: list[str] = Form(default=[]),
+):
+    """Update assigned positions for user."""
+    user_obj = db.query(User).filter(User.id == user_id).first()
+    if not user_obj:
+        set_flash_error(request, "User not found.")
+        return RedirectResponse("/users", status_code=302)
+
+    user_obj.positions.clear()
+    if position_ids:
+        pos_objs = db.query(Position).filter(Position.id.in_(position_ids)).all()
+        user_obj.positions.extend(pos_objs)
+
+    db.commit()
+    set_flash_success(request, f"Position assignments updated for '{user_obj.full_name}'.")
+    return RedirectResponse(f"/users/{user_id}/position-view", status_code=302)
+
 
 
 @router.get("", response_class=HTMLResponse)
@@ -90,8 +163,8 @@ async def user_create(
         err = "Phone number must be exactly 10 digits."
     elif db.query(User).filter(User.phone == phone_clean).first():
         err = f"Phone number '{phone_clean}' already registered."
-    elif role != UserRole.admin.value and not company_profile_id:
-        err = "Company Profile is mandatory for non-admin users."
+    elif role == UserRole.admin.value and db.query(User).filter(User.role == UserRole.admin).first():
+        err = "Only one System Administrator is permitted for this software setup. Admin credentials are configured in .env."
     elif db.query(User).filter(User.email == email).first():
         err = f"Email '{email}' already registered."
     elif db.query(User).filter(User.username == username).first():
@@ -172,10 +245,6 @@ async def user_update(
         err = "Phone number is mandatory."
     elif not re.match(r"^\d{10}$", phone_clean):
         err = "Phone number must be exactly 10 digits."
-    elif db.query(User).filter(User.phone == phone_clean, User.id != user_id).first():
-        err = f"Phone number '{phone_clean}' already registered."
-    elif role != UserRole.admin.value and not company_profile_id:
-        err = "Company Profile is mandatory for non-admin users."
     elif db.query(User).filter(User.email == email, User.id != user_id).first():
         err = f"Email '{email}' already registered."
         

@@ -46,7 +46,6 @@ class CompanyProfile(Base):
     # Relationships
     product_mappings = relationship("ProductAliasMap", back_populates="company_profile", cascade="all, delete-orphan")
     account_mappings = relationship("AccountAliasMap", back_populates="company_profile", cascade="all, delete-orphan")
-    products = relationship("Product", back_populates="company_profile")
 
     def get_tags(self) -> list[str]:
         try:
@@ -107,10 +106,6 @@ class SystemConfiguration(Base):
     # Mobile frontend behaviour
     gps_threshold_metres = Column(Integer, default=100, nullable=False)
     sync_interval_seconds = Column(Integer, default=300, nullable=False)
-    # API sync schedules (minutes)
-    zap_fetch_interval_minutes = Column(Integer, default=60, nullable=False)
-    cmms_post_interval_minutes = Column(Integer, default=30, nullable=False)
-    connect_sync_interval_minutes = Column(Integer, default=30, nullable=False)
     # Auto-flagging thresholds
     flag_gps_distance_metres = Column(Integer, default=100, nullable=False)
     flag_min_visit_seconds = Column(Integer, default=120, nullable=False)  # 2 minutes

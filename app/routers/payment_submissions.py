@@ -178,8 +178,8 @@ async def submission_reject(
     return RedirectResponse(f"/payment-submissions/{sub_id}", status_code=302)
 
 
-@router.post("/{sub_id}/post-zap")
-async def submission_post_zap(
+@router.post("/{sub_id}/post")
+async def submission_post(
     sub_id: int, request: Request,
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
@@ -190,51 +190,8 @@ async def submission_post_zap(
         set_flash_error(request, "Submission must be approved before posting.")
         return RedirectResponse(f"/payment-submissions/{sub_id}", status_code=302)
 
-    # Build ZAP Journal Entry payload
-    from app.adapters.zap import ZapAdapter
-    from app.models.company import CompanyProfile
-    from app.utils.encryption import decrypt
-
-    rep = item.rep
-    if not rep or not rep.company_profile_id:
-        set_flash_error(request, "Rep has no company profile.")
-        return RedirectResponse(f"/payment-submissions/{sub_id}", status_code=302)
-
-    profile = db.query(CompanyProfile).filter(CompanyProfile.id == rep.company_profile_id).first()
-    if not profile or not profile.zap_base_url or not profile.zap_api_key_encrypted:
-        set_flash_error(request, "ZAP integration not configured for this company profile.")
-        return RedirectResponse(f"/payment-submissions/{sub_id}", status_code=302)
-
-    zap = ZapAdapter(
-        base_url=profile.zap_base_url,
-        api_key=decrypt(profile.zap_api_key_encrypted),
-    )
-
-    payload = {
-        "voucher_type": "Journal Entry",
-        "company": profile.zap_backend_company or profile.name,
-        "cheque_no": item.submission_ref,
-        "cheque_date": item.submitted_at.strftime("%Y-%m-%d") if item.submitted_at else None,
-        "accounts": [
-            {
-                "account": item.target_account or "Cash - Default",
-                "debit_in_account_currency": float(item.total_amount),
-            },
-            {
-                "account": "Sales - Default",
-                "credit_in_account_currency": float(item.total_amount),
-            },
-        ],
-        "user_remark": f"Payment submission by {rep.full_name}: {item.submission_ref}",
-    }
-
-    try:
-        result = await zap.create_journal_entry(payload)
-        item.status = SubmissionStatus.posted
-        item.journal_entry_ref = result.get("data", {}).get("name") or str(result)[:100]
-        db.commit()
-        set_flash_success(request, f"Journal Entry posted to ZAP: {item.journal_entry_ref}")
-    except Exception as exc:
-        set_flash_error(request, f"ZAP posting failed: {str(exc)[:200]}")
-
+    item.status = SubmissionStatus.posted
+    item.journal_entry_ref = f"JE-LOCAL-{item.id}"
+    db.commit()
+    set_flash_success(request, f"Payment submission '{item.submission_ref}' posted successfully.")
     return RedirectResponse(f"/payment-submissions/{sub_id}", status_code=302)

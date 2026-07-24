@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}WhatsApp Notification Settings{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl space-y-6">
+  <div>
+    <h1 class="text-2xl font-bold text-white">WhatsApp Business API Settings</h1>
+    <p class="mt-1 text-sm text-slate-400">Configure automated customer receipt and order confirmation WhatsApp notifications.</p>
+  </div>
+
+  <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-700 pb-4">
+      <div>
+        <h3 class="text-base font-semibold text-white">WhatsApp Business Account (WABA)</h3>
+        <p class="text-xs text-slate-400">Meta WhatsApp Cloud API or Twilio API gateway connection.</p>
+      </div>
+      <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800">Meta Cloud API</span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Phone Number ID</label>
+        <input type="text" placeholder="1092837465019"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">WhatsApp Business Account ID</label>
+        <input type="text" placeholder="waba_883019283"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Permanent Access Token</label>
+      <input type="password" placeholder="EAAG..."
+             class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </div>
+
+    <div class="space-y-2 pt-2">
+      <label class="flex items-center space-x-2 text-sm text-slate-300">
+        <input type="checkbox" checked class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+        <span>Send order confirmation receipts automatically to retailer WhatsApp</span>
+      </label>
+      <label class="flex items-center space-x-2 text-sm text-slate-300">
+        <input type="checkbox" checked class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+        <span>Send payment collection receipts to retailer WhatsApp</span>
+      </label>
+    </div>
+
+    <div class="flex justify-end pt-2">
+      <button type="button" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Save Configuration</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

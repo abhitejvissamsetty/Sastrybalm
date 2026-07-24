@@ -12,6 +12,8 @@ from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 
+from app.utils.beat_types import get_all_beat_types
+
 router = APIRouter(prefix="/beats", tags=["beats"])
 templates = Jinja2Templates(directory="app/templates")
 
@@ -28,14 +30,14 @@ async def beat_list(
     query = db.query(Beat)
     if q:
         query = query.filter(Beat.name.ilike(f"%{q}%") | Beat.code.ilike(f"%{q}%"))
-    if beat_type and beat_type in [bt.value for bt in BeatType]:
+    if beat_type:
         query = query.filter(Beat.beat_type == beat_type)
     query = query.order_by(Beat.name)
     pagination = paginate(query, page)
     return templates.TemplateResponse("beats/list.html", {
         "request": request, "current_user": current_user,
         "pagination": pagination, "q": q, "beat_type": beat_type,
-        "BeatType": BeatType, **get_flash(request),
+        "beat_types": get_all_beat_types(db), "BeatType": BeatType, **get_flash(request),
     })
 
 
@@ -45,12 +47,16 @@ async def beat_new(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
+    from app.models.local_distribution import LocalChannelPartner
     territories = db.query(Geography).filter(
         Geography.level == GeoLevel.territory, Geography.is_active == True
     ).order_by(Geography.name).all()
+    channel_partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
+
     return templates.TemplateResponse("beats/form.html", {
         "request": request, "current_user": current_user,
-        "item": None, "territories": territories, "BeatType": BeatType, "BeatGrade": BeatGrade, "error": None,
+        "item": None, "territories": territories, "channel_partners": channel_partners,
+        "attached_ids": [], "beat_types": get_all_beat_types(db), "BeatType": BeatType, "BeatGrade": BeatGrade, "error": None,
     })
 
 
@@ -62,10 +68,16 @@ async def beat_create(
     name: str = Form(...),
     code: str = Form(...),
     beat_type: str = Form(...),
+    description: Optional[str] = Form(default=None),
+    pincodes: Optional[str] = Form(default=None),
     beat_grade: Optional[str] = Form(default=None),
     territory_id: Optional[str] = Form(default=None),
+    channel_partner_ids: list[str] = Form(default=[]),
     erp_id: Optional[str] = Form(default=None),
 ):
+    from app.models.local_distribution import LocalChannelPartner
+    from app.models.beat_channel_partner import BeatChannelPartner
+
     if db.query(Beat).filter(Beat.code == code.upper()).first():
         territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
         return templates.TemplateResponse("beats/form.html", {
@@ -73,12 +85,21 @@ async def beat_create(
             "item": None, "territories": territories, "BeatType": BeatType, "BeatGrade": BeatGrade,
             "error": f"Code '{code.upper()}' already exists.",
         })
-    db.add(Beat(
+    
+    beat = Beat(
         name=name, code=code.upper(), beat_type=BeatType(beat_type),
+        description=description or None, pincodes=pincodes or None,
         beat_grade=BeatGrade(beat_grade) if beat_grade else None,
         territory_id=int(territory_id) if territory_id else None,
         erp_id=erp_id or None,
-    ))
+    )
+    db.add(beat)
+    db.flush()
+
+    if channel_partner_ids:
+        for c_id in channel_partner_ids:
+            db.add(BeatChannelPartner(beat_id=beat.id, channel_partner_id=int(c_id)))
+
     db.commit()
     set_flash_success(request, f"Beat '{name}' created.")
     return RedirectResponse("/beats", status_code=302)
@@ -90,14 +111,21 @@ async def beat_edit(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
+    from app.models.local_distribution import LocalChannelPartner
+    from app.models.beat_channel_partner import BeatChannelPartner
+
     item = db.query(Beat).filter(Beat.id == beat_id).first()
     if not item or not item.is_active:
         set_flash_error(request, "Active beat not found or beat is inactive.")
         return RedirectResponse("/beats", status_code=302)
     territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
+    channel_partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
+    attached_ids = [bcp.channel_partner_id for bcp in db.query(BeatChannelPartner).filter(BeatChannelPartner.beat_id == beat_id).all()]
+
     return templates.TemplateResponse("beats/form.html", {
         "request": request, "current_user": current_user,
-        "item": item, "territories": territories, "BeatType": BeatType, "BeatGrade": BeatGrade, "error": None,
+        "item": item, "territories": territories, "channel_partners": channel_partners,
+        "attached_ids": attached_ids, "beat_types": get_all_beat_types(db), "BeatType": BeatType, "BeatGrade": BeatGrade, "error": None,
     })
 
 
@@ -109,10 +137,15 @@ async def beat_update(
     name: str = Form(...),
     code: str = Form(...),
     beat_type: str = Form(...),
+    description: Optional[str] = Form(default=None),
+    pincodes: Optional[str] = Form(default=None),
     beat_grade: Optional[str] = Form(default=None),
     territory_id: Optional[str] = Form(default=None),
+    channel_partner_ids: list[str] = Form(default=[]),
     erp_id: Optional[str] = Form(default=None),
 ):
+    from app.models.beat_channel_partner import BeatChannelPartner
+
     item = db.query(Beat).filter(Beat.id == beat_id).first()
     if not item or not item.is_active:
         set_flash_error(request, "Active beat not found or beat is inactive.")
@@ -127,9 +160,17 @@ async def beat_update(
     item.name = name
     item.code = code.upper()
     item.beat_type = BeatType(beat_type)
+    item.description = description or None
+    item.pincodes = pincodes or None
     item.beat_grade = BeatGrade(beat_grade) if beat_grade else None
     item.territory_id = int(territory_id) if territory_id else None
     item.erp_id = erp_id or None
+
+    db.query(BeatChannelPartner).filter(BeatChannelPartner.beat_id == beat_id).delete()
+    if channel_partner_ids:
+        for c_id in channel_partner_ids:
+            db.add(BeatChannelPartner(beat_id=beat_id, channel_partner_id=int(c_id)))
+
     db.commit()
     set_flash_success(request, f"Beat '{name}' updated.")
     return RedirectResponse("/beats", status_code=302)

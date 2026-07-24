@@ -9,7 +9,7 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-2xl font-bold text-white">Visit Records</h1>
-      <p class="mt-1 text-sm text-slate-400">All outlet visits by field reps</p>
+      <p class="mt-1 text-sm text-slate-400">All outlet visits, joint working logs, and field check-ins</p>
     </div>
     <a href="/timesheets"
        class="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors">
@@ -25,8 +25,16 @@
       <option value="{{ rep.id }}" {% if user_id == rep.id|string %}selected{% endif %}>{{ rep.full_name }}</option>
       {% endfor %}
     </select>
+
+    <select name="is_joint"
+            class="rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <option value="">All Visit Types</option>
+      <option value="yes" {% if is_joint == 'yes' %}selected{% endif %}>Joint Working Only</option>
+      <option value="no" {% if is_joint == 'no' %}selected{% endif %}>Individual Visits</option>
+    </select>
+
     <button type="submit" class="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-600 transition-colors">Filter</button>
-    {% if user_id %}
+    {% if user_id or is_joint %}
     <a href="/timesheets/visits/all" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
     {% endif %}
   </form>
@@ -38,6 +46,7 @@
           <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Time</th>
           <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Rep</th>
           <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Outlet</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Working Type</th>
           <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Purpose</th>
           <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Distance</th>
           <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden lg:table-cell">Order</th>
@@ -49,6 +58,18 @@
           <td class="px-4 py-3 text-sm text-slate-300">{{ item.visit_time.strftime('%Y-%m-%d %H:%M') }}</td>
           <td class="px-4 py-3 text-sm font-medium text-white">{{ item.user.full_name if item.user else '—' }}</td>
           <td class="px-4 py-3 text-sm text-slate-300 hidden sm:table-cell">{{ item.outlet.name if item.outlet else '—' }}</td>
+          <td class="px-4 py-3 text-xs">
+            {% if item.is_joint_visit %}
+            <span class="inline-flex items-center rounded-full bg-purple-950 px-2 py-0.5 text-xs font-semibold text-purple-300 border border-purple-800">
+              ⚡ Joint Visit
+            </span>
+            {% if item.joint_with_name %}
+            <div class="text-[10px] text-slate-400 mt-0.5">With: {{ item.joint_with_name }} ({{ item.joint_with_role or 'Manager' }})</div>
+            {% endif %}
+            {% else %}
+            <span class="text-slate-500">Solo Visit</span>
+            {% endif %}
+          </td>
           <td class="px-4 py-3 text-sm text-slate-400 hidden md:table-cell">{{ item.purpose or '—' }}</td>
           <td class="px-4 py-3 text-sm hidden md:table-cell">
             {% if item.distance_from_outlet is not none %}
@@ -69,12 +90,12 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" class="px-4 py-12 text-center text-sm text-slate-500">No visit records found.</td>
+          <td colspan="7" class="px-4 py-12 text-center text-sm text-slate-500">No visit records found.</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
-    {% set qs = "user_id=" ~ user_id %}
+    {% set qs = "user_id=" ~ user_id ~ "&is_joint=" ~ is_joint %}
     {{ paginate(pagination, "/timesheets/visits/all?" ~ qs) }}
   </div>
 

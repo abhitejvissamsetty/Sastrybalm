@@ -11,13 +11,13 @@ from app.config import settings
 
 from app.routers import auth, dashboard, geography, positions, beats, outlets, products, users, company
 from app.routers import orders, payments, expenses, timesheets, tracking, analytics, material_requests
-from app.routers import payment_submissions, asset_capitalizations, vendors, attendance, approvals, flags
+from app.routers import asset_capitalizations, vendors, attendance, approvals, flags, inventory
+from app.routers import settings as settings_router
 from app.routers.api import auth as api_auth
 from app.routers.api import master as api_master
 from app.routers.api import operations as api_operations
 from app.routers.api import webhooks as api_webhooks
 from app.scheduler import start_scheduler, scheduler
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -60,6 +60,8 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 _templates = Jinja2Templates(directory="app/templates")
 
+from app.routers import backup, channel_partners, warehouses
+
 # Web routers
 app.include_router(auth.router)
 app.include_router(dashboard.router)
@@ -68,6 +70,11 @@ app.include_router(positions.router)
 app.include_router(beats.router)
 app.include_router(outlets.router)
 app.include_router(products.router)
+app.include_router(warehouses.router)
+app.include_router(channel_partners.router)
+app.include_router(inventory.router)
+app.include_router(settings_router.router)
+app.include_router(backup.router)
 app.include_router(users.router)
 app.include_router(company.router)
 app.include_router(orders.router)
@@ -77,7 +84,6 @@ app.include_router(timesheets.router)
 app.include_router(tracking.router)
 app.include_router(analytics.router)
 app.include_router(material_requests.router)
-app.include_router(payment_submissions.router)
 app.include_router(asset_capitalizations.router)
 app.include_router(vendors.router)
 app.include_router(attendance.router)

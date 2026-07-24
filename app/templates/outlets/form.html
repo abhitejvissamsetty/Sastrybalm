@@ -90,11 +90,11 @@
     <!-- Channel & Shop Type Dropdowns -->
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
       <div>
-        <label class="block text-sm font-medium text-slate-300 mb-1.5">Channel</label>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Sales Channel</label>
         <select name="channel" class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
           <option value="">Select Channel...</option>
-          {% for ch in ChannelType %}
-          <option value="{{ ch.value }}" {% if item and item.channel == ch %}selected{% endif %}>{{ ch.value }}</option>
+          {% for bt in beat_types %}
+          <option value="{{ bt.code }}" {% if item and (item.channel == bt.code or item.channel.value == bt.code) %}selected{% endif %}>{{ bt.name }}</option>
           {% endfor %}
         </select>
       </div>

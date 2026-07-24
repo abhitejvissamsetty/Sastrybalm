@@ -31,6 +31,8 @@ class Beat(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     code = Column(String(100), unique=True, nullable=False, index=True)
+    description = Column(String(500), nullable=True)
+    pincodes = Column(String(500), nullable=True)
     beat_type = Column(SAEnum(BeatType), nullable=False, default=BeatType.GT)
     beat_grade = Column(SAEnum(BeatGrade), nullable=True)
     territory_id = Column(Integer, ForeignKey("geographies.id"), nullable=True)

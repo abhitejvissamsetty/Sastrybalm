@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if item else 'New' }} Warehouse{% endblock %}
+
+{% block content %}
+<div class="max-w-xl space-y-6">
+
+  <div class="flex items-center gap-x-4">
+    <a href="/warehouses" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">{{ 'Edit Warehouse' if item else 'New Warehouse' }}</h1>
+      <p class="mt-1 text-sm text-slate-400">{{ item.name if item else 'Create a warehouse location' }}</p>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" class="space-y-5 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Warehouse Name <span class="text-red-400">*</span></label>
+      <input type="text" name="name" required value="{{ item.name if item else '' }}"
+             class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Warehouse Code <span class="text-red-400">*</span></label>
+      <input type="text" name="code" required value="{{ item.code if item else '' }}"
+             class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500"
+             placeholder="e.g. WH-HYD-01">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Pincode</label>
+      <input type="text" name="pincode" value="{{ item.pincode if item and item.pincode else '' }}"
+             class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+             placeholder="e.g. 500001">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Full Address</label>
+      <textarea name="address" rows="3"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ item.address if item and item.address else '' }}</textarea>
+    </div>
+
+    {% if item %}
+    <div class="flex items-center gap-x-2">
+      <input type="checkbox" name="is_active" id="is_active" {% if item.is_active %}checked{% endif %}
+             class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+      <label for="is_active" class="text-sm font-medium text-slate-300">Active Location</label>
+    </div>
+    {% endif %}
+
+    <div class="flex items-center justify-end gap-x-3 pt-4 border-t border-slate-700">
+      <a href="/warehouses" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+      <button type="submit"
+              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        {{ 'Save Changes' if item else 'Create Warehouse' }}
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

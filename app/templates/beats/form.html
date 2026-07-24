@@ -3,7 +3,7 @@
 {% block title %}{{ 'Edit' if item else 'New' }} Beat{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl space-y-6">
+<div class="max-w-3xl space-y-6">
 
   <div class="flex items-center gap-x-4">
     <a href="/beats" class="text-slate-400 hover:text-white transition-colors">
@@ -21,31 +21,37 @@
   <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
   {% endif %}
 
-  <form method="post" class="space-y-5 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+  <form method="post" class="space-y-6 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
 
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
       <div>
-        <label class="block text-sm font-medium text-slate-300 mb-1.5">Name <span class="text-red-400">*</span></label>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Beat Name <span class="text-red-400">*</span></label>
         <input type="text" name="name" required value="{{ item.name if item else '' }}"
                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
       </div>
       <div>
-        <label class="block text-sm font-medium text-slate-300 mb-1.5">Code <span class="text-red-400">*</span></label>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Beat Code <span class="text-red-400">*</span></label>
         <input type="text" name="code" required value="{{ item.code if item else '' }}"
                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500"
                placeholder="e.g. HYD-GT-01">
       </div>
     </div>
 
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Description</label>
+      <textarea name="description" rows="2" placeholder="Brief beat route description, landmark coverage..."
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ item.description if item and item.description else '' }}</textarea>
+    </div>
+
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
       <div>
-        <label class="block text-sm font-medium text-slate-300 mb-1.5">Beat Type <span class="text-red-400">*</span></label>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Sales Channel <span class="text-red-400">*</span></label>
         <select name="beat_type" required
                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
           <option value="">Select type…</option>
-          {% for bt in BeatType %}
-          <option value="{{ bt.value }}" {% if item and item.beat_type == bt %}selected{% endif %}>
-            {{ bt.value.replace('_', ' ').title() }}
+          {% for bt in beat_types %}
+          <option value="{{ bt.code }}" {% if item and (item.beat_type == bt.code or item.beat_type.value == bt.code) %}selected{% endif %}>
+            {{ bt.name }}
           </option>
           {% endfor %}
         </select>
@@ -64,19 +70,56 @@
       </div>
     </div>
 
-    <div>
-      <label class="block text-sm font-medium text-slate-300 mb-1.5">Territory</label>
-      <select name="territory_id"
-              class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <option value="">None</option>
-        {% for t in territories %}
-        <option value="{{ t.id }}" {% if item and item.territory_id == t.id %}selected{% endif %}>{{ t.name }}</option>
-        {% endfor %}
-      </select>
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Territory Boundary</label>
+        <select name="territory_id" id="territorySelect" onchange="resolveRegion()"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="" data-region="Unassigned">None</option>
+          {% for t in territories %}
+          <option value="{{ t.id }}" data-region="{{ t.parent.name if t.parent else 'General Region' }}" {% if item and item.territory_id == t.id %}selected{% endif %}>
+            {{ t.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Resolved Region</label>
+        <div id="resolvedRegionBadge" class="w-full rounded-lg bg-slate-950 border border-slate-700/60 text-indigo-400 px-3 py-2 text-sm font-semibold">
+          {% if item and item.territory and item.territory.parent %}
+            {{ item.territory.parent.name }}
+          {% else %}
+            Select a Territory...
+          {% endif %}
+        </div>
+      </div>
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-slate-300 mb-1.5">ERP ID</label>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Pincodes Allocation</label>
+      <input type="text" name="pincodes" value="{{ item.pincodes if item and item.pincodes else '' }}"
+             class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+             placeholder="Comma-separated pincodes (e.g. 500001, 500002, 500003)">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-2">Distributors / Channel Partners (Multiple)</label>
+      <div class="max-h-48 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 p-3 space-y-2">
+        {% for cp in channel_partners %}
+        <label class="flex items-center space-x-3 text-sm text-slate-300 hover:text-white cursor-pointer">
+          <input type="checkbox" name="channel_partner_ids" value="{{ cp.id }}" {% if cp.id in attached_ids %}checked{% endif %}
+                 class="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500">
+          <span class="font-medium">{{ cp.name }}</span>
+          <span class="text-xs text-slate-500">({{ cp.partner_type }})</span>
+        </label>
+        {% else %}
+        <p class="text-xs text-slate-500 italic">No distributors registered yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">ERP Reference ID</label>
       <input type="text" name="erp_id" value="{{ item.erp_id if item and item.erp_id else '' }}"
              class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
              placeholder="Optional ERP reference">
@@ -86,7 +129,7 @@
     <input type="hidden" name="is_active" value="on">
     {% endif %}
 
-    <div class="flex items-center justify-end gap-x-3 pt-2 border-t border-slate-700">
+    <div class="flex items-center justify-end gap-x-3 pt-4 border-t border-slate-700">
       <a href="/beats" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
       <button type="submit"
               class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
@@ -96,4 +139,13 @@
 
   </form>
 </div>
+
+<script>
+function resolveRegion() {
+  const sel = document.getElementById('territorySelect');
+  const opt = sel.options[sel.selectedIndex];
+  const region = opt.getAttribute('data-region') || 'Select a Territory...';
+  document.getElementById('resolvedRegionBadge').innerText = region;
+}
+</script>
 {% endblock %}

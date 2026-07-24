@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Webhook Integration Settings{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Webhook Integration Settings</h1>
+      <p class="mt-1 text-sm text-slate-400">Configure multiple outbound event-based webhooks, secret signatures, and test payloads.</p>
+    </div>
+    <button type="button" onclick="document.getElementById('new-webhook-modal').classList.remove('hidden')"
+            class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      Add Event Webhook
+    </button>
+  </div>
+
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <!-- Configured Webhooks Table -->
+  <div class="table-container shadow-2xl shadow-black/50">
+    <table class="min-w-full divide-y divide-white/5">
+      <thead>
+        <tr class="bg-slate-900/80 backdrop-blur-md">
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Webhook Name</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Event Trigger</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Endpoint URL</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Last Triggered</th>
+          <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for wh in webhooks %}
+        <tr class="table-row-hover transition-colors">
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
+            {{ wh.name }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-xs">
+            <span class="inline-flex items-center rounded-md bg-indigo-950 px-2.5 py-1 font-mono font-semibold text-indigo-300 border border-indigo-800">
+              ⚡ {{ wh.event_type.value }}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-xs font-mono text-slate-300 max-w-xs truncate">
+            {{ wh.endpoint_url }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <form method="post" action="/settings/webhooks/{{ wh.id }}/toggle" class="inline">
+              <button type="submit" class="inline-flex items-center gap-x-1.5 text-xs font-semibold cursor-pointer">
+                {% if wh.is_active %}
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">Active</span>
+                {% else %}
+                <span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">Inactive</span>
+                {% endif %}
+              </button>
+            </form>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-400">
+            {{ wh.last_triggered_at.strftime('%Y-%m-%d %H:%M') if wh.last_triggered_at else 'Never' }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-xs font-medium">
+            <div class="flex items-center justify-end gap-x-3">
+              <form method="post" action="/settings/webhooks/{{ wh.id }}/test" class="inline">
+                <button type="submit" class="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors">
+                  Test Payload
+                </button>
+              </form>
+              <form method="post" action="/settings/webhooks/{{ wh.id }}/delete" class="inline" onsubmit="return confirm('Delete webhook {{ wh.name }}?')">
+                <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">
+                  Delete
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="px-6 py-12 text-center text-slate-500 text-sm">
+            No event webhooks configured yet. Click "Add Event Webhook" above to create one.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- New Webhook Modal -->
+  <div id="new-webhook-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-bold text-white">Add Event Webhook</h3>
+        <button type="button" onclick="document.getElementById('new-webhook-modal').classList.add('hidden')" class="text-slate-400 hover:text-white">
+          &times;
+        </button>
+      </div>
+
+      <form action="/settings/webhooks/new" method="post" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Webhook Name <span class="text-red-400">*</span></label>
+          <input type="text" name="name" required placeholder="e.g. ERP Order Sync Webhook"
+                 class="w-full rounded-lg bg-slate-950 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Event Trigger <span class="text-red-400">*</span></label>
+          <select name="event_type" required
+                  class="w-full rounded-lg bg-slate-950 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            {% for event in WebhookEvent %}
+            <option value="{{ event.value }}">⚡ {{ event.value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Endpoint URL <span class="text-red-400">*</span></label>
+          <input type="url" name="endpoint_url" required placeholder="https://api.yourdomain.com/v1/webhooks/orders"
+                 class="w-full rounded-lg bg-slate-950 border border-slate-700 text-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Secret Signing Key (Optional)</label>
+          <input type="text" name="secret_key" placeholder="whsec_secret_key_12345"
+                 class="w-full rounded-lg bg-slate-950 border border-slate-700 text-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div class="flex justify-end gap-x-3 pt-3 border-t border-slate-800">
+          <button type="button" onclick="document.getElementById('new-webhook-modal').classList.add('hidden')"
+                  class="rounded-lg px-4 py-2 text-xs font-medium text-slate-400 hover:text-white">Cancel</button>
+          <button type="submit" class="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-500">
+            Create Webhook
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

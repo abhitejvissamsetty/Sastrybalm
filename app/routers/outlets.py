@@ -54,6 +54,8 @@ async def outlet_list(
     })
 
 
+from app.utils.beat_types import get_all_beat_types
+
 @router.get("/new", response_class=HTMLResponse)
 async def outlet_new(
     request: Request,
@@ -65,7 +67,7 @@ async def outlet_new(
     return templates.TemplateResponse("outlets/form.html", {
         "request": request, "current_user": current_user,
         "item": None, "beats": beats, "territories": territories, "error": None,
-        "ChannelType": ChannelType, "ShopType": ShopType,
+        "beat_types": get_all_beat_types(db), "ChannelType": ChannelType, "ShopType": ShopType,
     })
 
 
@@ -194,7 +196,7 @@ async def outlet_edit(
     return templates.TemplateResponse("outlets/form.html", {
         "request": request, "current_user": current_user,
         "item": item, "beats": beats, "territories": territories, "error": None,
-        "ChannelType": ChannelType, "ShopType": ShopType,
+        "beat_types": get_all_beat_types(db), "ChannelType": ChannelType, "ShopType": ShopType,
     })
 
 

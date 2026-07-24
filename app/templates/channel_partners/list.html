@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "shared/pagination.html" import render as paginate %}
+
+{% block title %}Channel Partners{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold text-white tracking-tight">Channel Partners &amp; Distributors</h1>
+      <p class="mt-2 text-sm text-slate-400 font-medium">Manage primary distributors, super stockists, and institutional trade partners.</p>
+    </div>
+    {% if current_user.role.value == 'admin' %}
+    <a href="/channel-partners/new"
+       class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      New Channel Partner
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="glass rounded-2xl p-6 border border-white/5">
+    <form method="get" class="flex flex-wrap items-center gap-4">
+      <div class="relative flex-1 min-w-[240px]">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search partner name, mobile or ERP ID..."
+               class="w-full rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-slate-500 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+      </div>
+      <button type="submit" class="premium-btn rounded-xl bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition-all border border-white/5">
+        Filter
+      </button>
+    </form>
+  </div>
+
+  <div class="table-container shadow-2xl shadow-black/50">
+    <table class="min-w-full divide-y divide-white/5">
+      <thead>
+        <tr class="bg-slate-900/80 backdrop-blur-md">
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Partner Name</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Partner Type</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Beat Type</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Contact</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
+          <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for item in pagination.items %}
+        <tr class="table-row-hover transition-colors">
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
+            {{ item.name }}
+            {% if item.erp_id %}<div class="text-xs font-mono text-indigo-400 font-normal">ERP: {{ item.erp_id }}</div>{% endif %}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+            <span class="inline-flex items-center rounded-md bg-indigo-950 px-2.5 py-1 text-xs font-semibold text-indigo-300 border border-indigo-800">
+              {{ item.partner_type }}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+            <span class="inline-flex items-center rounded-md bg-purple-950 px-2.5 py-1 text-xs font-semibold text-purple-300 border border-purple-800">
+              {{ item.beat_type or 'GT' }}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+            {{ item.contact_person or '—' }}
+            {% if item.mobile %}<div class="text-xs text-slate-500">{{ item.mobile }}</div>{% endif %}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            {% if item.is_active %}
+            <span class="inline-flex items-center gap-x-1.5 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Active
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-x-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+              <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span> Inactive
+            </span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <a href="/channel-partners/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300">Edit</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="px-6 py-12 text-center text-slate-500">No channel partners found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if pagination.pages > 1 %}
+    <div class="bg-slate-900/50 px-6 py-4 border-t border-white/5">
+      {{ paginate(pagination, "/channel-partners?q=" ~ q) }}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

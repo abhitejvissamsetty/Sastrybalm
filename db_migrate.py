@@ -85,8 +85,39 @@ def run_migrations():
         # Beats
         add_column_safely(conn, "beats", "beat_type", "VARCHAR(50) NOT NULL DEFAULT 'GT'")
         add_column_safely(conn, "beats", "beat_grade", "VARCHAR(50) NULL")
+        add_column_safely(conn, "beats", "description", "TEXT NULL")
+        add_column_safely(conn, "beats", "pincodes", "VARCHAR(500) NULL")
         add_column_safely(conn, "beats", "erp_id", "VARCHAR(100) NULL")
         add_column_safely(conn, "beats", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+        
+        # Local Channel Partners
+        add_column_safely(conn, "local_channel_partners", "beat_type", "VARCHAR(50) NOT NULL DEFAULT 'GT'")
+
+        # Products
+        add_column_safely(conn, "products", "unit_cost", "DECIMAL(10, 2) NOT NULL DEFAULT 0")
+        add_column_safely(conn, "products", "stock_qty", "INT NOT NULL DEFAULT 0")
+        add_column_safely(conn, "products", "reorder_level", "INT NOT NULL DEFAULT 10")
+        add_column_safely(conn, "products", "category_type", "VARCHAR(50) NOT NULL DEFAULT 'Sales'")
+        add_column_safely(conn, "products", "warehouse_id", "INT NULL")
+        add_column_safely(conn, "products", "warehouse_location", "VARCHAR(100) NULL")
+
+        # System Configuration - Default row
+        conn.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))
+
+        # System Configuration - SMTP Settings
+        add_column_safely(conn, "system_configuration", "smtp_host", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "smtp_port", "INT NOT NULL DEFAULT 587")
+        add_column_safely(conn, "system_configuration", "smtp_user", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "smtp_password", "TEXT NULL")
+        add_column_safely(conn, "system_configuration", "smtp_from", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "smtp_use_tls", "BOOLEAN NOT NULL DEFAULT 1")
+
+        # Visit Records - Joint Working
+        add_column_safely(conn, "visit_records", "is_joint_visit", "BOOLEAN NOT NULL DEFAULT 0")
+        add_column_safely(conn, "visit_records", "joint_with_user_id", "INT NULL")
+        add_column_safely(conn, "visit_records", "joint_with_name", "VARCHAR(255) NULL")
+        add_column_safely(conn, "visit_records", "joint_with_role", "VARCHAR(100) NULL")
+        add_column_safely(conn, "visit_records", "joint_notes", "TEXT NULL")
             
         # Positions
         add_column_safely(conn, "positions", "level", "VARCHAR(50) NOT NULL DEFAULT 'L1'")
@@ -120,10 +151,13 @@ def run_migrations():
         # Product Alias Maps
         add_column_safely(conn, "product_alias_maps", "conversion_factor", "DECIMAL(10, 5) NOT NULL DEFAULT 1.0")
             
-        # System Configuration
-        add_column_safely(conn, "system_configuration", "zap_fetch_interval_minutes", "INT NOT NULL DEFAULT 60")
-        add_column_safely(conn, "system_configuration", "cmms_post_interval_minutes", "INT NOT NULL DEFAULT 30")
-        add_column_safely(conn, "system_configuration", "connect_sync_interval_minutes", "INT NOT NULL DEFAULT 30")
+        # System Configuration - Cleanup obsolete columns
+        try: conn.execute(text("ALTER TABLE system_configuration DROP COLUMN zap_fetch_interval_minutes"))
+        except Exception: pass
+        try: conn.execute(text("ALTER TABLE system_configuration DROP COLUMN cmms_post_interval_minutes"))
+        except Exception: pass
+        try: conn.execute(text("ALTER TABLE system_configuration DROP COLUMN connect_sync_interval_minutes"))
+        except Exception: pass
         add_column_safely(conn, "system_configuration", "flag_gps_distance_metres", "INT NOT NULL DEFAULT 100")
         add_column_safely(conn, "system_configuration", "flag_min_visit_seconds", "INT NOT NULL DEFAULT 120")
         add_column_safely(conn, "system_configuration", "payment_mode", "VARCHAR(50) NULL DEFAULT 'cash_only'")
@@ -147,13 +181,40 @@ def run_migrations():
             conn.execute(text("ALTER TABLE timesheets ADD CONSTRAINT fk_timesheet_approved_by FOREIGN KEY (approved_by_id) REFERENCES users(id) ON DELETE SET NULL"))
         except Exception: pass
 
-        # Visit Records
-        add_column_safely(conn, "visit_records", "checkout_time", "DATETIME NULL")
-        add_column_safely(conn, "visit_records", "visit_type", "VARCHAR(30) NULL")
-            
+        # Warehouses
+        add_column_safely(conn, "warehouses", "contact_person", "VARCHAR(255) NULL")
+        add_column_safely(conn, "warehouses", "mobile", "VARCHAR(20) NULL")
+
     print("Updates applied. Now running create_all to create missing tables...")
-    # This will create any tables that don't exist yet (attendance, vendors, payment_submissions, etc.)
+    # This will create any tables that don't exist yet (attendance, vendors, beat_types_master, etc.)
     Base.metadata.create_all(bind=engine)
+
+    # Seed default Beat Types Master & Main Warehouse
+    try:
+        from app.utils.beat_types import seed_default_beat_types
+        from app.models.warehouse import Warehouse
+        from app.database import SessionLocal
+        db_session = SessionLocal()
+        seed_default_beat_types(db_session)
+
+        # Ensure default warehouse exists
+        if db_session.query(Warehouse).count() == 0:
+            default_wh = Warehouse(
+                code="WH-MAIN",
+                name="Main Central Depot",
+                address="Central Operations Hub",
+                pincode="500001",
+                is_active=True
+            )
+            db_session.add(default_wh)
+            db_session.commit()
+            print("Main Central Depot warehouse seeded successfully!")
+
+        db_session.close()
+        print("Beat Types Master & Warehouses seeded successfully!")
+    except Exception as e:
+        print(f"Seeding error: {e}")
+
     print("Database migrations completed successfully!")
 
 if __name__ == "__main__":

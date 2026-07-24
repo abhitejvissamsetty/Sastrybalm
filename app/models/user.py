@@ -20,11 +20,18 @@ class UserRole(str, enum.Enum):
 
 
 class ModuleName(str, enum.Enum):
-    invoicing = "invoicing"
+    orders = "orders"
+    inventory = "inventory"
+    expenses = "expenses"
     timesheets = "timesheets"
-    connect = "connect"
-    cmms_retail = "cmms_retail"
-    cmms_vendor = "cmms_vendor"
+    attendance = "attendance"
+    visits = "visits"
+    gps_map = "gps_map"
+    analytics = "analytics"
+    approvals = "approvals"
+    settings = "settings"
+    backup = "backup"
+    invoicing = "invoicing"
 
 
 class PaymentMode(str, enum.Enum):

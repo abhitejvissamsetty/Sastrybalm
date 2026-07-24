@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.adapters.connect import ConnectAdapter
 from app.dependencies import get_db, require_api_auth
 from app.models.company import CompanyProfile
 from app.models.expense import Expense, ExpenseCategory, ExpenseStatus
@@ -610,16 +609,8 @@ async def api_sync_mr_cmms(
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
-    """API: manually trigger CMMS sync for a material request."""
-    import json
-    from datetime import datetime, timedelta
-    from app.adapters.cmms import CMSAdapter
-    from app.models.alert import Alert, AlertSeverity, AlertType
-    from app.models.material_request import MRSyncStatus
-    from app.models.company import CompanyProfile
-    from app.models.product import Product
-    from app.models.product_mapping import ProductAliasMap, AccountAliasMap
-    from app.utils.encryption import decrypt
+    """API: manually trigger native approval for a material request."""
+    from app.services.native_operations_service import approve_material_request_natively
 
     if current_user.role not in (UserRole.admin, UserRole.territory_manager):
         raise HTTPException(status_code=403, detail="Admin or manager role required.")
@@ -628,113 +619,8 @@ async def api_sync_mr_cmms(
     if not mr:
         raise HTTPException(status_code=404, detail="Material request not found.")
 
-    profile = db.query(CompanyProfile).filter(CompanyProfile.id == mr.company_profile_id).first()
-    if not profile or not profile.cmms_base_url:
-        raise HTTPException(status_code=400, detail="CMMS configuration missing for this company profile.")
-
-    mr.sync_status = MRSyncStatus.pending
-    mr.sync_error = None
-    db.commit()
-
-    api_key_secret = decrypt(profile.cmms_api_key_encrypted)
-
-    # 1. Resolve custom_location (Territory name or outlet name or "Test Location")
-    custom_location = "Test Location"
-    if mr.outlet:
-        if mr.outlet.territory:
-            custom_location = mr.outlet.territory.name
-        else:
-            custom_location = mr.outlet.name
-
-    # 2. Resolve items.item_code dynamically
-    cmms_item_code = "MBLIT"  # Default fallback
-    if mr.category:
-        product = db.query(Product).filter(
-            (Product.sku == mr.category) | 
-            (Product.erp_id == mr.category) | 
-            (Product.name == mr.category)
-        ).first()
-        if product:
-            alias = db.query(ProductAliasMap).filter(
-                ProductAliasMap.company_profile_id == mr.company_profile_id,
-                ProductAliasMap.product_id == product.id
-            ).first()
-            if alias and alias.cmms_item_code:
-                cmms_item_code = alias.cmms_item_code
-            else:
-                cmms_item_code = product.sku or product.erp_id or cmms_item_code
-        else:
-            cmms_item_code = mr.category
-
-    # 3. Resolve warehouse, expense_account, cost_center dynamically
-    warehouse_alias = db.query(AccountAliasMap).filter(
-        AccountAliasMap.company_profile_id == mr.company_profile_id,
-        AccountAliasMap.account_name == "warehouse"
-    ).first()
-    warehouse = warehouse_alias.cmms_account_code if warehouse_alias else f"Stores - {profile.code}"
-
-    expense_alias = db.query(AccountAliasMap).filter(
-        AccountAliasMap.company_profile_id == mr.company_profile_id,
-        AccountAliasMap.account_name == "expense_account"
-    ).first()
-    expense_account = expense_alias.cmms_account_code if expense_alias else f"Capital Equipment - {profile.code}"
-
-    cost_center_alias = db.query(AccountAliasMap).filter(
-        AccountAliasMap.company_profile_id == mr.company_profile_id,
-        AccountAliasMap.account_name == "cost_center"
-    ).first()
-    cost_center = cost_center_alias.cmms_account_code if cost_center_alias else f"Main - {profile.code}"
-
-    # Build the items list
-    schedule_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
-    items_payload = [
-        {
-            "item_code": cmms_item_code,
-            "qty": 1,
-            "custom_request_description": mr.description,
-            "schedule_date": schedule_date,
-            "warehouse": warehouse,
-            "uom": "Nos",
-            "expense_account": expense_account,
-            "cost_center": cost_center
-        }
-    ]
-
-    # Build the CMMS/Frappe Material Request document payload
-    payload = {
-        "material_request_type": "Purchase",
-        "company": profile.cmms_backend_company or profile.name,
-        "custom_location": custom_location,
-        "custom_raised_by": mr.user.email if mr.user else "N/A",
-        "items": items_payload
-    }
-
-    dynamic_adapter = CMSAdapter(
-        base_url=profile.cmms_base_url,
-        api_key=api_key_secret
-    )
-
-    try:
-        result = await dynamic_adapter.create_material_request(payload)
-        mr.sync_status = MRSyncStatus.synced
-        mr.cmms_ref = result.get("name") or result.get("id") or str(result)
-        mr.cmms_response = json.dumps(result)[:2000]
-        mr.sync_error = None
-        mr.sync_retries = 0
-        db.commit()
-        return {"status": "synced", "cmms_ref": mr.cmms_ref}
-    except Exception as exc:
-        mr.sync_status = MRSyncStatus.failed
-        mr.sync_error = str(exc)[:1000]
-        mr.sync_retries += 1
-        db.add(Alert(
-            severity=AlertSeverity.critical,
-            alert_type=AlertType.sync_failure,
-            title=f"CMMS sync failed: {mr.mr_number}",
-            message=str(exc)[:500],
-        ))
-        db.commit()
-        raise HTTPException(status_code=502, detail=f"CMMS sync failed: {exc}")
+    approve_material_request_natively(mr, db)
+    return {"status": "synced", "cmms_ref": mr.cmms_ref}
 
 
 @router.post("/orders/{order_id}/sync-connect")
@@ -743,9 +629,9 @@ async def api_sync_order_connect(
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
-    """API: manually trigger CONNECT sync for an order."""
-    from app.models.alert import Alert, AlertSeverity, AlertType
-    from app.models.order import FlowType, SyncStatus
+    """API: manually trigger native order confirmation."""
+    from app.models.order import Order
+    from app.services.native_operations_service import confirm_order_natively
 
     if current_user.role not in (UserRole.admin, UserRole.territory_manager):
         raise HTTPException(status_code=403, detail="Admin or manager role required.")
@@ -753,81 +639,9 @@ async def api_sync_order_connect(
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found.")
-    if order.flow_type != FlowType.connect:
-        raise HTTPException(status_code=400, detail="Order does not use CONNECT flow.")
 
-    profile = db.query(CompanyProfile).filter(CompanyProfile.id == order.company_profile_id).first()
-    if not profile or not profile.connect_base_url:
-        raise HTTPException(status_code=400, detail="CONNECT configuration missing for this company profile.")
-
-    order.sync_status = SyncStatus.pending
-    order.sync_error = None
-    db.commit()
-
-    api_key_secret = decrypt(profile.connect_api_key_encrypted)
-
-    items_payload = []
-    for it in order.items:
-        alias = db.query(ProductAliasMap).filter(
-            ProductAliasMap.company_profile_id == order.company_profile_id,
-            ProductAliasMap.product_id == it.product_id
-        ).first()
-
-        connect_code = alias.connect_item_code if alias else (it.product.sku or it.product.erp_id)
-        items_payload.append({
-            "item": connect_code,
-            "quantity": it.quantity,
-            "item_rate": float(it.unit_price),
-            "line_item_amount": float(it.line_total)
-        })
-
-    payload = {
-        "order_date": order.created_at.strftime("%Y-%m-%d %H:%M:%S") if order.created_at else datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "ordered_by": order.user.email,
-        "agent_code": order.user.employee_id or order.user.username,
-        "delivery_address": order.outlet.name,
-        "contact": order.outlet.owner_name or "N/A",
-        "service_category": order.outlet.channel.value if (order.outlet and order.outlet.channel) else "General",
-        "channel_partner": "",
-        "order_notes": order.notes or "",
-        "items": items_payload,
-        "timeline": [
-            {
-                "event_type": "Status Update",
-                "recorded_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "fieldname": "order_status",
-                "from_value": "Submitted",
-                "to_value": "Assigned",
-                "created_by": order.user.email
-            }
-        ]
-    }
-
-    dynamic_adapter = ConnectAdapter(
-        base_url=profile.connect_base_url,
-        api_key=api_key_secret
-    )
-
-    try:
-        result = await dynamic_adapter.submit_order(payload)
-        order.sync_status = SyncStatus.synced
-        order.connect_ref = result.get("data", {}).get("name") or result.get("name") or str(result)
-        order.sync_error = None
-        order.sync_retries = 0
-        db.commit()
-        return {"status": "synced", "connect_ref": order.connect_ref}
-    except Exception as exc:
-        order.sync_status = SyncStatus.failed
-        order.sync_error = str(exc)[:1000]
-        order.sync_retries += 1
-        db.add(Alert(
-            severity=AlertSeverity.critical,
-            alert_type=AlertType.sync_failure,
-            title=f"CONNECT sync failed: {order.order_number}",
-            message=str(exc)[:500],
-        ))
-        db.commit()
-        raise HTTPException(status_code=502, detail=f"CONNECT sync failed: {exc}")
+    confirm_order_natively(order, db)
+    return {"status": "synced", "connect_ref": order.connect_ref}
 
 
 class PaymentSubmissionRequest(BaseModel):

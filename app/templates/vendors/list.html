@@ -9,7 +9,7 @@
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
       <h1 class="text-2xl font-bold text-white">Vendors</h1>
-      <p class="mt-1 text-sm text-slate-400">Manage CMMS partner vendors and technicians.</p>
+      <p class="mt-1 text-sm text-slate-400">Manage partner vendors and technicians.</p>
     </div>
     {% if current_user.role.value == 'admin' %}
     <div class="flex gap-x-3">
@@ -65,9 +65,6 @@
           <tr class="hover:bg-slate-700/30 transition-colors duration-100">
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-white">
               {{ item.name }}
-              {% if item.cmms_supplier_ref %}
-              <span class="ml-2 inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-slate-400 border border-slate-700">CMMS: {{ item.cmms_supplier_ref }}</span>
-              {% endif %}
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-slate-300">{{ item.contact_person or '—' }}</td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-slate-300">

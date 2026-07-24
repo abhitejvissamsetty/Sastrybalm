@@ -39,10 +39,10 @@
           </button>
         </form>
       {% elif item.status.value == 'approved' and current_user.role.value == 'admin' %}
-        <form method="post" action="/payment-submissions/{{ item.id }}/post-zap">
+        <form method="post" action="/payment-submissions/{{ item.id }}/post">
           <button type="submit"
                   class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
-            Post to ZAP
+            Post Submission
           </button>
         </form>
       {% endif %}

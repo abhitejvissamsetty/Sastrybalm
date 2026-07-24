@@ -2,7 +2,7 @@ from __future__ import annotations
 import enum
 from datetime import date, datetime
 
-from sqlalchemy import (Column, Date, DateTime, Enum, Float, ForeignKey,
+from sqlalchemy import (Boolean, Column, Date, DateTime, Enum, Float, ForeignKey,
                         Integer, String, Text, func)
 from sqlalchemy.orm import relationship
 
@@ -85,8 +85,15 @@ class VisitRecord(Base):
     purpose = Column(String(50), nullable=True)
     visit_type = Column(String(30), nullable=True)  # in_location, telephonic, out_of_range
     notes = Column(Text, nullable=True)
+    # Joint Working fields
+    is_joint_visit = Column(Boolean, default=False, nullable=False)
+    joint_with_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    joint_with_name = Column(String(255), nullable=True)
+    joint_with_role = Column(String(100), nullable=True)
+    joint_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
+    joint_with_user = relationship("User", foreign_keys=[joint_with_user_id])
     user = relationship("User", foreign_keys=[user_id], back_populates="visit_records")
     outlet = relationship("Outlet", foreign_keys=[outlet_id])
     timesheet = relationship("Timesheet", back_populates="visits")

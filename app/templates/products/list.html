@@ -1,27 +1,23 @@
 {% extends "base.html" %}
 {% from "shared/pagination.html" import render as paginate %}
 
-{% block title %}Products{% endblock %}
+{% block title %}Products Catalogue{% endblock %}
 
 {% block content %}
 <div class="space-y-8">
 
   <div class="flex items-center justify-between">
     <div>
-      <h1 class="text-3xl font-bold text-white tracking-tight">Products</h1>
-      <p class="mt-2 text-sm text-slate-400 font-medium">Manage your product catalogue, pricing and tax configurations</p>
+      <h1 class="text-3xl font-bold text-white tracking-tight">Products Catalogue</h1>
+      <p class="mt-2 text-sm text-slate-400 font-medium">Manage master product listings, category classification, inventory balances, and pricing.</p>
     </div>
     <div class="flex items-center gap-x-3">
       {% if current_user.role.value in ['admin', 'territory_manager'] %}
-      <form method="post" action="/products/import" enctype="multipart/form-data" class="flex items-center">
-        <label class="premium-btn cursor-pointer rounded-xl border border-white/5 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white transition-all">
-          Import
-          <input type="file" name="file" accept=".csv" class="hidden" onchange="this.form.submit()">
-        </label>
-      </form>
-      <a href="/products/export"
-         class="premium-btn rounded-xl border border-white/5 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white transition-all">
-        Export
+      <a href="/inventory/movements" class="rounded-xl border border-white/10 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white transition-all">
+        Stock Audit Logs
+      </a>
+      <a href="/warehouses" class="rounded-xl border border-white/10 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white transition-all">
+        Warehouses
       </a>
       <a href="/products/new"
          class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
@@ -34,10 +30,6 @@
     </div>
   </div>
 
-  <div class="rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4 text-sm text-indigo-300">
-    💡 Products catalogue and synchronization are configured under <a href="/company/profiles" class="font-bold text-white underline hover:text-indigo-200">Company Profiles</a>. Direct edits/creation are preserved locally but synchronization is governed by Company Profiles.
-  </div>
-
   <div class="glass rounded-2xl p-6 border border-white/5">
     <form method="get" class="flex flex-wrap items-center gap-4">
       <div class="relative flex-1 min-w-[240px]">
@@ -46,29 +38,21 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
-        <input type="text" name="q" value="{{ q }}" placeholder="Search products, SKU or ERP ID…"
+        <input type="text" name="q" value="{{ q }}" placeholder="Search product name, SKU or ERP ID…"
                class="w-full rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-slate-500 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
       </div>
       
-      <input type="text" name="category" value="{{ category }}" placeholder="Category…"
-             class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all w-40">
-
-      <select name="company_profile_id" {% if current_user.company_profile_id %}disabled{% endif %}
-              class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[160px]">
-        {% if not current_user.company_profile_id %}
-        <option value="">All Company Profiles</option>
-        {% endif %}
-        {% for p in profiles %}
-        <option value="{{ p.id }}" {% if company_profile_id == p.id|string %}selected{% endif %}>{{ p.name }}</option>
+      <select name="category_type"
+              class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[180px]">
+        <option value="">All Categories</option>
+        {% for cat in ProductCategory %}
+        <option value="{{ cat.value }}" {% if category_type == cat.value %}selected{% endif %}>{{ cat.value }}</option>
         {% endfor %}
       </select>
-      {% if current_user.company_profile_id %}
-      <input type="hidden" name="company_profile_id" value="{{ current_user.company_profile_id }}">
-      {% endif %}
 
       <select name="must_sell"
               class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[140px]">
-        <option value="">All Products</option>
+        <option value="">All Priorities</option>
         <option value="yes" {% if must_sell == 'yes' %}selected{% endif %}>Must-Sell Only</option>
         <option value="no" {% if must_sell == 'no' %}selected{% endif %}>Non Must-Sell</option>
       </select>
@@ -77,36 +61,22 @@
         Filter
       </button>
       
-      {% if q or category or must_sell or company_profile_id %}
+      {% if q or category_type or must_sell %}
       <a href="/products" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
       {% endif %}
     </form>
   </div>
 
-  {% if pagination is none %}
-  <div class="glass rounded-2xl p-12 border border-white/5 text-center shadow-2xl">
-     <div class="flex flex-col items-center max-w-md mx-auto">
-       <div class="h-16 w-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-6">
-         <svg class="h-8 w-8 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-         </svg>
-       </div>
-       <h2 class="text-xl font-bold text-white mb-2">Select a Company Profile</h2>
-       <p class="text-slate-400 text-sm leading-relaxed">Please select a Company Profile from the filter dropdown above to view and manage its Product Catalogue.</p>
-     </div>
-  </div>
-  {% else %}
   <div class="table-container shadow-2xl shadow-black/50">
     <table class="min-w-full divide-y divide-white/5">
       <thead>
         <tr class="bg-slate-900/80 backdrop-blur-md">
-          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Product & Division</th>
-          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden sm:table-cell">SKU / ERP</th>
-          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden md:table-cell">Category</th>
-          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">MRP</th>
-          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden lg:table-cell">GST</th>
-          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden lg:table-cell">Integration Mappings</th>
-          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Priority</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Product Name</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden sm:table-cell">SKU / Code</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Category Scope</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">MRP / Cost</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Stock Balance</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden lg:table-cell">Warehouse</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
           {% if current_user.role.value in ['admin', 'territory_manager'] %}
           <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
@@ -117,56 +87,39 @@
         {% for item in pagination.items %}
         <tr class="table-row-hover transition-colors">
           <td class="px-6 py-4 whitespace-nowrap">
-            <div class="text-sm font-semibold text-white flex items-center gap-2">
-              {{ item.name }}
-              {% if item.primary_category == 'Consumable' %}
-                <span class="inline-flex items-center rounded-md bg-blue-900/50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300 border border-blue-800/30">CMMS</span>
-              {% elif item.primary_category == 'Connect' %}
-                <span class="inline-flex items-center rounded-md bg-purple-900/50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-300 border border-purple-800/30">CONNECT</span>
-              {% else %}
-                <span class="inline-flex items-center rounded-md bg-emerald-900/50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-800/30">ZAP</span>
-              {% endif %}
-            </div>
+            <div class="text-sm font-semibold text-white">{{ item.name }}</div>
             {% if item.division %}<div class="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">{{ item.division }}</div>{% endif %}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-xs font-mono text-slate-400 hidden sm:table-cell">
             {% if item.sku %}<div class="text-indigo-400 font-bold">{{ item.sku }}</div>{% endif %}
             {% if item.erp_id %}<div class="text-slate-500">{{ item.erp_id }}</div>{% endif %}
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400 hidden md:table-cell font-medium">
-            {{ item.primary_category or '—' }}
-            {% if item.secondary_category %}<span class="text-slate-600 font-normal"> / {{ item.secondary_category }}</span>{% endif %}
+          <td class="px-6 py-4 whitespace-nowrap text-xs font-medium">
+            {% if item.category_type.value == 'Sales' %}
+              <span class="inline-flex items-center rounded-md bg-emerald-950/80 px-2.5 py-1 text-xs font-semibold text-emerald-300 border border-emerald-800">Sales</span>
+            {% elif item.category_type.value == 'Marketing - Procurement' %}
+              <span class="inline-flex items-center rounded-md bg-purple-950/80 px-2.5 py-1 text-xs font-semibold text-purple-300 border border-purple-800">Procurement</span>
+            {% else %}
+              <span class="inline-flex items-center rounded-md bg-cyan-950/80 px-2.5 py-1 text-xs font-semibold text-cyan-300 border border-cyan-800">Mktg Stock</span>
+            {% endif %}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
-            {{ item.display_price }}
+            ₹{{ "%.2f"|format(item.mrp) }}
+            {% if item.unit_cost %}<div class="text-[10px] text-slate-400 font-normal">Cost: ₹{{ "%.2f"|format(item.unit_cost) }}</div>{% endif %}
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400 hidden lg:table-cell">
-            {{ item.gst_rate }}%
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-400 hidden lg:table-cell">
-            {% if mappings_dict and item.id in mappings_dict %}
-              {% set m = mappings_dict[item.id] %}
-              <div class="space-y-0.5">
-                {% if m.zap_item_code %}<div><span class="text-[10px] font-bold text-slate-500">ZAP:</span> <span class="font-mono text-indigo-300">{{ m.zap_item_code }}</span></div>{% endif %}
-                {% if m.cmms_item_code %}<div><span class="text-[10px] font-bold text-slate-500">CMMS:</span> <span class="font-mono text-indigo-300">{{ m.cmms_item_code }}</span></div>{% endif %}
-                {% if m.connect_item_code %}<div><span class="text-[10px] font-bold text-slate-500">CONN:</span> <span class="font-mono text-indigo-300">{{ m.connect_item_code }}</span></div>{% endif %}
-                <div><span class="text-[10px] font-bold text-slate-500">Factor:</span> <span class="font-mono text-amber-300">{{ m.conversion_factor }}</span></div>
-              </div>
-            {% else %}
-              <span class="inline-flex items-center rounded bg-red-950/40 px-2 py-0.5 text-xs font-semibold text-red-400 border border-red-900/30">
-                Not Mapped
-              </span>
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            {% if item.must_sell %}
-            <span class="inline-flex items-center gap-x-1.5 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
-              <span class="h-1.5 w-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
-              Must-Sell
+          <td class="px-6 py-4 whitespace-nowrap text-sm">
+            {% if item.stock_qty <= item.reorder_level %}
+            <span class="inline-flex items-center rounded-full bg-red-900/40 px-2.5 py-0.5 text-xs font-semibold text-red-400 border border-red-800/50">
+              Low: {{ item.stock_qty }} units
             </span>
             {% else %}
-            <span class="text-slate-600 text-[10px] font-bold uppercase tracking-wider">Standard</span>
+            <span class="inline-flex items-center rounded-full bg-emerald-900/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-400 border border-emerald-800/50">
+              {{ item.stock_qty }} units
+            </span>
             {% endif %}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-400 hidden lg:table-cell">
+            {{ item.warehouse.name if item.warehouse else 'Central Depot' }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
             {% if item.is_active %}
@@ -197,7 +150,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="9" class="px-6 py-20 text-center">
+          <td colspan="8" class="px-6 py-20 text-center">
              <div class="flex flex-col items-center">
                <div class="h-12 w-12 rounded-full bg-slate-900 flex items-center justify-center mb-4 border border-white/5">
                  <svg class="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -214,12 +167,13 @@
         {% endfor %}
       </tbody>
     </table>
+    {% if pagination and pagination.pages > 1 %}
     <div class="bg-slate-900/50 px-6 py-4 border-t border-white/5">
-      {% set qs = "q=" ~ q ~ "&category=" ~ category ~ "&must_sell=" ~ must_sell ~ "&company_profile_id=" ~ company_profile_id %}
+      {% set qs = "q=" ~ q ~ "&category_type=" ~ category_type ~ "&must_sell=" ~ must_sell %}
       {{ paginate(pagination, "/products?" ~ qs) }}
     </div>
+    {% endif %}
   </div>
-  {% endif %}
 
 </div>
 {% endblock %}

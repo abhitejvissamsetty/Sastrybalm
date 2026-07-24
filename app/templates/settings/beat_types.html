@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Beat Types Master Configuration{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Beat Types Master</h1>
+      <p class="mt-1 text-sm text-slate-400">Configure global Beat &amp; Channel Types used across Beats, Outlets, and Channel Partners.</p>
+    </div>
+    <button type="button" onclick="document.getElementById('new-beat-type-modal').classList.remove('hidden')"
+            class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      Add Beat Type
+    </button>
+  </div>
+
+  {% if success %}
+  <div class="rounded-lg bg-emerald-900/40 border border-emerald-700 px-4 py-3 text-sm text-emerald-300">{{ success }}</div>
+  {% endif %}
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <!-- Beat Types Table -->
+  <div class="table-container shadow-2xl shadow-black/50">
+    <table class="min-w-full divide-y divide-white/5">
+      <thead>
+        <tr class="bg-slate-900/80 backdrop-blur-md">
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Code</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Display Name</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Description</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
+          <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for item in items %}
+        <tr class="table-row-hover transition-colors">
+          <td class="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-indigo-400">
+            {{ item.code }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
+            {{ item.name }}
+          </td>
+          <td class="px-6 py-4 text-xs text-slate-400 max-w-xs">
+            {{ item.description or '—' }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <form method="post" action="/settings/beat-types/{{ item.id }}/toggle" class="inline">
+              <button type="submit" class="inline-flex items-center gap-x-1.5 text-xs font-semibold cursor-pointer">
+                {% if item.is_active %}
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">Active</span>
+                {% else %}
+                <span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">Inactive</span>
+                {% endif %}
+              </button>
+            </form>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-xs font-medium">
+            <form method="post" action="/settings/beat-types/{{ item.id }}/delete" class="inline" onsubmit="return confirm('Delete beat type {{ item.name }}?')">
+              <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="px-6 py-12 text-center text-slate-500 text-sm">
+            No beat types found. Click "Add Beat Type" to create one.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- New Beat Type Modal -->
+  <div id="new-beat-type-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-bold text-white">Add New Beat Type</h3>
+        <button type="button" onclick="document.getElementById('new-beat-type-modal').classList.add('hidden')" class="text-slate-400 hover:text-white">
+          &times;
+        </button>
+      </div>
+
+      <form action="/settings/beat-types/new" method="post" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Beat Type Code <span class="text-red-400">*</span></label>
+          <input type="text" name="code" required placeholder="e.g. ECOMMERCE"
+                 class="w-full rounded-lg bg-slate-950 border border-slate-700 text-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Display Name <span class="text-red-400">*</span></label>
+          <input type="text" name="name" required placeholder="e.g. E-Commerce &amp; Quick Commerce"
+                 class="w-full rounded-lg bg-slate-950 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Description (Optional)</label>
+          <textarea name="description" rows="2" placeholder="Brief description of this trade channel..."
+                    class="w-full rounded-lg bg-slate-950 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-x-3 pt-3 border-t border-slate-800">
+          <button type="button" onclick="document.getElementById('new-beat-type-modal').classList.add('hidden')"
+                  class="rounded-lg px-4 py-2 text-xs font-medium text-slate-400 hover:text-white">Cancel</button>
+          <button type="submit" class="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-500">
+            Save Beat Type
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

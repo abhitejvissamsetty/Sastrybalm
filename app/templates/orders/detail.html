@@ -155,46 +155,129 @@
   </div>
   {% endif %}
 
-  <!-- Payments linked to this order -->
-  {% if item.payments %}
-  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
-    <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
-      <h2 class="text-sm font-semibold text-slate-300">Payments</h2>
-      <a href="/payments/new?order_id={{ item.id }}"
-         class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">+ Add Payment</a>
+  <!-- Payments Section embedded in Order -->
+  <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-6">
+    <div class="flex items-center justify-between border-b border-slate-700 pb-4">
+      <div>
+        <h2 class="text-base font-bold text-white">Payment Collections</h2>
+        <p class="text-xs text-slate-400">Total Paid: <span class="font-bold text-emerald-400">₹{{ "%.2f"|format(total_paid) }}</span> &bull; Balance Due: <span class="font-bold text-red-400">₹{{ "%.2f"|format(item.balance_due) }}</span></p>
+      </div>
+      <button type="button" onclick="document.getElementById('record-payment-form').classList.toggle('hidden')"
+              class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors">
+        + Record Payment Collection
+      </button>
     </div>
+
+    <!-- Record Payment Form -->
+    <form id="record-payment-form" action="/orders/{{ item.id }}/record-payment" method="post" class="hidden space-y-4 bg-slate-900/80 p-5 rounded-xl border border-slate-700">
+      <h3 class="text-sm font-bold text-white">Record New Collection</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Payment Mode</label>
+          <select name="payment_mode" id="order-payment-mode" onchange="toggleDenominations()"
+                  class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="cash">Cash Collection</option>
+            <option value="upi">UPI / QR Code</option>
+            <option value="cheque">Cheque</option>
+            <option value="bank_transfer">Bank Transfer</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Amount Collected (₹)</label>
+          <input type="number" step="0.01" name="amount" required value="{{ item.balance_due }}"
+                 class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Reference / UTR / Cheque #</label>
+          <input type="text" name="reference_no" placeholder="Optional reference"
+                 class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+      </div>
+
+      <!-- Denomination Breakdown for Cash -->
+      <div id="cash-denominations-block" class="space-y-2 pt-2 border-t border-slate-800">
+        <span class="text-xs font-semibold text-slate-400 block">Cash Bill Denomination Count</span>
+        <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
+          <div>
+            <label class="block text-[10px] text-slate-400">₹500 x</label>
+            <input type="number" min="0" name="count_500" value="0" class="w-full rounded bg-slate-800 border border-slate-700 text-white px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400">₹200 x</label>
+            <input type="number" min="0" name="count_200" value="0" class="w-full rounded bg-slate-800 border border-slate-700 text-white px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400">₹100 x</label>
+            <input type="number" min="0" name="count_100" value="0" class="w-full rounded bg-slate-800 border border-slate-700 text-white px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400">₹50 x</label>
+            <input type="number" min="0" name="count_50" value="0" class="w-full rounded bg-slate-800 border border-slate-700 text-white px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400">₹20 x</label>
+            <input type="number" min="0" name="count_20" value="0" class="w-full rounded bg-slate-800 border border-slate-700 text-white px-2 py-1 text-xs">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400">₹10 x</label>
+            <input type="number" min="0" name="count_10" value="0" class="w-full rounded bg-slate-800 border border-slate-700 text-white px-2 py-1 text-xs">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1">Notes</label>
+        <input type="text" name="notes" placeholder="Collection notes..."
+               class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div class="flex justify-end gap-x-2">
+        <button type="button" onclick="document.getElementById('record-payment-form').classList.add('hidden')"
+                class="rounded-lg px-3 py-1.5 text-xs text-slate-400 hover:text-white">Cancel</button>
+        <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500">
+          Save Payment
+        </button>
+      </div>
+    </form>
+
+    <!-- Payment Log Table -->
+    {% if payments %}
     <table class="min-w-full divide-y divide-slate-700">
       <thead>
-        <tr class="bg-slate-800">
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Ref</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Method</th>
+        <tr class="bg-slate-900/60">
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Ref #</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Mode</th>
           <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-700/50">
-        {% for p in item.payments %}
+        {% for p in payments %}
         <tr>
-          <td class="px-4 py-3 text-sm font-mono text-white">{{ p.payment_ref }}</td>
-          <td class="px-4 py-3 text-sm text-slate-300">{{ p.method.value.upper() }}</td>
-          <td class="px-4 py-3 text-sm font-medium text-white text-right">₹{{ p.amount }}</td>
-          <td class="px-4 py-3 text-sm">
-            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ p.status_badge_cls() }}">
-              {{ p.status.value.title() }}
-            </span>
-          </td>
+          <td class="px-4 py-3 text-sm font-mono text-white">{{ p.reference_no or ('PAY-' ~ p.id) }}</td>
+          <td class="px-4 py-3 text-sm text-slate-300 uppercase font-medium">{{ p.payment_mode.value }}</td>
+          <td class="px-4 py-3 text-sm font-bold text-emerald-400 text-right">₹{{ "%.2f"|format(p.amount) }}</td>
+          <td class="px-4 py-3 text-xs text-slate-400">{{ p.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    {% else %}
+    <p class="text-xs text-slate-500 italic text-center py-2">No payment collections recorded for this order yet.</p>
+    {% endif %}
   </div>
-  {% else %}
-  <div class="rounded-xl border border-slate-700/50 border-dashed p-5 text-center">
-    <p class="text-sm text-slate-500">No payments recorded yet.</p>
-    <a href="/payments/new?order_id={{ item.id }}"
-       class="mt-2 inline-block text-sm text-indigo-400 hover:underline">Record a payment</a>
-  </div>
-  {% endif %}
+
+<script>
+function toggleDenominations() {
+  const mode = document.getElementById('order-payment-mode').value;
+  const block = document.getElementById('cash-denominations-block');
+  if (mode === 'cash') {
+    block.classList.remove('hidden');
+  } else {
+    block.classList.add('hidden');
+  }
+}
+</script>
 
   <!-- CONNECT Integration (shown for CONNECT flow orders) -->
   {% if item.flow_type.value == 'connect' %}

@@ -54,17 +54,22 @@
         {% endfor %}
       </select>
 
+      <select name="territory_id" id="filter-territory-id" onchange="filterBeatsByTerritory()"
+              class="rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all min-w-[160px]">
+        <option value="">All Territories</option>
+        {% for t in territories %}
+        <option value="{{ t.id }}" {% if territory_id == t.id|string %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+
       <div class="relative min-w-[180px]" id="beat-filter-autocomplete">
         <input type="text" id="beat-filter-search" placeholder="Search beat..." autocomplete="off"
                value="{{ selected_beat.name if selected_beat else '' }}"
                class="w-full rounded-xl bg-slate-900/50 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
         <input type="hidden" name="beat_id" id="beat-filter-id" value="{{ beat_id }}">
         <div id="beat-filter-suggestions" class="suggestions-list absolute z-10 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg bg-slate-900 border border-slate-700 text-white hidden">
-          <div class="suggestion-item px-3 py-2 text-sm hover:bg-indigo-600 cursor-pointer text-slate-400 border-b border-white/5" data-id="" data-name="All Beats">
-            All Beats
-          </div>
           {% for b in beats %}
-          <div class="suggestion-item px-3 py-2 text-sm hover:bg-indigo-600 cursor-pointer" data-id="{{ b.id }}" data-name="{{ b.name }}">
+          <div class="suggestion-item px-3 py-2 text-sm hover:bg-indigo-600 cursor-pointer" data-id="{{ b.id }}" data-name="{{ b.name }}" data-territory-id="{{ b.territory_id }}">
             {{ b.name }} ({{ b.code }})
           </div>
           {% endfor %}
@@ -75,7 +80,7 @@
         Filter
       </button>
       
-      {% if q or status or beat_id %}
+      {% if q or status or beat_id or territory_id %}
       <a href="/outlets" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
       {% endif %}
     </form>

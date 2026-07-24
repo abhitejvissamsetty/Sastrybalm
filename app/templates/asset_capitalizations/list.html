@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Asset Capitalizations{% endblock %}
+{% block title %}Marketing Assets{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -8,8 +8,8 @@
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-bold text-white">Asset Capitalizations</h1>
-      <p class="mt-1 text-sm text-slate-400">Marketing materials and assets deployed at outlets.</p>
+      <h1 class="text-2xl font-bold text-white">Marketing Assets</h1>
+      <p class="mt-1 text-sm text-slate-400">Marketing materials, branding collaterals, and assets deployed at retail outlets.</p>
     </div>
     {% if current_user.role.value in ['admin', 'field_rep', 'vendor'] %}
     <div class="flex gap-x-3">

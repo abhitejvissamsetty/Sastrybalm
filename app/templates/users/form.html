@@ -3,7 +3,7 @@
 {% block title %}{{ 'Edit' if item else 'New' }} User{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl space-y-6">
+<div class="max-w-4xl space-y-6">
 
   <div class="flex items-center gap-x-4">
     <a href="/users" class="text-slate-400 hover:text-white transition-colors">
@@ -13,210 +13,214 @@
     </a>
     <div>
       <h1 class="text-2xl font-bold text-white">{{ 'Edit User' if item else 'New User' }}</h1>
-      <p class="mt-1 text-sm text-slate-400">{{ item.full_name if item else 'Create a new user account' }}</p>
+      <p class="mt-1 text-sm text-slate-400">{{ item.full_name if item else 'Configure user identity, assigned role, and dashboard feature access matrix.' }}</p>
     </div>
   </div>
 
   {% if error %}
-  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  <div class="rounded-xl bg-red-900/40 border border-red-700 p-4 text-sm text-red-300">{{ error }}</div>
   {% endif %}
 
   <form method="post" class="space-y-6">
 
     <!-- Identity -->
-    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
-      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Identity</h2>
+    <div class="glass rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-5">
+      <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">User Identity</h2>
 
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Full Name <span class="text-red-400">*</span></label>
+          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">Full Name <span class="text-red-400">*</span></label>
           <input type="text" name="full_name" required value="{{ item.full_name if item else '' }}"
-                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                 class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Email <span class="text-red-400">*</span></label>
+          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">Email Address <span class="text-red-400">*</span></label>
           <input type="email" name="email" required value="{{ item.email if item else '' }}"
-                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                 class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
       </div>
 
       {% if not item %}
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Username <span class="text-red-400">*</span></label>
+          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">Username <span class="text-red-400">*</span></label>
           <input type="text" name="username" required
-                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                 class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Password <span class="text-red-400">*</span></label>
+          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">Password <span class="text-red-400">*</span></label>
           <input type="password" name="password" required
-                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                 class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
       </div>
       {% else %}
       <div>
-        <label class="block text-sm font-medium text-slate-300 mb-1.5">New Password <span class="text-slate-500 font-normal">(leave blank to keep current)</span></label>
+        <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">New Password <span class="text-slate-500 font-normal lowercase">(leave blank to keep current)</span></label>
         <input type="password" name="new_password"
-               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                placeholder="••••••••">
       </div>
       {% endif %}
 
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Employee ID</label>
+          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">Employee ID</label>
           <input type="text" name="employee_id" value="{{ item.employee_id if item and item.employee_id else '' }}"
-                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                 class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Phone <span class="text-red-400">*</span></label>
+          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">Mobile Phone <span class="text-red-400">*</span></label>
           <input type="text" name="phone" required value="{{ item.phone if item and item.phone else '' }}"
                  pattern="[0-9]{10}" maxlength="10" placeholder="e.g. 9876543210" title="Phone number must be exactly 10 digits"
-                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                 class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
       </div>
     </div>
 
-    <!-- Role & Assignment -->
-    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
-      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Role &amp; Assignment</h2>
+    <!-- Role Assignment -->
+    <div class="glass rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-5">
+      <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">System Role</h2>
 
-      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Role <span class="text-red-400">*</span></label>
-          <select name="role" required
-                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            {% for r in UserRole %}
-            <option value="{{ r.value }}" {% if item and item.role == r %}selected{% elif not item and r.value == 'field_rep' %}selected{% endif %}>
-              {{ r.value.replace('_', ' ').title() }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Company Profile <span class="text-red-400" id="company-profile-asterisk">*</span></label>
-          <select name="company_profile_id" id="company-profile-id"
-                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="" data-tags="">None</option>
-            {% for c in companies %}
-            <option value="{{ c.id }}" data-tags="{{ c.get_tags()|join(',') }}" {% if item and item.company_profile_id == c.id %}selected{% endif %}>{{ c.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Positions (Multiple allowed)</label>
-          <select name="position_ids" multiple size="4"
-                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            {% set user_pos_ids = item.positions|map(attribute='id')|list if item else [] %}
-            {% for p in positions %}
-            <option value="{{ p.id }}" {% if p.id in user_pos_ids %}selected{% endif %}>{{ p.name }} ({{ p.code }})</option>
-            {% endfor %}
-          </select>
-        </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">System Role <span class="text-red-400">*</span></label>
+        <select name="role" required
+                class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          {% for r in UserRole %}
+          {% if r.value != 'admin' or (item and item.role == r) %}
+          <option value="{{ r.value }}" {% if item and item.role == r %}selected{% elif not item and r.value == 'field_rep' %}selected{% endif %}>
+            {{ r.value.replace('_', ' ').title() }}
+          </option>
+          {% endif %}
+          {% endfor %}
+        </select>
       </div>
 
       {% if item %}
-      <div class="flex items-center gap-x-3">
+      <div class="flex items-center gap-x-3 pt-2">
         <input type="checkbox" name="is_active" id="is_active" value="on" {% if item.is_active %}checked{% endif %}
-               class="h-4 w-4 rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
-        <label for="is_active" class="text-sm font-medium text-slate-300">Active</label>
+               class="h-4 w-4 rounded border-slate-600 bg-slate-950 text-indigo-600 focus:ring-indigo-500">
+        <label for="is_active" class="text-sm font-medium text-slate-300">Active User Account</label>
       </div>
       {% endif %}
     </div>
 
-    <!-- Module Access -->
-    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-4">
-      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Module Access</h2>
-      <p class="text-xs text-slate-500">Select which modules this user can access on the mobile app.</p>
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {% set active_mods = item.active_modules() if item else [] %}
-        {% for mod in ModuleName %}
-        <label class="flex items-center gap-x-2.5 cursor-pointer module-checkbox-wrapper" data-module="{{ mod.value }}">
-          <input type="checkbox" name="modules" value="{{ mod.value }}"
-                 {% if mod.value in active_mods %}checked{% endif %}
-                 class="h-4 w-4 rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
-          <span class="text-sm text-slate-300">{{ mod.value.replace('_', ' ').title() }}</span>
+    <!-- User Role Feature Access Matrix -->
+    <div class="glass rounded-2xl border border-indigo-500/20 bg-slate-900/60 p-6 space-y-5">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 class="text-xs font-bold text-indigo-400 uppercase tracking-widest">Dashboard &amp; Feature Access Permission Matrix</h2>
+          <p class="text-xs text-slate-400 mt-1">Select features and modules this user is authorized to access on the web dashboard and mobile app.</p>
+        </div>
+        <label class="inline-flex items-center gap-x-2 bg-slate-950 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer hover:border-indigo-500 transition-colors">
+          <input type="checkbox" id="master-toggle" onchange="toggleAllPermissions(this.checked)" class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+          <span class="text-xs font-bold text-slate-300">Select / Deselect All</span>
         </label>
-        {% endfor %}
+      </div>
+
+      {% set active_mods = item.active_modules() if item else ['orders', 'inventory', 'expenses', 'timesheets', 'attendance', 'visits', 'gps_map', 'analytics', 'approvals'] %}
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <!-- Category: Operations -->
+        <div class="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-3">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-x-2">
+            <span class="h-2 w-2 rounded-full bg-indigo-500"></span> Operations
+          </h3>
+          <div class="space-y-2.5 text-xs text-slate-300">
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Orders &amp; Billing</span>
+              <input type="checkbox" name="modules" value="orders" {% if 'orders' in active_mods or 'invoicing' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Inventory &amp; Stock Catalogue</span>
+              <input type="checkbox" name="modules" value="inventory" {% if 'inventory' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Expenses Management</span>
+              <input type="checkbox" name="modules" value="expenses" {% if 'expenses' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Timesheets Management</span>
+              <input type="checkbox" name="modules" value="timesheets" {% if 'timesheets' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+          </div>
+        </div>
+
+        <!-- Category: Field Tracking -->
+        <div class="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-3">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-x-2">
+            <span class="h-2 w-2 rounded-full bg-emerald-500"></span> Field Operations
+          </h3>
+          <div class="space-y-2.5 text-xs text-slate-300">
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Attendance Check-ins</span>
+              <input type="checkbox" name="modules" value="attendance" {% if 'attendance' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Store Visit Records</span>
+              <input type="checkbox" name="modules" value="visits" {% if 'visits' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Live GPS Map View</span>
+              <input type="checkbox" name="modules" value="gps_map" {% if 'gps_map' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+          </div>
+        </div>
+
+        <!-- Category: Analytics & Approvals -->
+        <div class="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-3">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-x-2">
+            <span class="h-2 w-2 rounded-full bg-amber-500"></span> Analytics &amp; Approvals
+          </h3>
+          <div class="space-y-2.5 text-xs text-slate-300">
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Sales &amp; Performance Analytics</span>
+              <input type="checkbox" name="modules" value="analytics" {% if 'analytics' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Manager Approvals Hub</span>
+              <input type="checkbox" name="modules" value="approvals" {% if 'approvals' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+          </div>
+        </div>
+
+        <!-- Category: Settings & System -->
+        <div class="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-3">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-x-2">
+            <span class="h-2 w-2 rounded-full bg-cyan-500"></span> Master Data &amp; System Settings
+          </h3>
+          <div class="space-y-2.5 text-xs text-slate-300">
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Warehouses &amp; Channel Partners</span>
+              <input type="checkbox" name="modules" value="settings" {% if 'settings' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
+              <span>Data Backup &amp; Recovery</span>
+              <input type="checkbox" name="modules" value="backup" {% if 'backup' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            </label>
+          </div>
+        </div>
+
       </div>
     </div>
 
-    <div class="flex items-center justify-end gap-x-3">
-      <a href="/users" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+    <div class="flex items-center justify-end gap-x-3 pt-2">
+      <a href="/users" class="rounded-xl px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
       <button type="submit"
-              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+              class="premium-btn rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
         {{ 'Save Changes' if item else 'Create User' }}
       </button>
     </div>
 
   </form>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  const companySelect = document.getElementById('company-profile-id');
-  const roleSelect = document.getElementsByName('role')[0];
-  const companyAsterisk = document.getElementById('company-profile-asterisk');
-  const moduleWrappers = document.querySelectorAll('.module-checkbox-wrapper');
-
-  function updateFormState() {
-    const selectedRole = roleSelect.value;
-    const selectedOpt = companySelect.options[companySelect.selectedIndex];
-    
-    // Toggle company profile asterisk
-    if (selectedRole === 'admin') {
-      companyAsterisk.classList.add('hidden');
-      companySelect.required = false;
-    } else {
-      companyAsterisk.classList.remove('hidden');
-      companySelect.required = true;
-    }
-
-    // Get tags of selected company
-    let tags = [];
-    if (selectedOpt && selectedOpt.getAttribute('data-tags')) {
-      const dataTagsAttr = selectedOpt.getAttribute('data-tags').trim();
-      tags = dataTagsAttr ? dataTagsAttr.split(',') : [];
-    }
-
-    // Filter modules
-    moduleWrappers.forEach(wrapper => {
-      const mod = wrapper.getAttribute('data-module');
-      let visible = false;
-      if (tags.includes('ZAP-READY') && ['invoicing', 'payments', 'timesheets'].includes(mod)) {
-        visible = true;
-      }
-      if (tags.includes('CMMS-READY') && ['cmms_retail', 'cmms_vendor'].includes(mod)) {
-        visible = true;
-      }
-      if (tags.includes('CONNECT-READY') && ['connect'].includes(mod)) {
-        visible = true;
-      }
-      
-      // If role is admin, show all modules regardless of tags
-      if (selectedRole === 'admin') {
-        visible = true;
-      }
-
-      if (visible) {
-        wrapper.classList.remove('hidden');
-      } else {
-        wrapper.classList.add('hidden');
-        // Uncheck if hidden
-        const checkbox = wrapper.querySelector('input[type="checkbox"]');
-        if (checkbox) checkbox.checked = false;
-      }
+  function toggleAllPermissions(checked) {
+    const checkboxes = document.querySelectorAll('.permission-checkbox');
+    checkboxes.forEach(cb => {
+      cb.checked = checked;
     });
   }
-
-  companySelect.addEventListener('change', updateFormState);
-  roleSelect.addEventListener('change', updateFormState);
-  updateFormState();
-});
 </script>
 {% endblock %}

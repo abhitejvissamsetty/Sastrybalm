@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Role & Permissions Matrix{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="md:flex md:items-center md:justify-between mb-8">
+    <div class="min-w-0 flex-1">
+      <h2 class="text-2xl font-bold leading-7 text-white sm:truncate sm:text-3xl sm:tracking-tight">
+        Role Governance & Access Permissions Matrix
+      </h2>
+      <p class="mt-1 text-sm text-slate-400">
+        System access permissions matrix across Super Admin, Admin, Territory Manager, and Field Sales Representative roles.
+      </p>
+    </div>
+    <div class="mt-4 flex md:ml-4 md:mt-0">
+      <a href="/users" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+        &larr; Back to Users & Reps
+      </a>
+    </div>
+  </div>
+
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+    <table class="min-w-full divide-y divide-slate-800 text-left text-sm text-slate-300">
+      <thead class="bg-slate-950/50 text-xs uppercase font-semibold text-slate-400">
+        <tr>
+          <th class="py-4 px-6">Module / Feature Scope</th>
+          <th class="py-4 px-4 text-center">Super Admin</th>
+          <th class="py-4 px-4 text-center">Admin</th>
+          <th class="py-4 px-4 text-center">Territory Manager</th>
+          <th class="py-4 px-4 text-center">Field Rep</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800/60 font-medium">
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-4 px-6 font-semibold text-white">System Settings & SMTP Config</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Access</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Access</td>
+          <td class="py-4 px-4 text-center text-slate-500">—</td>
+          <td class="py-4 px-4 text-center text-slate-500">—</td>
+        </tr>
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-4 px-6 font-semibold text-white">Users & Reps Management</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Access</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Access</td>
+          <td class="py-4 px-4 text-center text-indigo-400">View Reps</td>
+          <td class="py-4 px-4 text-center text-slate-500">—</td>
+        </tr>
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-4 px-6 font-semibold text-white">Beats & Geography Setup</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Access</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Access</td>
+          <td class="py-4 px-4 text-center text-indigo-400">Assigned Territory</td>
+          <td class="py-4 px-4 text-center text-indigo-400">Assigned Beat</td>
+        </tr>
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-4 px-6 font-semibold text-white">Products & Inventory Control</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Access</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Access</td>
+          <td class="py-4 px-4 text-center text-indigo-400">View & Inward</td>
+          <td class="py-4 px-4 text-center text-indigo-400">Catalogue View</td>
+        </tr>
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-4 px-6 font-semibold text-white">Orders & Direct Collections</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Access</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Access</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Team Scope</td>
+          <td class="py-4 px-4 text-center text-indigo-400">Create & Collect</td>
+        </tr>
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-4 px-6 font-semibold text-white">Material Requests & Asset Capitalizations</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Approve & Deploy</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Approve & Deploy</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Approve & Deploy</td>
+          <td class="py-4 px-4 text-center text-indigo-400">Submit Request</td>
+        </tr>
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-4 px-6 font-semibold text-white">Joint Working Visit Logs</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Audit</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Full Audit</td>
+          <td class="py-4 px-4 text-center text-emerald-400 font-bold">Territory Scope</td>
+          <td class="py-4 px-4 text-center text-indigo-400">Punch Joint Visit</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

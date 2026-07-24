@@ -1,17 +1,19 @@
-import asyncio
 import json
 import logging
-from datetime import datetime
+from decimal import Decimal
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.adapters.cmms import cmms_adapter
 from app.dependencies import get_db, require_web_auth, require_web_roles
-from app.models.alert import Alert, AlertSeverity, AlertType
 from app.models.material_request import MaterialRequest, MRStatus, MRSyncStatus
+from app.models.product import Product, ProductCategory
+from app.models.procurement import VendorQuotation, WorkOrder, QuotationStatus, WorkOrderStatus, QCStatus
+from app.models.inventory import StockMovement
+from app.models.asset_capitalization import AssetCapitalization, ACStatus
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
@@ -42,13 +44,8 @@ async def mr_list(
     pagination = paginate(query, page)
 
     reps = []
-    if current_user.role.value in ["admin", "manager"]:
-        reps = (
-            db.query(User)
-            .filter(User.role == UserRole.field_rep, User.is_active == True)
-            .order_by(User.full_name)
-            .all()
-        )
+    if current_user.role.value in ["admin", "territory_manager"]:
+        reps = db.query(User).filter(User.role == UserRole.field_rep, User.is_active == True).order_by(User.full_name).all()
 
     return templates.TemplateResponse("material_requests/list.html", {
         "request": request, "current_user": current_user,
@@ -58,6 +55,52 @@ async def mr_list(
     })
 
 
+@router.get("/new", response_class=HTMLResponse)
+async def mr_new(
+    request: Request,
+    current_user: User = Depends(require_web_auth),
+    db: Session = Depends(get_db),
+):
+    # Filter products strictly to Marketing - Procurement category
+    items = db.query(Product).filter(
+        Product.is_active == True,
+        Product.category_type == ProductCategory.marketing_procurement
+    ).order_by(Product.name).all()
+
+    return templates.TemplateResponse("material_requests/form.html", {
+        "request": request, "current_user": current_user, "items": items, "error": None,
+    })
+
+
+@router.post("/new")
+async def mr_create(
+    request: Request,
+    current_user: User = Depends(require_web_auth),
+    db: Session = Depends(get_db),
+    product_id: int = Form(...),
+    quantity: int = Form(...),
+    notes: Optional[str] = Form(default=None),
+):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product or product.category_type != ProductCategory.marketing_procurement:
+        set_flash_error(request, "Material requests can only be placed for 'Marketing - Procurement' items.")
+        return RedirectResponse("/material-requests/new", status_code=302)
+
+    import uuid
+    mr = MaterialRequest(
+        user_id=current_user.id,
+        request_number=f"MR-MKTG-{uuid.uuid4().hex[:6].upper()}",
+        status=MRStatus.submitted,
+        item_details=json.dumps({"product_id": product.id, "product_name": product.name, "qty": quantity}),
+        notes=notes or None,
+    )
+    db.add(mr)
+    db.commit()
+
+    set_flash_success(request, f"Material request {mr.request_number} created.")
+    return RedirectResponse("/material-requests", status_code=302)
+
+
 @router.get("/{mr_id}", response_class=HTMLResponse)
 async def mr_detail(
     mr_id: int, request: Request,
@@ -65,15 +108,17 @@ async def mr_detail(
     db: Session = Depends(get_db),
 ):
     q = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id)
-    if current_user.role == UserRole.field_rep:
-        q = q.filter(MaterialRequest.user_id == current_user.id)
     item = q.first()
     if not item:
         set_flash_error(request, "Material request not found.")
         return RedirectResponse("/material-requests", status_code=302)
+
+    quotations = db.query(VendorQuotation).filter(VendorQuotation.material_request_id == mr_id).all()
+
     return templates.TemplateResponse("material_requests/detail.html", {
         "request": request, "current_user": current_user,
-        "item": item, "MRStatus": MRStatus, "MRSyncStatus": MRSyncStatus,
+        "item": item, "quotations": quotations,
+        "MRStatus": MRStatus, "MRSyncStatus": MRSyncStatus,
         **get_flash(request),
     })
 
@@ -83,158 +128,153 @@ async def mr_update_status(
     mr_id: int, request: Request,
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
-    new_status: str = Query(default=""),
+    new_status: str = Form(...),
 ):
-    from fastapi import Form
-    form = await request.form()
-    new_status = form.get("new_status", "")
-    valid = [s.value for s in MRStatus]
     item = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
     if not item:
         set_flash_error(request, "Material request not found.")
         return RedirectResponse("/material-requests", status_code=302)
-    if new_status not in valid:
-        set_flash_error(request, "Invalid status.")
-        return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
-    item.status = MRStatus(new_status)
-    db.commit()
-    set_flash_success(request, f"Status updated to {new_status}.")
+
+    if new_status in ["Approved", "Rejected", "Held", "approved", "rejected", "held"]:
+        st_map = {"approved": MRStatus.approved, "rejected": MRStatus.rejected, "held": MRStatus.submitted}
+        item.status = st_map.get(new_status.lower(), MRStatus.approved)
+        db.commit()
+        set_flash_success(request, f"Material Request status updated to '{new_status.title()}'.")
+    else:
+        set_flash_error(request, f"Invalid status '{new_status}'.")
+
     return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
 
 
-@router.post("/{mr_id}/sync-cmms")
-async def mr_sync_cmms(
+@router.post("/{mr_id}/quote")
+async def mr_submit_quote(
     mr_id: int, request: Request,
+    current_user: User = Depends(require_web_auth),
+    db: Session = Depends(get_db),
+    quote_amount: str = Form(...),
+    lead_time_days: int = Form(7),
+    notes: Optional[str] = Form(default=None),
+):
+    """Vendor places quotation on an Approved Material Request."""
+    mr = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
+    if not mr:
+        set_flash_error(request, "Material Request not found.")
+        return RedirectResponse("/material-requests", status_code=302)
+
+    quote = VendorQuotation(
+        material_request_id=mr_id,
+        vendor_id=current_user.id,
+        quote_amount=Decimal(quote_amount),
+        lead_time_days=lead_time_days,
+        status=QuotationStatus.pending,
+        notes=notes or None,
+    )
+    db.add(quote)
+    db.commit()
+    set_flash_success(request, "Quotation submitted successfully.")
+    return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+
+
+@router.post("/{mr_id}/quote/{quote_id}/review")
+async def quote_review(
+    mr_id: int, quote_id: int, request: Request,
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
+    decision: str = Form(...), # approved, rejected, held
 ):
-    """Submit or re-submit a material request to CMMS."""
-    item = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
-    if not item:
-        set_flash_error(request, "Material request not found.")
-        return RedirectResponse("/material-requests", status_code=302)
-
-    if item.status not in (MRStatus.submitted, MRStatus.acknowledged):
-        set_flash_error(request, "Only submitted or acknowledged requests can be synced to CMMS.")
+    """Admin/Manager approves quotation and generates Work Order."""
+    quote = db.query(VendorQuotation).filter(VendorQuotation.id == quote_id).first()
+    if not quote:
+        set_flash_error(request, "Quotation not found.")
         return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
 
-    # Mark as pending sync
-    item.sync_status = MRSyncStatus.pending
-    item.sync_error = None
-    db.commit()
-
-    from datetime import timedelta
-    from app.adapters.cmms import CMSAdapter
-    from app.models.company import CompanyProfile
-    from app.models.product import Product
-    from app.models.product_mapping import ProductAliasMap, AccountAliasMap
-    from app.utils.encryption import decrypt
-
-    profile = db.query(CompanyProfile).filter(CompanyProfile.id == item.company_profile_id).first()
-    if not profile or not profile.cmms_base_url:
-        set_flash_error(request, "CMMS configuration missing for this company profile.")
-        return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
-
-    api_key_secret = decrypt(profile.cmms_api_key_encrypted)
-
-    # 1. Resolve custom_location (Territory name or outlet name or "Test Location")
-    custom_location = "Test Location"
-    if item.outlet:
-        if item.outlet.territory:
-            custom_location = item.outlet.territory.name
-        else:
-            custom_location = item.outlet.name
-
-    # 2. Resolve items.item_code dynamically
-    cmms_item_code = "MBLIT"  # Default fallback
-    if item.category:
-        product = db.query(Product).filter(
-            (Product.sku == item.category) | 
-            (Product.erp_id == item.category) | 
-            (Product.name == item.category)
-        ).first()
-        if product:
-            alias = db.query(ProductAliasMap).filter(
-                ProductAliasMap.company_profile_id == item.company_profile_id,
-                ProductAliasMap.product_id == product.id
-            ).first()
-            if alias and alias.cmms_item_code:
-                cmms_item_code = alias.cmms_item_code
-            else:
-                cmms_item_code = product.sku or product.erp_id or cmms_item_code
-        else:
-            cmms_item_code = item.category
-
-    # 3. Resolve warehouse, expense_account, cost_center dynamically
-    warehouse_alias = db.query(AccountAliasMap).filter(
-        AccountAliasMap.company_profile_id == item.company_profile_id,
-        AccountAliasMap.account_name == "warehouse"
-    ).first()
-    warehouse = warehouse_alias.cmms_account_code if warehouse_alias else f"Stores - {profile.code}"
-
-    expense_alias = db.query(AccountAliasMap).filter(
-        AccountAliasMap.company_profile_id == item.company_profile_id,
-        AccountAliasMap.account_name == "expense_account"
-    ).first()
-    expense_account = expense_alias.cmms_account_code if expense_alias else f"Capital Equipment - {profile.code}"
-
-    cost_center_alias = db.query(AccountAliasMap).filter(
-        AccountAliasMap.company_profile_id == item.company_profile_id,
-        AccountAliasMap.account_name == "cost_center"
-    ).first()
-    cost_center = cost_center_alias.cmms_account_code if cost_center_alias else f"Main - {profile.code}"
-
-    # Build the items list
-    schedule_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
-    items_payload = [
-        {
-            "item_code": cmms_item_code,
-            "qty": 1,
-            "custom_request_description": item.description,
-            "schedule_date": schedule_date,
-            "warehouse": warehouse,
-            "uom": "Nos",
-            "expense_account": expense_account,
-            "cost_center": cost_center
-        }
-    ]
-
-    # Build the CMMS/Frappe Material Request document payload
-    payload = {
-        "material_request_type": "Purchase",
-        "company": profile.cmms_backend_company or profile.name,
-        "custom_location": custom_location,
-        "custom_raised_by": item.user.email if item.user else "N/A",
-        "items": items_payload
-    }
-
-    dynamic_adapter = CMSAdapter(
-        base_url=profile.cmms_base_url,
-        api_key=api_key_secret
-    )
-
-    try:
-        result = await dynamic_adapter.create_material_request(payload)
-        item.sync_status = MRSyncStatus.synced
-        item.cmms_ref = result.get("name") or result.get("id") or str(result)
-        item.cmms_response = json.dumps(result)[:2000]
-        item.sync_error = None
-        item.sync_retries = 0
+    if decision.lower() == "approved":
+        quote.status = QuotationStatus.approved
+        import uuid
+        wo = WorkOrder(
+            quotation_id=quote.id,
+            wo_number=f"WO-{uuid.uuid4().hex[:6].upper()}",
+            status=WorkOrderStatus.issued,
+            qc_status=QCStatus.pending,
+        )
+        db.add(wo)
         db.commit()
-        set_flash_success(request, f"Material request synced to CMMS. Ref: {item.cmms_ref}")
-        logger.info("CMMS sync success — MR %s → ref %s", item.mr_number, item.cmms_ref)
-    except Exception as exc:
-        item.sync_status = MRSyncStatus.failed
-        item.sync_error = str(exc)[:1000]
-        item.sync_retries += 1
-        db.add(Alert(
-            severity=AlertSeverity.critical,
-            alert_type=AlertType.sync_failure,
-            title=f"CMMS sync failed: {item.mr_number}",
-            message=f"Material request {item.mr_number} failed to sync to CMMS: {str(exc)[:500]}",
-        ))
+        set_flash_success(request, f"Quotation approved! Work Order {wo.wo_number} issued.")
+    elif decision.lower() == "rejected":
+        quote.status = QuotationStatus.rejected
         db.commit()
-        set_flash_error(request, f"CMMS sync failed: {exc}")
-        logger.error("CMMS sync failed — MR %s: %s", item.mr_number, exc)
+        set_flash_success(request, "Quotation rejected.")
+    else:
+        quote.status = QuotationStatus.held
+        db.commit()
+        set_flash_success(request, "Quotation put on hold.")
 
     return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+
+
+@router.post("/work-orders/{wo_id}/qc")
+async def work_order_qc(
+    wo_id: int, request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+    qc_result: str = Form(...), # passed, failed
+):
+    """Conclude Work Order, perform QC, Itemize Stock Inward, and Convert to Marketing Asset."""
+    wo = db.query(WorkOrder).filter(WorkOrder.id == wo_id).first()
+    if not wo:
+        set_flash_error(request, "Work order not found.")
+        return RedirectResponse("/material-requests", status_code=302)
+
+    if qc_result.lower() == "passed":
+        wo.qc_status = QCStatus.passed
+        wo.status = WorkOrderStatus.concluded
+
+        # Parse Material Request item details
+        mr = wo.quotation.material_request
+        details = {}
+        try:
+            details = json.loads(mr.item_details or "{}")
+        except Exception:
+            pass
+
+        prod_id = details.get("product_id")
+        qty = details.get("qty", 1)
+
+        if prod_id:
+            prod = db.query(Product).filter(Product.id == prod_id).first()
+            if prod:
+                # 1. Itemised Stock Inward (adds to Marketing - Stock)
+                prod.stock_qty += qty
+                prod.category_type = ProductCategory.marketing_stock
+                movement = StockMovement(
+                    product_id=prod.id,
+                    movement_type="INWARD",
+                    quantity=qty,
+                    reference_no=wo.wo_number,
+                    notes="Work Order QC Verification Inward",
+                    created_by_id=current_user.id,
+                )
+                db.add(movement)
+
+                # 2. Automatically Convert to Marketing Asset
+                import uuid
+                asset = AssetCapitalization(
+                    ac_number=f"AC-{uuid.uuid4().hex[:6].upper()}",
+                    user_id=mr.user_id,
+                    outlet_id=mr.outlet_id if mr.outlet_id else 1,
+                    item_name=prod.name,
+                    item_code=prod.sku or f"SKU-{prod.id}",
+                    quantity=qty,
+                    status=ACStatus.deployed,
+                    notes=f"Converted from Work Order {wo.wo_number}",
+                )
+                db.add(asset)
+
+        db.commit()
+        set_flash_success(request, f"Work Order {wo.wo_number} QC Passed! Stock itemized and converted to Marketing Asset.")
+    else:
+        wo.qc_status = QCStatus.failed
+        db.commit()
+        set_flash_error(request, f"Work Order {wo.wo_number} QC Failed.")
+
+    return RedirectResponse(f"/material-requests/{wo.quotation.material_request_id}", status_code=302)

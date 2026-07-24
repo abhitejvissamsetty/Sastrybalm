@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 10080  # 7 days
 
+    admin_username: str = "admin"
+    admin_password: str = "admin123"
+
     cmms_base_url: str = ""
     cmms_api_key: str = ""
     connect_base_url: str = ""

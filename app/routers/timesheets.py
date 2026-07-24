@@ -69,16 +69,22 @@ async def visit_list(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     user_id: str = Query(default=""),
+    is_joint: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
     query = db.query(VisitRecord)
     if user_id:
         query = query.filter(VisitRecord.user_id == int(user_id))
+    if is_joint == "yes":
+        query = query.filter(VisitRecord.is_joint_visit == True)
+    elif is_joint == "no":
+        query = query.filter(VisitRecord.is_joint_visit == False)
+
     query = query.order_by(VisitRecord.visit_time.desc())
     pagination = paginate(query, page)
     reps = db.query(User).filter(User.role == UserRole.field_rep, User.is_active == True).order_by(User.full_name).all()
     return templates.TemplateResponse("timesheets/visits.html", {
         "request": request, "current_user": current_user,
-        "pagination": pagination, "user_id": user_id, "reps": reps,
+        "pagination": pagination, "user_id": user_id, "is_joint": is_joint, "reps": reps,
         **get_flash(request),
     })
