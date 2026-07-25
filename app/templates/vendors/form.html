@@ -13,7 +13,7 @@
     </a>
     <div>
       <h1 class="text-2xl font-bold text-white">{{ 'Edit Vendor' if item else 'New Vendor' }}</h1>
-      <p class="mt-1 text-sm text-slate-400">{{ item.name if item else 'Add a vendor or service provider' }}</p>
+      <p class="mt-1 text-sm text-slate-400">{{ item.name if item else 'Add a vendor or service provider with geography and product specialization scopes' }}</p>
     </div>
   </div>
 
@@ -37,14 +37,51 @@
           <label class="block text-sm font-medium text-slate-300 mb-1.5">Category</label>
           <input type="text" name="category" value="{{ item.category if item and item.category else '' }}"
                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                 placeholder="e.g. Signage, Logistics">
+                 placeholder="e.g. Signage, Logistics, POSM">
+        </div>
+      </div>
+    </div>
+
+    <!-- Vendor Scope Configurations -->
+    <div class="rounded-xl border border-indigo-500/30 bg-slate-800/50 p-6 space-y-5">
+      <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Vendor Scopes (Geography &amp; Product Supply)</h2>
+
+      <!-- Geography Scope -->
+      <div>
+        <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5">Geography Scope <span class="text-indigo-400 font-normal lowercase">(Scopes Material Requests to this region)</span></label>
+        <select name="geography_id"
+                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Geographies / Unscoped</option>
+          {% for g in geographies %}
+          <option value="{{ g.id }}" {% if item and item.geography_id == g.id %}selected{% endif %}>
+            {{ g.name }} ({{ g.level.value.title() }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Product Scope (Multi Select) -->
+      <div>
+        <label class="block text-xs font-bold text-slate-300 uppercase mb-2">Product Supply Scope <span class="text-indigo-400 font-normal lowercase">(Multi-select specialized product catalogue)</span></label>
+        {% set assigned_p_ids = item.supplied_products | map(attribute='id') | list if item else [] %}
+        <div class="max-h-48 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 p-3 space-y-2">
+          {% for p in products %}
+          <label class="flex items-center space-x-3 text-sm text-slate-300 hover:text-white cursor-pointer">
+            <input type="checkbox" name="product_ids" value="{{ p.id }}" {% if p.id in assigned_p_ids %}checked{% endif %}
+                   class="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500">
+            <span class="font-medium">{{ p.name }}</span>
+            <span class="text-xs text-slate-500">({{ p.category_type or 'Sales' }})</span>
+          </label>
+          {% else %}
+          <p class="text-xs text-slate-500 italic">No products registered yet.</p>
+          {% endfor %}
         </div>
       </div>
     </div>
 
     <!-- Contact Details -->
     <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
-      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Contact & Access</h2>
+      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Contact &amp; Access</h2>
 
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div>

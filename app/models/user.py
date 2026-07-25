@@ -48,6 +48,14 @@ user_positions = Table(
     Column("position_id", Integer, ForeignKey("positions.id"), primary_key=True),
 )
 
+# Many-to-many: User (QC Manager) ↔ Vendors
+user_vendors = Table(
+    "user_vendors",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("vendor_id", Integer, ForeignKey("vendors.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 class User(Base):
     __tablename__ = "users"
@@ -56,7 +64,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     username = Column(String(100), unique=True, nullable=False, index=True)
     full_name = Column(String(255), nullable=False)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)
     role = Column(SAEnum(UserRole), nullable=False, default=UserRole.field_rep)
     is_active = Column(Boolean, default=True, nullable=False)
 
@@ -69,6 +77,10 @@ class User(Base):
     # Company profile — mandatory for non-admin users
     company_profile_id = Column(Integer, ForeignKey("company_profiles.id", ondelete="SET NULL"), nullable=True)
 
+    # Role-specific scoped assignments
+    geography_id = Column(Integer, ForeignKey("geographies.id", ondelete="SET NULL"), nullable=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True)
+
     # Payment settings (per-user, when invoicing module is enabled)
     payment_mode = Column(SAEnum(PaymentMode), nullable=True)
     denomination_mandatory = Column(Boolean, default=False, nullable=False)
@@ -76,9 +88,12 @@ class User(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    # Many-to-many positions
+    # Relationships
     positions = relationship("Position", secondary=user_positions, back_populates="users")
     company_profile = relationship("CompanyProfile", foreign_keys=[company_profile_id])
+    geography = relationship("Geography", foreign_keys=[geography_id])
+    vendor = relationship("Vendor", foreign_keys=[vendor_id])
+    qc_vendors = relationship("Vendor", secondary=user_vendors)
     module_access = relationship(
         "UserModuleAccess", back_populates="user", cascade="all, delete-orphan"
     )

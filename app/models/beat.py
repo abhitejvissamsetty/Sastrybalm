@@ -25,6 +25,32 @@ class BeatGrade(str, enum.Enum):
     non_metro = "Non-Metro"
 
 
+def parse_beat_type(val: str) -> BeatType:
+    if not val:
+        return BeatType.GT
+    val_clean = str(val).strip()
+    val_upper = val_clean.upper()
+    val_lower = val_clean.lower()
+    for bt in BeatType:
+        if bt.value == val_clean or bt.value.upper() == val_upper or bt.value.lower() == val_lower or bt.name.upper() == val_upper:
+            return bt
+    return BeatType.GT
+
+
+from typing import Optional
+
+
+def parse_beat_grade(val: Optional[str]) -> Optional[BeatGrade]:
+    if not val:
+        return None
+    val_clean = str(val).strip()
+    val_lower = val_clean.lower()
+    for bg in BeatGrade:
+        if bg.value.lower() == val_lower or bg.name.lower() == val_lower:
+            return bg
+    return None
+
+
 class Beat(Base):
     __tablename__ = "beats"
 

@@ -62,6 +62,7 @@
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">User Profile</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden sm:table-cell">Username</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Role</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden lg:table-cell">Assigned Scope</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden md:table-cell">Positions</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
           <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
@@ -98,6 +99,17 @@
                          {% else %}bg-blue-500/10 text-blue-400 border border-blue-500/20{% endif %}">
               {{ item.role.value.replace('_', ' ').title() }}
             </span>
+          </td>
+          <td class="px-6 py-4 text-xs text-slate-300 hidden lg:table-cell font-medium">
+            {% if item.geography %}
+              <span class="text-indigo-400 font-semibold">{{ item.geography.name }}</span>
+            {% elif item.vendor %}
+              <span class="text-emerald-400 font-semibold">{{ item.vendor.name }}</span>
+            {% elif item.qc_vendors %}
+              <span class="text-amber-400 font-semibold">{{ item.qc_vendors | map(attribute='name') | join(', ') }}</span>
+            {% else %}
+              <span class="text-slate-500">—</span>
+            {% endif %}
           </td>
           <td class="px-6 py-4 text-sm text-slate-400 hidden md:table-cell font-medium">{{ item.position_names() }}</td>
           <td class="px-6 py-4 whitespace-nowrap">

@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_web_auth, require_web_roles
-from app.models.beat import Beat, BeatType, BeatGrade
+from app.models.beat import Beat, BeatType, BeatGrade, parse_beat_type, parse_beat_grade
 from app.models.geography import Geography, GeoLevel
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
@@ -80,16 +80,18 @@ async def beat_create(
 
     if db.query(Beat).filter(Beat.code == code.upper()).first():
         territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
+        channel_partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
         return templates.TemplateResponse("beats/form.html", {
             "request": request, "current_user": current_user,
-            "item": None, "territories": territories, "BeatType": BeatType, "BeatGrade": BeatGrade,
+            "item": None, "territories": territories, "channel_partners": channel_partners,
+            "attached_ids": [], "beat_types": get_all_beat_types(db), "BeatType": BeatType, "BeatGrade": BeatGrade,
             "error": f"Code '{code.upper()}' already exists.",
         })
     
     beat = Beat(
-        name=name, code=code.upper(), beat_type=BeatType(beat_type),
+        name=name, code=code.upper(), beat_type=parse_beat_type(beat_type),
         description=description or None, pincodes=pincodes or None,
-        beat_grade=BeatGrade(beat_grade) if beat_grade else None,
+        beat_grade=parse_beat_grade(beat_grade),
         territory_id=int(territory_id) if territory_id else None,
         erp_id=erp_id or None,
     )
@@ -144,6 +146,7 @@ async def beat_update(
     channel_partner_ids: list[str] = Form(default=[]),
     erp_id: Optional[str] = Form(default=None),
 ):
+    from app.models.local_distribution import LocalChannelPartner
     from app.models.beat_channel_partner import BeatChannelPartner
 
     item = db.query(Beat).filter(Beat.id == beat_id).first()
@@ -152,17 +155,20 @@ async def beat_update(
         return RedirectResponse("/beats", status_code=302)
     if db.query(Beat).filter(Beat.code == code.upper(), Beat.id != beat_id).first():
         territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
+        channel_partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
+        attached_ids = [bcp.channel_partner_id for bcp in db.query(BeatChannelPartner).filter(BeatChannelPartner.beat_id == beat_id).all()]
         return templates.TemplateResponse("beats/form.html", {
             "request": request, "current_user": current_user,
-            "item": item, "territories": territories, "BeatType": BeatType, "BeatGrade": BeatGrade,
+            "item": item, "territories": territories, "channel_partners": channel_partners,
+            "attached_ids": attached_ids, "beat_types": get_all_beat_types(db), "BeatType": BeatType, "BeatGrade": BeatGrade,
             "error": f"Code '{code.upper()}' already in use.",
         })
     item.name = name
     item.code = code.upper()
-    item.beat_type = BeatType(beat_type)
+    item.beat_type = parse_beat_type(beat_type)
     item.description = description or None
     item.pincodes = pincodes or None
-    item.beat_grade = BeatGrade(beat_grade) if beat_grade else None
+    item.beat_grade = parse_beat_grade(beat_grade)
     item.territory_id = int(territory_id) if territory_id else None
     item.erp_id = erp_id or None
 

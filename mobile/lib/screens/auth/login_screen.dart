@@ -12,60 +12,88 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _usernameCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
+  final _loginCtrl = TextEditingController();
+  final _otpCtrl = TextEditingController();
+  bool _otpSent = false;
   bool _loading = false;
-  bool _obscurePassword = true;
+  String? _sentTarget;
 
-  Future<void> _login() async {
-    final username = _usernameCtrl.text.trim();
-    final password = _passwordCtrl.text.trim();
-
-    if (username.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter both username and password'),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+  Future<void> _requestOtp() async {
+    final loginInput = _loginCtrl.text.trim();
+    if (loginInput.isEmpty) {
+      _showSnackBar('Please enter your registered email, username, or phone number', Colors.red.shade700);
       return;
     }
 
     setState(() => _loading = true);
     try {
-      await ref.read(authStateProvider.notifier).login(username, password);
-      if (mounted) context.go('/home');
+      final service = ref.read(authServiceProvider);
+      final res = await service.requestOtp(loginInput);
+      if (mounted) {
+        setState(() {
+          _otpSent = true;
+          _sentTarget = res['email'] ?? loginInput;
+        });
+        _showSnackBar('OTP code sent successfully to ${res['email'] ?? loginInput}', Colors.green.shade700);
+      }
     } catch (e) {
       if (mounted) {
-        String errorMsg = 'Login failed. Check your connection.';
+        String errorMsg = 'Failed to request OTP. Check your connection or username.';
         if (e is DioException) {
           final data = e.response?.data;
           if (data is Map && data.containsKey('detail')) {
             errorMsg = data['detail'].toString();
-          } else if (e.response?.statusCode == 401) {
-            errorMsg = 'Invalid username or password';
           }
-        } else if (e.toString().contains('401')) {
-          errorMsg = 'Invalid username or password';
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showSnackBar(errorMsg, Colors.red.shade700);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  Future<void> _verifyOtp() async {
+    final otpCode = _otpCtrl.text.trim();
+    if (otpCode.isEmpty || otpCode.length < 6) {
+      _showSnackBar('Please enter the 6-digit OTP code sent to your email', Colors.red.shade700);
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final loginInput = _loginCtrl.text.trim();
+      await ref.read(authStateProvider.notifier).verifyOtp(loginInput, otpCode);
+      if (mounted) context.go('/home');
+    } catch (e) {
+      if (mounted) {
+        String errorMsg = 'Invalid or expired OTP code';
+        if (e is DioException) {
+          final data = e.response?.data;
+          if (data is Map && data.containsKey('detail')) {
+            errorMsg = data['detail'].toString();
+          }
+        }
+        _showSnackBar(errorMsg, Colors.red.shade700);
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showSnackBar(String message, Color bgColor) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: bgColor,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   void dispose() {
-    _usernameCtrl.dispose();
-    _passwordCtrl.dispose();
+    _loginCtrl.dispose();
+    _otpCtrl.dispose();
     super.dispose();
   }
 
@@ -75,7 +103,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.primary, // Primary color background for top section
+      backgroundColor: theme.colorScheme.primary,
       body: SingleChildScrollView(
         child: SizedBox(
           height: size.height,
@@ -86,7 +114,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 top: 0,
                 left: 0,
                 right: 0,
-                height: size.height * 0.4,
+                height: size.height * 0.38,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   decoration: BoxDecoration(
@@ -103,12 +131,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Icon(
-                          Icons.business_center_rounded,
+                          Icons.mark_email_read_rounded,
                           color: Colors.white,
                           size: 36,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       const Text(
                         'Sastrybalm SFA',
                         style: TextStyle(
@@ -120,10 +148,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Field Operations & Sales Automation',
+                        'Secure Passwordless Email OTP Authentication',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.75),
-                          fontSize: 15,
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -131,14 +159,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
               ),
-              // Overlapping bottom form card
+
+              // Bottom card
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
-                height: size.height * 0.63,
+                height: size.height * 0.65,
                 child: Container(
-                  padding: const EdgeInsets.fromLTRB(30, 40, 30, 24),
+                  padding: const EdgeInsets.fromLTRB(30, 36, 30, 24),
                   decoration: BoxDecoration(
                     color: theme.scaffoldBackgroundColor,
                     borderRadius: const BorderRadius.only(
@@ -157,7 +186,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Welcome Back',
+                        _otpSent ? 'Enter Verification Code' : 'Welcome Back',
                         style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                           fontSize: 24,
@@ -165,101 +194,158 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Sign in to access your beats and log orders.',
+                        _otpSent
+                            ? 'Enter the 6-digit OTP code sent to ${_sentTarget ?? 'your email'}.'
+                            : 'Enter your registered email or username to receive a login OTP.',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontSize: 14,
                         ),
                       ),
-                      const SizedBox(height: 36),
-                      TextField(
-                        controller: _usernameCtrl,
-                        style: theme.textTheme.bodyLarge,
-                        decoration: InputDecoration(
-                          labelText: 'Username',
-                          hintText: 'Enter your username',
-                          prefixIcon: const Icon(Icons.person_outline_rounded),
-                          filled: true,
-                          fillColor: theme.colorScheme.surface,
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.primary.withOpacity(0.12),
+                      const SizedBox(height: 32),
+
+                      if (!_otpSent) ...[
+                        TextField(
+                          controller: _loginCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          style: theme.textTheme.bodyLarge,
+                          decoration: InputDecoration(
+                            labelText: 'Email or Username / Mobile',
+                            hintText: 'e.g. rajesh.rep@sastrybalm.com or rep1',
+                            prefixIcon: const Icon(Icons.person_outline_rounded),
+                            filled: true,
+                            fillColor: theme.colorScheme.surface,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.primary.withOpacity(0.12),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.primary,
+                                width: 1.5,
+                              ),
                             ),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.primary,
-                              width: 1.5,
-                            ),
-                          ),
+                          onSubmitted: (_) => _requestOtp(),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _passwordCtrl,
-                        obscureText: _obscurePassword,
-                        style: theme.textTheme.bodyLarge,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          hintText: 'Enter your password',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        const Spacer(),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 54,
+                          child: ElevatedButton(
+                            onPressed: _loading ? null : _requestOtp,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              elevation: 4,
                             ),
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                          ),
-                          filled: true,
-                          fillColor: theme.colorScheme.surface,
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.primary.withOpacity(0.12),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.primary,
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                        onSubmitted: (_) => _login(),
-                      ),
-                      const Spacer(),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: ElevatedButton(
-                          onPressed: _loading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.colorScheme.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            elevation: 4,
-                            shadowColor: theme.colorScheme.primary.withOpacity(0.3),
-                          ),
-                          child: _loading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
+                            child: _loading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Send Login OTP',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                )
-                              : const Text(
-                                  'Sign In',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                          ),
                         ),
-                      ),
+                      ] else ...[
+                        TextField(
+                          controller: _otpCtrl,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 8,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: '6-Digit OTP Code',
+                            hintText: '123456',
+                            counterText: '',
+                            prefixIcon: const Icon(Icons.shield_outlined),
+                            filled: true,
+                            fillColor: theme.colorScheme.surface,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.primary.withOpacity(0.12),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.primary,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                          onSubmitted: (_) => _verifyOtp(),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _otpSent = false;
+                                  _otpCtrl.clear();
+                                });
+                              },
+                              child: const Text('Change Email / Username'),
+                            ),
+                            TextButton(
+                              onPressed: _loading ? null : _requestOtp,
+                              child: const Text('Resend OTP'),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 54,
+                          child: ElevatedButton(
+                            onPressed: _loading ? null : _verifyOtp,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              elevation: 4,
+                            ),
+                            child: _loading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Verify & Login',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                     ],
                   ),

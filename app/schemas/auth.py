@@ -10,6 +10,15 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RequestOtpSchema(BaseModel):
+    email: str
+
+
+class VerifyOtpSchema(BaseModel):
+    email: str
+    otp_code: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

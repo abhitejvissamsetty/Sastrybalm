@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import 'attendance_provider.dart';
+import 'beat_provider.dart';
 
 final apiClientProvider = Provider((ref) => ApiClient());
 
@@ -62,12 +64,15 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
     }
   }
 
-  Future<void> login(String username, String password) async {
+  Future<void> verifyOtp(String emailOrLogin, String otpCode) async {
     state = const AsyncValue.loading();
     try {
-      final user = await _authService.login(username, password);
+      final user = await _authService.verifyOtp(emailOrLogin, otpCode);
       await loadConfig();
       state = AsyncValue.data(user);
+      _ref.read(attendanceProvider.notifier).refresh();
+      _ref.invalidate(beatsProvider);
+      _ref.invalidate(productsProvider);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       rethrow;
@@ -77,6 +82,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
   Future<void> logout() async {
     await _authService.logout();
     _ref.read(appConfigProvider.notifier).state = null;
+    _ref.invalidate(attendanceProvider);
+    _ref.invalidate(beatsProvider);
+    _ref.invalidate(productsProvider);
     state = const AsyncValue.data(null);
   }
 

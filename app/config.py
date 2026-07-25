@@ -29,9 +29,12 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = "noreply@sastrybalm.com"
+    db_custom_url: str = ""
 
     @property
     def db_url(self) -> str:
+        if self.db_custom_url:
+            return self.db_custom_url
         return (
             f"mysql+pymysql://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"

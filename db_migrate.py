@@ -68,6 +68,8 @@ def run_migrations():
         add_column_safely(conn, "users", "imei", "VARCHAR(50) NULL")
         add_column_safely(conn, "users", "payment_mode", "VARCHAR(50) NULL")
         add_column_safely(conn, "users", "denomination_mandatory", "BOOLEAN NOT NULL DEFAULT 0")
+        add_column_safely(conn, "users", "geography_id", "INT NULL")
+        add_column_safely(conn, "users", "vendor_id", "INT NULL")
         add_column_safely(conn, "users", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
             
         # Orders
@@ -106,7 +108,10 @@ def run_migrations():
         add_column_safely(conn, "products", "warehouse_location", "VARCHAR(100) NULL")
 
         # System Configuration - Default row
-        conn.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))
+        if conn.engine.name == "sqlite":
+            conn.execute(text("INSERT OR IGNORE INTO system_configuration (id) VALUES (1)"))
+        else:
+            conn.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))
 
         # System Configuration - SMTP Settings
         add_column_safely(conn, "system_configuration", "smtp_host", "VARCHAR(255) NULL")
@@ -188,6 +193,9 @@ def run_migrations():
         # Warehouses
         add_column_safely(conn, "warehouses", "contact_person", "VARCHAR(255) NULL")
         add_column_safely(conn, "warehouses", "mobile", "VARCHAR(20) NULL")
+
+        # Vendors
+        add_column_safely(conn, "vendors", "geography_id", "INT NULL")
 
     print("Updates applied. Now running create_all to create missing tables...")
     # This will create any tables that don't exist yet (attendance, vendors, beat_types_master, etc.)

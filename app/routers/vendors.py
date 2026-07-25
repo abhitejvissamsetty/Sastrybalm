@@ -45,14 +45,28 @@ async def vendor_list(
     })
 
 
+from app.models.geography import Geography
+from app.models.product import Product
+
+
+def _vendor_form_context(db: Session) -> dict:
+    geographies = db.query(Geography).filter(Geography.is_active == True).order_by(Geography.name).all()
+    products = db.query(Product).filter(Product.is_active == True).order_by(Product.name).all()
+    return {
+        "geographies": geographies,
+        "products": products,
+    }
+
+
 @router.get("/new", response_class=HTMLResponse)
 async def vendor_new(
     request: Request,
     current_user: User = Depends(_ADMIN),
+    db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse("vendors/form.html", {
         "request": request, "current_user": current_user,
-        "item": None, "error": None,
+        "item": None, "error": None, **_vendor_form_context(db),
     })
 
 
@@ -67,13 +81,15 @@ async def vendor_create(
     email: Optional[str] = Form(default=None),
     category: Optional[str] = Form(default=None),
     cmms_supplier_ref: Optional[str] = Form(default=None),
+    geography_id: Optional[str] = Form(default=None),
+    product_ids: list[str] = Form(default=[]),
     password: Optional[str] = Form(default=None),
     address: Optional[str] = Form(default=None),
 ):
     if mobile and db.query(Vendor).filter(Vendor.mobile == mobile).first():
         return templates.TemplateResponse("vendors/form.html", {
             "request": request, "current_user": current_user,
-            "item": None, "error": f"Mobile '{mobile}' already registered.",
+            "item": None, "error": f"Mobile '{mobile}' already registered.", **_vendor_form_context(db),
         })
 
     v = Vendor(
@@ -83,9 +99,14 @@ async def vendor_create(
         email=email or None,
         category=category or None,
         cmms_supplier_ref=cmms_supplier_ref or None,
+        geography_id=int(geography_id) if geography_id else None,
         hashed_password=hash_password(password) if password else None,
         address=address or None,
     )
+    if product_ids:
+        p_objs = db.query(Product).filter(Product.id.in_(product_ids)).all()
+        v.supplied_products.extend(p_objs)
+
     db.add(v)
     db.commit()
     set_flash_success(request, f"Vendor '{name}' created.")
@@ -104,7 +125,7 @@ async def vendor_edit(
         return RedirectResponse("/vendors", status_code=302)
     return templates.TemplateResponse("vendors/form.html", {
         "request": request, "current_user": current_user,
-        "item": item, "error": None,
+        "item": item, "error": None, **_vendor_form_context(db),
     })
 
 
@@ -119,6 +140,8 @@ async def vendor_update(
     email: Optional[str] = Form(default=None),
     category: Optional[str] = Form(default=None),
     cmms_supplier_ref: Optional[str] = Form(default=None),
+    geography_id: Optional[str] = Form(default=None),
+    product_ids: list[str] = Form(default=[]),
     new_password: Optional[str] = Form(default=None),
     address: Optional[str] = Form(default=None),
 ):
@@ -132,9 +155,16 @@ async def vendor_update(
     item.email = email or None
     item.category = category or None
     item.cmms_supplier_ref = cmms_supplier_ref or None
+    item.geography_id = int(geography_id) if geography_id else None
     item.address = address or None
     if new_password:
         item.hashed_password = hash_password(new_password)
+
+    item.supplied_products.clear()
+    if product_ids:
+        p_objs = db.query(Product).filter(Product.id.in_(product_ids)).all()
+        item.supplied_products.extend(p_objs)
+
     db.commit()
     set_flash_success(request, f"Vendor '{name}' updated.")
     return RedirectResponse("/vendors", status_code=302)

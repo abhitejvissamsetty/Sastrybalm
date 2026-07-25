@@ -5,10 +5,17 @@ class AuthService {
   final ApiClient _client;
   AuthService(this._client);
 
-  Future<AppUser> login(String username, String password) async {
-    final response = await _client.dio.post('/auth/token', data: {
-      'username': username,
-      'password': password,
+  Future<Map<String, dynamic>> requestOtp(String emailOrLogin) async {
+    final response = await _client.dio.post('/auth/request-otp', data: {
+      'email': emailOrLogin,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<AppUser> verifyOtp(String emailOrLogin, String otpCode) async {
+    final response = await _client.dio.post('/auth/verify-otp', data: {
+      'email': emailOrLogin,
+      'otp_code': otpCode,
     });
     final data = response.data as Map<String, dynamic>;
     await _client.saveToken(data['access_token']);

@@ -13,7 +13,7 @@
     </a>
     <div>
       <h1 class="text-2xl font-bold text-white">{{ 'Edit User' if item else 'New User' }}</h1>
-      <p class="mt-1 text-sm text-slate-400">{{ item.full_name if item else 'Configure user identity, assigned role, and dashboard feature access matrix.' }}</p>
+      <p class="mt-1 text-sm text-slate-400">{{ item.full_name if item else 'Configure user identity, assigned role, role-specific scopes, and feature permissions.' }}</p>
     </div>
   </div>
 
@@ -48,8 +48,8 @@
                  class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">Password <span class="text-red-400">*</span></label>
-          <input type="password" name="password" required
+          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">Password <span class="text-slate-500 font-normal lowercase">(Optional — Non-admin users log in via Email OTP)</span></label>
+          <input type="password" name="password"
                  class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
       </div>
@@ -77,22 +77,86 @@
       </div>
     </div>
 
-    <!-- Role Assignment -->
+    <!-- System Role & Role-Specific Configuration -->
     <div class="glass rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-5">
-      <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">System Role</h2>
+      <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">System Role &amp; Role-Specific Scopes</h2>
 
-      <div>
-        <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">System Role <span class="text-red-400">*</span></label>
-        <select name="role" required
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">System Role <span class="text-red-400">*</span></label>
+          <select name="role" id="roleSelect" onchange="updateRoleScopedFields()" required
+                  class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            {% for r in UserRole %}
+            {% if r.value != 'admin' or (item and item.role == r) %}
+            <option value="{{ r.value }}" {% if item and item.role == r %}selected{% elif not item and r.value == 'field_rep' %}selected{% endif %}>
+              {{ r.value.replace('_', ' ').title() }}
+            </option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">Company Profile</label>
+          <select name="company_profile_id"
+                  class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">None / Unassigned</option>
+            {% for cp in company_profiles %}
+            <option value="{{ cp.id }}" {% if item and item.company_profile_id == cp.id %}selected{% endif %}>
+              {{ cp.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Scoped Field: Territory Manager (Geography Assignment) -->
+      <div id="scope-territory-manager" class="hidden rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4 space-y-2">
+        <label class="block text-xs font-bold text-indigo-300 uppercase">Managing Region / Zone (Geography Scope) <span class="text-red-400">*</span></label>
+        <select name="geography_id"
                 class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          {% for r in UserRole %}
-          {% if r.value != 'admin' or (item and item.role == r) %}
-          <option value="{{ r.value }}" {% if item and item.role == r %}selected{% elif not item and r.value == 'field_rep' %}selected{% endif %}>
-            {{ r.value.replace('_', ' ').title() }}
+          <option value="">Select Geography / Region...</option>
+          {% for g in geographies %}
+          <option value="{{ g.id }}" {% if item and item.geography_id == g.id %}selected{% endif %}>
+            {{ g.name }} ({{ g.level.value.title() }})
           </option>
-          {% endif %}
           {% endfor %}
         </select>
+        <p class="text-xs text-slate-400">A Territory Manager manages all beat routes and representatives within this assigned Geography.</p>
+      </div>
+
+      <!-- Scoped Field: QC Manager (Multi Select Vendors) -->
+      <div id="scope-qc-manager" class="hidden rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 space-y-2">
+        <label class="block text-xs font-bold text-amber-300 uppercase">Attached Vendors (Multi-Select Scope) <span class="text-red-400">*</span></label>
+        <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-2">
+          {% set assigned_v_ids = item.qc_vendors | map(attribute='id') | list if item else [] %}
+          {% for v in vendors %}
+          <label class="flex items-center space-x-3 text-sm text-slate-300 hover:text-white cursor-pointer">
+            <input type="checkbox" name="qc_vendor_ids" value="{{ v.id }}" {% if v.id in assigned_v_ids %}checked{% endif %}
+                   class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-amber-600 focus:ring-amber-500">
+            <span class="font-medium">{{ v.name }}</span>
+            <span class="text-xs text-slate-500">({{ v.category or 'General' }})</span>
+          </label>
+          {% else %}
+          <p class="text-xs text-slate-500 italic">No vendors registered yet.</p>
+          {% endfor %}
+        </div>
+        <p class="text-xs text-slate-400">A QC Manager oversees quality control and material approvals across multiple attached Vendors.</p>
+      </div>
+
+      <!-- Scoped Field: Vendor Tech / Vendor Admin (Single Select Vendor) -->
+      <div id="scope-vendor-single" class="hidden rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-2">
+        <label class="block text-xs font-bold text-emerald-300 uppercase">Assigned Vendor Scope <span class="text-red-400">*</span></label>
+        <select name="vendor_id"
+                class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">Select Vendor...</option>
+          {% for v in vendors %}
+          <option value="{{ v.id }}" {% if item and item.vendor_id == v.id %}selected{% endif %}>
+            {{ v.name }} ({{ v.category or 'Vendor' }})
+          </option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-slate-400">Vendor Technicians and Vendor Admins are scoped exclusively to their single assigned Vendor.</p>
       </div>
 
       {% if item %}
@@ -102,6 +166,34 @@
         <label for="is_active" class="text-sm font-medium text-slate-300">Active User Account</label>
       </div>
       {% endif %}
+    </div>
+
+    <!-- Position Hierarchy Assignment -->
+    <div class="glass rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Assigned Positions (Hierarchy)</h2>
+          <p class="text-xs text-slate-400 mt-1">L1 positions are assignable to Field Reps &amp; Territory Managers. L2/L3/L4 positions are restricted to Territory Managers.</p>
+        </div>
+      </div>
+
+      {% set assigned_p_ids = item.positions | map(attribute='id') | list if item else [] %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto p-2 border border-slate-800 rounded-xl bg-slate-950">
+        {% for p in positions %}
+        <label class="position-item flex items-center justify-between p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition-colors" data-level="{{ p.level.value if p.level.value else p.level }}">
+          <div class="flex items-center space-x-3">
+            <input type="checkbox" name="position_ids" value="{{ p.id }}" {% if p.id in assigned_p_ids %}checked{% endif %}
+                   class="position-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
+            <span class="text-xs font-medium text-slate-200">{{ p.name }}</span>
+          </div>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ 'bg-indigo-900/50 text-indigo-300' if p.level.value == 'L1' else 'bg-amber-900/50 text-amber-300' }}">
+            {{ p.level.value if p.level.value else p.level }}
+          </span>
+        </label>
+        {% else %}
+        <p class="text-xs text-slate-500 italic p-2">No positions created yet.</p>
+        {% endfor %}
+      </div>
     </div>
 
     <!-- User Role Feature Access Matrix -->
@@ -216,11 +308,47 @@
 </div>
 
 <script>
+  function updateRoleScopedFields() {
+    const roleSelect = document.getElementById('roleSelect');
+    const role = roleSelect ? roleSelect.value : '';
+
+    const territoryDiv = document.getElementById('scope-territory-manager');
+    const qcDiv = document.getElementById('scope-qc-manager');
+    const vendorSingleDiv = document.getElementById('scope-vendor-single');
+
+    if (territoryDiv) territoryDiv.classList.add('hidden');
+    if (qcDiv) qcDiv.classList.add('hidden');
+    if (vendorSingleDiv) vendorSingleDiv.classList.add('hidden');
+
+    if (role === 'territory_manager') {
+      if (territoryDiv) territoryDiv.classList.remove('hidden');
+    } else if (role === 'qc_manager') {
+      if (qcDiv) qcDiv.classList.remove('hidden');
+    } else if (role === 'vendor_technician' || role === 'vendor_admin') {
+      if (vendorSingleDiv) vendorSingleDiv.classList.remove('hidden');
+    }
+
+    // Filter position levels for non-Territory Managers
+    const posItems = document.querySelectorAll('.position-item');
+    posItems.forEach(item => {
+      const level = item.getAttribute('data-level');
+      const cb = item.querySelector('.position-checkbox');
+      if (role === 'field_rep' && (level === 'L2' || level === 'L3' || level === 'L4')) {
+        item.classList.add('opacity-40', 'pointer-events-none');
+        if (cb) cb.checked = false;
+      } else {
+        item.classList.remove('opacity-40', 'pointer-events-none');
+      }
+    });
+  }
+
   function toggleAllPermissions(checked) {
     const checkboxes = document.querySelectorAll('.permission-checkbox');
     checkboxes.forEach(cb => {
       cb.checked = checked;
     });
   }
+
+  document.addEventListener('DOMContentLoaded', updateRoleScopedFields);
 </script>
 {% endblock %}

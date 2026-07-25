@@ -10,6 +10,7 @@ from app.models.company import CompanyProfile
 from app.models.geography import Geography, GeoLevel
 from app.models.position import Position
 from app.models.user import ModuleName, PaymentMode, User, UserModuleAccess, UserRole
+from app.models.vendor import Vendor, VendorStatus
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 from app.utils.security import hash_password
@@ -21,10 +22,15 @@ templates = Jinja2Templates(directory="app/templates")
 def _form_context(db: Session, for_role: str = "") -> dict:
     positions_query = db.query(Position).filter(Position.is_active == True)
     if for_role == UserRole.field_rep.value:
-        # Filter positions for field reps to L1 level
         positions_query = positions_query.filter(Position.level == "L1")
+    geographies = db.query(Geography).filter(Geography.is_active == True).order_by(Geography.name).all()
+    vendors = db.query(Vendor).filter(Vendor.status == VendorStatus.active).order_by(Vendor.name).all()
+    company_profiles = db.query(CompanyProfile).filter(CompanyProfile.is_active == True).order_by(CompanyProfile.name).all()
     return {
         "positions": positions_query.order_by(Position.name).all(),
+        "geographies": geographies,
+        "vendors": vendors,
+        "company_profiles": company_profiles,
         "UserRole": UserRole,
         "ModuleName": ModuleName,
         "PaymentMode": PaymentMode,
@@ -49,29 +55,17 @@ async def user_role_matrix(
 async def user_position_view(
     user_id: int,
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
-    """View and update user position assignment & hierarchy tree."""
-    user_obj = db.query(User).filter(User.id == user_id).first()
-    if not user_obj:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
         set_flash_error(request, "User not found.")
         return RedirectResponse("/users", status_code=302)
-
-    pos_query = db.query(Position).filter(Position.is_active == True)
-    if user_obj.role == UserRole.field_rep:
-        # Filter available positions for field reps to L1 level
-        pos_query = pos_query.filter(Position.level == "L1")
-
-    all_positions = pos_query.order_by(Position.name).all()
-    assigned_ids = [p.id for p in user_obj.positions]
-
-    return templates.TemplateResponse("users/position_view_modal.html", {
+    return templates.TemplateResponse("users/position_view.html", {
         "request": request,
         "current_user": current_user,
-        "user_obj": user_obj,
-        "all_positions": all_positions,
-        "assigned_ids": assigned_ids,
+        "user_item": user,
         **get_flash(request),
     })
 
@@ -146,12 +140,15 @@ async def user_create(
     full_name: str = Form(...),
     email: str = Form(...),
     username: str = Form(...),
-    password: str = Form(...),
+    password: Optional[str] = Form(default=None),
     role: str = Form(...),
     employee_id: Optional[str] = Form(default=None),
     phone: str = Form(...),
     position_ids: list[str] = Form(default=[]),
     company_profile_id: Optional[str] = Form(default=None),
+    geography_id: Optional[str] = Form(default=None),
+    vendor_id: Optional[str] = Form(default=None),
+    qc_vendor_ids: list[str] = Form(default=[]),
     modules: list[str] = Form(default=[]),
 ):
     import re
@@ -169,6 +166,15 @@ async def user_create(
         err = f"Email '{email}' already registered."
     elif db.query(User).filter(User.username == username).first():
         err = f"Username '{username}' already taken."
+
+    # Validate Position assignment rules
+    if not err and position_ids:
+        pos_objs = db.query(Position).filter(Position.id.in_(position_ids)).all()
+        for p in pos_objs:
+            p_lvl = p.level.value if hasattr(p.level, "value") else str(p.level)
+            if p_lvl in ["L2", "L3", "L4"] and role != UserRole.territory_manager.value:
+                err = f"Position '{p.name}' ({p_lvl}) can only be assigned to a Territory Manager. Field Reps can only be assigned L1 positions."
+                break
         
     if err:
         return templates.TemplateResponse("users/form.html", {
@@ -178,16 +184,23 @@ async def user_create(
         
     user = User(
         full_name=full_name, email=email, username=username,
-        hashed_password=hash_password(password),
+        hashed_password=hash_password(password) if password else hash_password("OTP_USER_PASSWORDLESS"),
         role=UserRole(role),
         employee_id=employee_id or None, phone=phone_clean or None,
         company_profile_id=int(company_profile_id) if company_profile_id else None,
+        geography_id=int(geography_id) if geography_id and role == UserRole.territory_manager.value else None,
+        vendor_id=int(vendor_id) if vendor_id and role in [UserRole.vendor_technician.value, UserRole.vendor_admin.value] else None,
         payment_mode=None,
         denomination_mandatory=False,
     )
     if position_ids:
         pos_objs = db.query(Position).filter(Position.id.in_(position_ids)).all()
         user.positions.extend(pos_objs)
+
+    if role == UserRole.qc_manager.value and qc_vendor_ids:
+        qc_v_objs = db.query(Vendor).filter(Vendor.id.in_(qc_vendor_ids)).all()
+        user.qc_vendors.extend(qc_v_objs)
+
     db.add(user)
     db.flush()
     
@@ -229,6 +242,9 @@ async def user_update(
     phone: str = Form(...),
     position_ids: list[str] = Form(default=[]),
     company_profile_id: Optional[str] = Form(default=None),
+    geography_id: Optional[str] = Form(default=None),
+    vendor_id: Optional[str] = Form(default=None),
+    qc_vendor_ids: list[str] = Form(default=[]),
     is_active: Optional[str] = Form(default=None),
     new_password: Optional[str] = Form(default=None),
     modules: list[str] = Form(default=[]),
@@ -247,6 +263,15 @@ async def user_update(
         err = "Phone number must be exactly 10 digits."
     elif db.query(User).filter(User.email == email, User.id != user_id).first():
         err = f"Email '{email}' already registered."
+
+    # Validate Position assignment rules
+    if not err and position_ids:
+        pos_objs = db.query(Position).filter(Position.id.in_(position_ids)).all()
+        for p in pos_objs:
+            p_lvl = p.level.value if hasattr(p.level, "value") else str(p.level)
+            if p_lvl in ["L2", "L3", "L4"] and role != UserRole.territory_manager.value:
+                err = f"Position '{p.name}' ({p_lvl}) can only be assigned to a Territory Manager. Field Reps can only be assigned L1 positions."
+                break
         
     if err:
         return templates.TemplateResponse("users/form.html", {
@@ -260,6 +285,8 @@ async def user_update(
     item.employee_id = employee_id or None
     item.phone = phone_clean
     item.company_profile_id = int(company_profile_id) if company_profile_id else None
+    item.geography_id = int(geography_id) if geography_id and role == UserRole.territory_manager.value else None
+    item.vendor_id = int(vendor_id) if vendor_id and role in [UserRole.vendor_technician.value, UserRole.vendor_admin.value] else None
     item.is_active = is_active == "on"
     if new_password:
         item.hashed_password = hash_password(new_password)
@@ -268,6 +295,11 @@ async def user_update(
     if position_ids:
         pos_objs = db.query(Position).filter(Position.id.in_(position_ids)).all()
         item.positions.extend(pos_objs)
+
+    item.qc_vendors.clear()
+    if role == UserRole.qc_manager.value and qc_vendor_ids:
+        qc_v_objs = db.query(Vendor).filter(Vendor.id.in_(qc_vendor_ids)).all()
+        item.qc_vendors.extend(qc_v_objs)
 
     # Refresh module access — flush first to clear session state before re-inserting
     db.query(UserModuleAccess).filter(UserModuleAccess.user_id == user_id).delete(synchronize_session='fetch')

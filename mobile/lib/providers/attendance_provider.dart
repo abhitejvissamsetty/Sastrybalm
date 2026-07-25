@@ -3,28 +3,41 @@ import '../models/attendance.dart';
 import '../services/attendance_service.dart';
 import 'auth_provider.dart';
 
+import 'package:dio/dio.dart';
+
 final attendanceServiceProvider = Provider((ref) {
   final client = ref.watch(apiClientProvider);
   return AttendanceService(client);
 });
 
 final attendanceProvider = StateNotifierProvider<AttendanceNotifier, AsyncValue<AttendanceState>>((ref) {
-  return AttendanceNotifier(ref.read(attendanceServiceProvider));
+  return AttendanceNotifier(ref.read(attendanceServiceProvider), ref);
 });
 
 class AttendanceNotifier extends StateNotifier<AsyncValue<AttendanceState>> {
   final AttendanceService _service;
+  final Ref _ref;
 
-  AttendanceNotifier(this._service) : super(const AsyncValue.loading()) {
+  AttendanceNotifier(this._service, this._ref) : super(const AsyncValue.loading()) {
     refresh();
   }
 
   Future<void> refresh() async {
+    final authState = _ref.read(authStateProvider);
+    if (authState.value == null) {
+      state = AsyncValue.data(AttendanceState.notCheckedIn());
+      return;
+    }
+
     try {
       final today = await _service.fetchToday();
       state = AsyncValue.data(today);
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      if (e is DioException && e.response?.statusCode == 401) {
+        state = AsyncValue.data(AttendanceState.notCheckedIn());
+      } else {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 

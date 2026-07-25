@@ -39,7 +39,12 @@ class ApiClient {
           return handler.next(options);
         },
         onError: (DioException error, handler) async {
-          if (error.response?.statusCode == 401) {
+          final path = error.requestOptions.path;
+          final isAuthRequest = path.contains('/auth/token') ||
+              path.contains('/auth/request-otp') ||
+              path.contains('/auth/verify-otp');
+
+          if (error.response?.statusCode == 401 && !isAuthRequest) {
             // Clear stored credentials immediately
             await _storage.delete(key: 'jwt_token');
             // Notify listeners (AuthNotifier) so the app navigates to /login
