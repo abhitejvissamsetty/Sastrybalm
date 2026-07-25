@@ -37,9 +37,9 @@
       </svg>
     </div>
     <div class="text-sm">
-      <h4 class="font-bold text-white">Automated Daily Backups &amp; Data Security</h4>
+      <h4 class="font-bold text-white">Automated SQL Backups &amp; 5-File Retention Policy</h4>
       <p class="text-slate-300 mt-1">
-        Backups include all system master data (Sales Channels, Outlets, Beat Routes, Users, Products, Warehouses) and operational transaction records (Orders, Payments, Attendance, Expenses, Visits, Inventory logs). Automated daily backups run every night at 00:00 IST.
+        Backups are generated directly in standard MySQL executable <code class="font-mono text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">.sql</code> format. Backups include all system master data (Sales Channels, Outlets, Beat Routes, Users, Products, Warehouses) and operational transaction records. The system automatically retains the <strong>5 most recent backups</strong>, purging older files. Automated daily backups run every night at 00:00 IST.
       </p>
     </div>
   </div>
@@ -49,7 +49,7 @@
     <table class="min-w-full divide-y divide-white/5">
       <thead>
         <tr class="bg-slate-900/80 backdrop-blur-md">
-          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Backup Archive</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">SQL Backup File</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Created At</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">File Size</th>
           <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
@@ -65,12 +65,12 @@
             {{ b.created_at }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-xs font-mono text-slate-400">
-            {{ b.size_mb }} MB
+            {{ b.size_display if b.size_display else (b.size_mb ~ ' MB') }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-xs font-medium space-x-3">
             <a href="/settings/backup/download/{{ b.filename }}"
                class="inline-flex items-center gap-x-1 rounded-lg bg-indigo-950 px-3 py-1 text-xs font-semibold text-indigo-300 border border-indigo-800/60 hover:bg-indigo-900 transition-colors">
-              Download ZIP
+              Download .SQL File
             </a>
             <form method="post" action="/settings/backup/delete/{{ b.filename }}" class="inline" onsubmit="return confirmSubmit(event, 'Delete database backup file {{ b.filename }}?', 'Delete Backup', 'danger')">
               <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">
@@ -82,7 +82,7 @@
         {% else %}
         <tr>
           <td colspan="4" class="px-6 py-12 text-center text-slate-500 text-sm">
-            No backup archives generated yet. Click "Generate Instant Backup" above.
+            No SQL backup files generated yet. Click "Generate Instant Backup" above.
           </td>
         </tr>
         {% endfor %}

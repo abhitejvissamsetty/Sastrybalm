@@ -49,12 +49,14 @@ async def backup_download(
     current_user: User = Depends(require_web_roles(UserRole.admin)),
 ):
     filepath = os.path.join(BACKUP_DIR, filename)
-    if not os.path.exists(filepath) or not filename.endswith(".zip"):
+    if not os.path.exists(filepath) or not (filename.endswith(".sql") or filename.endswith(".zip")):
         return RedirectResponse("/settings/backup", status_code=302)
+    
+    media_type = "application/sql" if filename.endswith(".sql") else "application/zip"
     return FileResponse(
         path=filepath,
         filename=filename,
-        media_type="application/zip"
+        media_type=media_type
     )
 
 
@@ -65,7 +67,7 @@ async def backup_delete(
     current_user: User = Depends(require_web_roles(UserRole.admin)),
 ):
     filepath = os.path.join(BACKUP_DIR, filename)
-    if os.path.exists(filepath) and filename.endswith(".zip"):
+    if os.path.exists(filepath) and (filename.endswith(".sql") or filename.endswith(".zip")):
         os.remove(filepath)
         set_flash_success(request, f"Backup '{filename}' deleted.")
     else:

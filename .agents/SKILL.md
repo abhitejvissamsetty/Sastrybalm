@@ -157,3 +157,4 @@ curl -I http://127.0.0.1:8090/login
 6. **Inventory Stock Deactivation Validation**: Deactivating any Product, Warehouse, or Region must validate that active inventory stock is 0. If inventory stock is present, deactivation is rejected with a clear validation error.
 7. **No Hardcoded Test Warehouses**: Warehouses must never be hardcoded or auto-seeded in migration scripts (`db_migrate.py`) or setting routers. All warehouses must be explicitly configured via Admin controls.
 8. **Channel Partner Mandatory Fields**: Channel Partners require mandatory selection of at least 1 Sales Channel (Multi-select) and a Geography Scope limited to Territory or Region.
+9. **SQL Database Backups & 5-File Retention Policy**: System database backups are generated in standard executable `.sql` format. The system automatically retains only the 5 most recent backup files, purging older files upon new backup creation.
