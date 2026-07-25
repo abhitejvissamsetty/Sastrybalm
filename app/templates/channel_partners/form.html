@@ -41,22 +41,41 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-      <div>
-        <label class="block text-sm font-medium text-slate-300 mb-1.5">Sales Channel</label>
-        <select name="beat_type"
-                class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          {% for bt in beat_types %}
-          <option value="{{ bt.code }}" {% if item and item.beat_type == bt.code %}selected{% endif %}>{{ bt.name }}</option>
-          {% endfor %}
-        </select>
+    <!-- Mandatory Geography Scope (Territory or Region) -->
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Geography Scope (Territory or Region) <span class="text-red-400 font-bold">*</span></label>
+      <select name="geography_id" required
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">-- Select Territory or Region --</option>
+        {% for g in geographies %}
+        <option value="{{ g.id }}" {% if item and item.geography_id == g.id %}selected{% endif %}>
+          {{ g.name }} ({{ g.level.value.title() }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Mandatory Multi-Select Sales Channels -->
+    <div class="space-y-2 rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4">
+      <label class="block text-xs font-bold text-indigo-300 uppercase">Sales Channels <span class="text-red-400 font-bold">* (Mandatory: select at least 1)</span></label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-3">
+        {% set active_channels = item.sales_channels_list if item else ['GT'] %}
+        {% for bt in beat_types %}
+        <label class="flex items-center space-x-3 text-sm text-slate-300 hover:text-white cursor-pointer p-1 rounded hover:bg-slate-900">
+          <input type="checkbox" name="sales_channels" value="{{ bt.code }}" {% if bt.code in active_channels %}checked{% endif %}
+                 class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+          <span class="font-medium">{{ bt.name }}</span>
+          <span class="text-xs font-mono text-indigo-400">({{ bt.code }})</span>
+        </label>
+        {% endfor %}
       </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-300 mb-1.5">ERP Reference ID</label>
-        <input type="text" name="erp_id" value="{{ item.erp_id if item and item.erp_id else '' }}"
-               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-               placeholder="Optional ERP ID">
-      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">ERP Reference ID</label>
+      <input type="text" name="erp_id" value="{{ item.erp_id if item and item.erp_id else '' }}"
+             class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm font-mono placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+             placeholder="Optional ERP ID">
     </div>
 
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">

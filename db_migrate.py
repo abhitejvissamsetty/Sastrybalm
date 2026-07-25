@@ -106,6 +106,13 @@ def run_migrations():
         
         # Local Channel Partners
         add_column_safely(conn, "local_channel_partners", "beat_type", "VARCHAR(50) NOT NULL DEFAULT 'GT'")
+        add_column_safely(conn, "local_channel_partners", "partner_type", "VARCHAR(100) NULL DEFAULT 'Distributor'")
+        add_column_safely(conn, "local_channel_partners", "sales_channels", "TEXT NULL")
+        add_column_safely(conn, "local_channel_partners", "geography_id", "INT NULL")
+        add_column_safely(conn, "local_channel_partners", "contact_person", "VARCHAR(255) NULL")
+        add_column_safely(conn, "local_channel_partners", "mobile", "VARCHAR(20) NULL")
+        add_column_safely(conn, "local_channel_partners", "address", "TEXT NULL")
+        add_column_safely(conn, "local_channel_partners", "erp_id", "VARCHAR(100) NULL")
 
         # Products
         add_column_safely(conn, "products", "unit_cost", "DECIMAL(10, 2) NOT NULL DEFAULT 0")
@@ -216,29 +223,14 @@ def run_migrations():
     # This will create any tables that don't exist yet (attendance, vendors, beat_types_master, etc.)
     Base.metadata.create_all(bind=engine)
 
-    # Seed default Beat Types Master & Main Warehouse
+    # Seed default Beat Types Master
     try:
         from app.utils.beat_types import seed_default_beat_types
-        from app.models.warehouse import Warehouse
         from app.database import SessionLocal
         db_session = SessionLocal()
         seed_default_beat_types(db_session)
-
-        # Ensure default warehouse exists
-        if db_session.query(Warehouse).count() == 0:
-            default_wh = Warehouse(
-                code="WH-MAIN",
-                name="Main Central Depot",
-                address="Central Operations Hub",
-                pincode="500001",
-                is_active=True
-            )
-            db_session.add(default_wh)
-            db_session.commit()
-            print("Main Central Depot warehouse seeded successfully!")
-
         db_session.close()
-        print("Beat Types Master & Warehouses seeded successfully!")
+        print("Beat Types Master seeded successfully!")
     except Exception as e:
         print(f"Seeding error: {e}")
 

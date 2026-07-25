@@ -117,6 +117,25 @@ async def warehouse_edit(
     })
 
 
+from sqlalchemy.sql import func
+from app.models.product_warehouse import ProductWarehouseStock
+from app.models.product import Product
+
+
+def _check_warehouse_stock(db: Session, wh_id: int) -> int:
+    wh_stock = db.query(func.sum(ProductWarehouseStock.stock_qty)).filter(
+        ProductWarehouseStock.warehouse_id == wh_id,
+        ProductWarehouseStock.is_active == True
+    ).scalar() or 0
+
+    legacy_stock = db.query(func.sum(Product.stock_qty)).filter(
+        Product.warehouse_id == wh_id,
+        Product.is_active == True
+    ).scalar() or 0
+
+    return int(wh_stock + legacy_stock)
+
+
 @router.post("/{wh_id}/edit")
 async def warehouse_update(
     wh_id: int,
@@ -144,13 +163,61 @@ async def warehouse_update(
             "regions": _get_regions(db),
         })
 
+    # Validate inventory stock before deactivating warehouse
+    new_is_active = is_active == "on"
+    if item.is_active and not new_is_active:
+        total_stock = _check_warehouse_stock(db, wh_id)
+        if total_stock > 0:
+            return templates.TemplateResponse("warehouses/form.html", {
+                "request": request,
+                "current_user": current_user,
+                "item": item,
+                "error": f"Cannot deactivate warehouse '{item.name}' because inventory stock ({total_stock} units) is present. Clear or adjust stock to 0 before deactivation.",
+                "regions": _get_regions(db),
+            })
+
     item.name = name
     item.code = code.upper()
     item.pincode = pincode or None
     item.address = address or None
     item.geography_id = int(geography_id) if geography_id else None
-    item.is_active = is_active == "on"
+    item.is_active = new_is_active
 
     db.commit()
     set_flash_success(request, f"Warehouse '{name}' updated.")
+    return RedirectResponse("/warehouses", status_code=302)
+
+
+@router.post("/{wh_id}/delete")
+async def warehouse_deactivate(
+    wh_id: int,
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    item = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
+    if item:
+        total_stock = _check_warehouse_stock(db, wh_id)
+        if total_stock > 0:
+            set_flash_error(request, f"Cannot deactivate warehouse '{item.name}' because inventory stock ({total_stock} units) is present. Clear or adjust stock to 0 before deactivation.")
+            return RedirectResponse("/warehouses", status_code=302)
+
+        item.is_active = False
+        db.commit()
+        set_flash_success(request, f"Warehouse '{item.name}' deactivated successfully.")
+    return RedirectResponse("/warehouses", status_code=302)
+
+
+@router.post("/{wh_id}/activate")
+async def warehouse_activate(
+    wh_id: int,
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    item = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
+    if item:
+        item.is_active = True
+        db.commit()
+        set_flash_success(request, f"Warehouse '{item.name}' activated successfully.")
     return RedirectResponse("/warehouses", status_code=302)

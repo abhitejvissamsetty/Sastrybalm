@@ -122,6 +122,13 @@ When an **Outlet** places an Order, Asset Request, or Material Request:
 
 ---
 
+## 🤝 6. Channel Partners Rules & Mandates
+
+- **Mandatory Geography Scope**: Every Channel Partner must be assigned to a Geography node scoped strictly to **Territory** (`GeoLevel.territory`) or **Region** (`GeoLevel.region`). Saving a Channel Partner without a valid Territory/Region geography scope is rejected.
+- **Mandatory Multi-Select Sales Channels**: Every Channel Partner must have at least one **Sales Channel** selected from the available beat types (e.g. `GT`, `MT`). Selection is mandatory during creation and edits.
+
+---
+
 ## 🛠️ Common Operations & Developer Commands
 
 ### Run Development Server
@@ -147,3 +154,6 @@ curl -I http://127.0.0.1:8090/login
 3. **Use PTR label everywhere**: Ensure `PTR` is displayed instead of `Unit Cost` in product listing and stock reports.
 4. **Enforce Glassmorphic Alerts**: JavaScript alerts must use the custom modal design system (`confirmSubmit` / custom modal alerts).
 5. **Territory Manager Scope Rules**: Territory Managers can create/edit L1 Positions, create/edit Beats & Routes, create/edit Vendors, and perform inventory inwarding/adjustments for regional warehouses. They cannot create/edit Geographies, Warehouses, Users, Products, or L2-L4 Positions.
+6. **Inventory Stock Deactivation Validation**: Deactivating any Product, Warehouse, or Region must validate that active inventory stock is 0. If inventory stock is present, deactivation is rejected with a clear validation error.
+7. **No Hardcoded Test Warehouses**: Warehouses must never be hardcoded or auto-seeded in migration scripts (`db_migrate.py`) or setting routers. All warehouses must be explicitly configured via Admin controls.
+8. **Channel Partner Mandatory Fields**: Channel Partners require mandatory selection of at least 1 Sales Channel (Multi-select) and a Geography Scope limited to Territory or Region.

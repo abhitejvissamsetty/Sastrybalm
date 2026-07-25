@@ -254,18 +254,6 @@ async def warehouses_list(
     from app.models.warehouse import Warehouse
     warehouses = db.query(Warehouse).order_by(Warehouse.name).all()
 
-    # Seed default if empty
-    if not warehouses:
-        default_wh = Warehouse(
-            code="WH-MAIN",
-            name="Main Central Depot",
-            address="Central Operations Hub",
-            pincode="500001",
-            is_active=True
-        )
-        db.add(default_wh)
-        db.commit()
-        warehouses = db.query(Warehouse).order_by(Warehouse.name).all()
 
     return templates.TemplateResponse("settings/warehouses.html", {
         "request": request,

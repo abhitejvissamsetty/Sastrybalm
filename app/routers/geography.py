@@ -222,6 +222,21 @@ async def geo_delete(
         if active_beats > 0:
             set_flash_error(request, f"Cannot deactivate '{item.name}' because it is attached to active beats.")
             return RedirectResponse("/geography", status_code=302)
+
+        # Check inventory stock in attached warehouses for Region
+        if item.level == GeoLevel.region:
+            from app.models.product_warehouse import ProductWarehouseStock
+            from app.models.warehouse import Warehouse
+            from sqlalchemy.sql import func
+            region_wh_ids = [w.id for w in db.query(Warehouse).filter(Warehouse.geography_id == item.id).all()]
+            if region_wh_ids:
+                wh_stock = db.query(func.sum(ProductWarehouseStock.stock_qty)).filter(
+                    ProductWarehouseStock.warehouse_id.in_(region_wh_ids),
+                    ProductWarehouseStock.is_active == True
+                ).scalar() or 0
+                if wh_stock > 0:
+                    set_flash_error(request, f"Cannot deactivate Region '{item.name}' because attached warehouses have active inventory stock ({wh_stock} units). Clear or adjust inventory stock before deactivation.")
+                    return RedirectResponse("/geography", status_code=302)
             
         item.is_active = False
         db.commit()

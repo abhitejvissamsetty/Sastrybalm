@@ -40,7 +40,8 @@
         <tr class="bg-slate-900/80 backdrop-blur-md">
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Partner Name</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Partner Type</th>
-          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Beat Type</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Geography Scope</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Sales Channels</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Contact</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
           <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
@@ -58,10 +59,27 @@
               {{ item.partner_type }}
             </span>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-            <span class="inline-flex items-center rounded-md bg-purple-950 px-2.5 py-1 text-xs font-semibold text-purple-300 border border-purple-800">
-              {{ item.beat_type or 'GT' }}
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-300">
+            {% if item.geography %}
+            <span class="inline-flex items-center rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-indigo-300 border border-slate-700">
+              {{ item.geography.name }} ({{ item.geography.level.value.title() }})
             </span>
+            {% else %}
+            <span class="text-slate-500 italic">{{ item.territory_name or 'Unscoped' }}</span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 text-sm text-slate-300">
+            <div class="flex flex-wrap gap-1">
+              {% for sc in item.sales_channels_list %}
+              <span class="inline-flex items-center rounded-md bg-purple-950 px-2 py-0.5 text-xs font-semibold text-purple-300 border border-purple-800">
+                {{ sc }}
+              </span>
+              {% else %}
+              <span class="inline-flex items-center rounded-md bg-purple-950 px-2 py-0.5 text-xs font-semibold text-purple-300 border border-purple-800">
+                {{ item.beat_type or 'GT' }}
+              </span>
+              {% endfor %}
+            </div>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
             {{ item.contact_person or '—' }}

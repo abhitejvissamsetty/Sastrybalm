@@ -46,6 +46,19 @@ async def channel_partner_list(
     })
 
 
+import json
+from app.models.geography import Geography, GeoLevel
+
+
+def _cp_form_context(db: Session):
+    geographies = db.query(Geography).filter(
+        Geography.is_active == True,
+        Geography.level.in_([GeoLevel.territory, GeoLevel.region])
+    ).order_by(Geography.level, Geography.name).all()
+    beat_types = get_all_beat_types(db)
+    return {"geographies": geographies, "beat_types": beat_types}
+
+
 @router.get("/new", response_class=HTMLResponse)
 async def channel_partner_new(
     request: Request,
@@ -56,8 +69,8 @@ async def channel_partner_new(
         "request": request,
         "current_user": current_user,
         "item": None,
-        "beat_types": get_all_beat_types(db),
         "error": None,
+        **_cp_form_context(db),
     })
 
 
@@ -68,7 +81,8 @@ async def channel_partner_create(
     db: Session = Depends(get_db),
     name: str = Form(...),
     partner_type: str = Form("Distributor"),
-    beat_type: str = Form("GT"),
+    geography_id: Optional[str] = Form(default=None),
+    sales_channels: list[str] = Form(default=[]),
     contact_person: Optional[str] = Form(default=None),
     mobile: Optional[str] = Form(default=None),
     email: Optional[str] = Form(default=None),
@@ -76,10 +90,41 @@ async def channel_partner_create(
     address: Optional[str] = Form(default=None),
     erp_id: Optional[str] = Form(default=None),
 ):
+    form_data = await request.form()
+    raw_channels = form_data.getlist("sales_channels") or sales_channels
+    selected_channels = [c for c in raw_channels if c and c.strip()]
+
+    err = None
+    if not selected_channels:
+        err = "Selecting at least one Sales Channel is mandatory."
+
+    geo_id_int = int(geography_id) if geography_id and str(geography_id).isdigit() else None
+    if not err and not geo_id_int:
+        err = "Selecting a Geography (Territory or Region) is mandatory."
+    elif not err and geo_id_int:
+        geo_node = db.query(Geography).filter(Geography.id == geo_id_int, Geography.is_active == True).first()
+        if not geo_node or geo_node.level not in [GeoLevel.territory, GeoLevel.region]:
+            err = "Geography scope must be a Territory or Region."
+
+    if err:
+        return templates.TemplateResponse("channel_partners/form.html", {
+            "request": request,
+            "current_user": current_user,
+            "item": None,
+            "error": err,
+            **_cp_form_context(db),
+        })
+
+    import uuid
+    partner_code = f"CP-{uuid.uuid4().hex[:6].upper()}"
     partner = LocalChannelPartner(
+        code=partner_code,
         name=name,
         partner_type=partner_type,
-        beat_type=beat_type,
+        beat_type=selected_channels[0] if selected_channels else "GT",
+        sales_channels=json.dumps(selected_channels),
+        geography_id=geo_id_int,
+        territory_name=geo_node.name if geo_node else None,
         contact_person=contact_person or None,
         mobile=mobile or None,
         email=email or None,
@@ -108,8 +153,8 @@ async def channel_partner_edit(
         "request": request,
         "current_user": current_user,
         "item": item,
-        "beat_types": get_all_beat_types(db),
         "error": None,
+        **_cp_form_context(db),
     })
 
 
@@ -121,7 +166,8 @@ async def channel_partner_update(
     db: Session = Depends(get_db),
     name: str = Form(...),
     partner_type: str = Form("Distributor"),
-    beat_type: str = Form("GT"),
+    geography_id: Optional[str] = Form(default=None),
+    sales_channels: list[str] = Form(default=[]),
     contact_person: Optional[str] = Form(default=None),
     mobile: Optional[str] = Form(default=None),
     email: Optional[str] = Form(default=None),
@@ -134,9 +180,37 @@ async def channel_partner_update(
         set_flash_error(request, "Channel Partner not found.")
         return RedirectResponse("/channel-partners", status_code=302)
 
+    form_data = await request.form()
+    raw_channels = form_data.getlist("sales_channels") or sales_channels
+    selected_channels = [c for c in raw_channels if c and c.strip()]
+
+    err = None
+    if not selected_channels:
+        err = "Selecting at least one Sales Channel is mandatory."
+
+    geo_id_int = int(geography_id) if geography_id and str(geography_id).isdigit() else None
+    if not err and not geo_id_int:
+        err = "Selecting a Geography (Territory or Region) is mandatory."
+    elif not err and geo_id_int:
+        geo_node = db.query(Geography).filter(Geography.id == geo_id_int, Geography.is_active == True).first()
+        if not geo_node or geo_node.level not in [GeoLevel.territory, GeoLevel.region]:
+            err = "Geography scope must be a Territory or Region."
+
+    if err:
+        return templates.TemplateResponse("channel_partners/form.html", {
+            "request": request,
+            "current_user": current_user,
+            "item": item,
+            "error": err,
+            **_cp_form_context(db),
+        })
+
     item.name = name
     item.partner_type = partner_type
-    item.beat_type = beat_type
+    item.beat_type = selected_channels[0] if selected_channels else "GT"
+    item.sales_channels = json.dumps(selected_channels)
+    item.geography_id = geo_id_int
+    item.territory_name = geo_node.name if geo_node else item.territory_name
     item.contact_person = contact_person or None
     item.mobile = mobile or None
     item.email = email or None
