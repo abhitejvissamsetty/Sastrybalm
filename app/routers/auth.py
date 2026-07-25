@@ -14,11 +14,18 @@ router = APIRouter(tags=["auth"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+from app.services.auth import is_system_onboarded
+
+
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(
     request: Request,
     user: Optional[User] = Depends(get_current_web_user),
+    db: Session = Depends(get_db),
 ):
+    if not is_system_onboarded(db):
+        return RedirectResponse("/onboarding", status_code=302)
+
     if user:
         return RedirectResponse("/dashboard", status_code=302)
     error = request.session.pop("_flash_error", None)
@@ -38,9 +45,12 @@ async def login(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
+    if not is_system_onboarded(db):
+        return RedirectResponse("/onboarding", status_code=302)
+
     user = authenticate_user(db, username, password)
     if not user:
-        request.session["_flash_error"] = "Invalid username or password. Note: Admin authenticates via .env credentials."
+        request.session["_flash_error"] = "Invalid admin username or password."
         return RedirectResponse("/login", status_code=302)
     request.session["user_id"] = user.id
     return RedirectResponse("/dashboard", status_code=302)

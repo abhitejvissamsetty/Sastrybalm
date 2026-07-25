@@ -14,32 +14,62 @@ from app.utils.security import hash_password, verify_password
 logger = logging.getLogger(__name__)
 
 
-def get_or_create_single_admin(db: Session) -> User:
-    """Ensure strictly ONLY ONE single admin exists in the system aligned with .env credentials."""
+from app.utils.backup_service import restore_sql_backup
+
+
+def is_system_onboarded(db: Session) -> bool:
+    """Check if the system has completed onboarding (active admin with encrypted password in users table)."""
+    admin = db.query(User).filter(User.role == UserRole.admin, User.is_active == True).first()
+    return bool(admin and admin.hashed_password and admin.hashed_password.strip() != "" and admin.hashed_password != "PENDING_ONBOARDING")
+
+
+def complete_system_onboarding(
+    db: Session,
+    username: str,
+    full_name: str,
+    email: str,
+    phone: str,
+    password: str,
+    backup_file_path: Optional[str] = None,
+) -> User:
+    """Perform first-bootup system onboarding: optionally restore .sql backup, then save Admin with encrypted password in users table."""
+    # 1. Restore backup data if provided
+    if backup_file_path and os.path.exists(backup_file_path):
+        try:
+            restore_sql_backup(backup_file_path)
+        except Exception as e:
+            logger.error("Error restoring backup during onboarding: %s", e)
+
+    # 2. Get or create Admin user in users table
     admin = db.query(User).filter(User.role == UserRole.admin).first()
     if not admin:
-        admin = db.query(User).filter(User.username == settings.admin_username).first()
+        admin = db.query(User).filter(User.username == username.strip()).first()
+
+    phone_clean = phone.strip() if phone and phone.strip() else "9999999999"
 
     if not admin:
         admin = User(
-            username=settings.admin_username,
-            email="admin@sastrybalm.com",
-            full_name="System Administrator",
+            username=username.strip(),
+            full_name=full_name.strip() or "System Administrator",
+            email=email.strip() or "admin@sastrybalm.com",
+            phone=phone_clean,
             role=UserRole.admin,
             is_active=True,
-            hashed_password=hash_password(settings.admin_password),
+            hashed_password=hash_password(password),
         )
         db.add(admin)
-        db.commit()
-        db.refresh(admin)
     else:
-        # Sync admin attributes with .env configuration
-        admin.username = settings.admin_username
+        admin.username = username.strip()
+        admin.full_name = full_name.strip() or admin.full_name
+        admin.email = email.strip() or admin.email
+        admin.phone = phone_clean
         admin.role = UserRole.admin
         admin.is_active = True
-        admin.hashed_password = hash_password(settings.admin_password)
-        db.commit()
+        admin.hashed_password = hash_password(password)
 
+    db.commit()
+    db.refresh(admin)
+    logger.info("System onboarding completed. Admin user '%s' saved in users table.", admin.username)
     return admin
 
 
@@ -47,16 +77,22 @@ from app.models.alert import Alert, AlertSeverity, AlertType
 
 
 def authenticate_user(db: Session, login: str, password: str) -> Optional[User]:
-    """Authenticate System Admin strictly against .env settings. All non-admin users must authenticate via OTP."""
-    # Check if login is for admin
-    if login == settings.admin_username:
-        if password == settings.admin_password:
-            return get_or_create_single_admin(db)
-        else:
-            logger.warning("Failed admin login attempt for username '%s'", login)
-            return None
+    """Authenticate System Admin against encrypted hashed password in users table."""
+    user = (
+        db.query(User)
+        .filter((User.username == login) | (User.email == login) | (User.phone == login))
+        .first()
+    )
+    if not user or not user.is_active:
+        return None
 
-    # For non-admin users, passwords are removed. Authentication MUST happen via Email OTP.
+    if user.role == UserRole.admin:
+        if user.hashed_password and verify_password(password, user.hashed_password):
+            return user
+        logger.warning("Failed admin login attempt for '%s'", login)
+        return None
+
+    # For non-admin users, passwords are not used — authentication is via OTP
     logger.info("Non-admin user '%s' attempted password login. Direct password auth disabled — use OTP authentication.", login)
     return None
 
@@ -72,7 +108,7 @@ def generate_and_send_user_otp(db: Session, login_or_email: str) -> Dict[str, An
         return {"success": False, "error": "Registered user account not found or inactive."}
 
     if user.role == UserRole.admin:
-        return {"success": False, "error": "System Admin must authenticate via .env credentials."}
+        return {"success": False, "error": "System Admin must authenticate via password."}
 
     user_email = user.email or f"{user.username}@sastrybalm.local"
     otp_code = f"{random.randint(100000, 999999)}"

@@ -129,6 +129,17 @@ When an **Outlet** places an Order, Asset Request, or Material Request:
 
 ---
 
+## 💾 7. Database Backup & Schema Mismatch Synchronization Strategy
+
+- **Format & Retention**: System database backups are generated as executable `.sql` dump files containing `DROP TABLE IF EXISTS` statements, `SHOW CREATE TABLE` DDL structures, and column-explicit batch `INSERT INTO` statements. The system automatically retains only the 5 most recent backup files.
+- **Handling Mismatches Between Backup Schema & Present Schema**:
+  1. **Explicit Column Names (`INSERT INTO \`table\` (\`col1\`, \`col2\`)`)**: Prevents column count crashes. New columns in the active DB automatically default to their defined `DEFAULT` values (e.g. `is_active=1`, `created_at=NOW()`).
+  2. **Automated Idempotent Post-Restore Migration (`db_migrate.py`)**: Immediately after importing/restoring a `.sql` backup, `db_migrate.py` must be executed to run `add_column_safely()`, adding any missing tables or columns required by the active application code.
+  3. **Foreign Key Safety**: Backups wrap imports inside `SET FOREIGN_KEY_CHECKS=0;` and `SET FOREIGN_KEY_CHECKS=1;` to prevent foreign key constraint ordering deadlocks.
+  4. **Header Version Verification**: `.sql` headers contain software version and timestamp metadata for schema version tracking.
+
+---
+
 ## 🛠️ Common Operations & Developer Commands
 
 ### Run Development Server
@@ -158,3 +169,5 @@ curl -I http://127.0.0.1:8090/login
 7. **No Hardcoded Test Warehouses**: Warehouses must never be hardcoded or auto-seeded in migration scripts (`db_migrate.py`) or setting routers. All warehouses must be explicitly configured via Admin controls.
 8. **Channel Partner Mandatory Fields**: Channel Partners require mandatory selection of at least 1 Sales Channel (Multi-select) and a Geography Scope limited to Territory or Region.
 9. **SQL Database Backups & 5-File Retention Policy**: System database backups are generated in standard executable `.sql` format. The system automatically retains only the 5 most recent backup files, purging older files upon new backup creation.
+10. **Post-Restore Schema Synchronization**: Always run `db_migrate.py` after restoring any `.sql` backup to align the schema with the latest application models via `add_column_safely()`.
+11. **First Bootup Onboarding & Encrypted Admin Password**: Admin credentials are no longer served from `.env`. On first bootup, the system presents an Onboarding Wizard (`/onboarding`) to configure Admin credentials (saved as bcrypt hash in `users` table) and optionally restore data from a `.sql` backup.

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 
-from app.routers import auth, dashboard, geography, positions, beats, outlets, products, users, company
+from app.routers import auth, dashboard, geography, positions, beats, outlets, products, users, company, onboarding
 from app.routers import orders, payments, expenses, timesheets, tracking, analytics, material_requests
 from app.routers import asset_capitalizations, vendors, attendance, approvals, flags, inventory
 from app.routers import settings as settings_router
@@ -63,6 +63,7 @@ _templates = Jinja2Templates(directory="app/templates")
 from app.routers import backup, channel_partners, warehouses
 
 # Web routers
+app.include_router(onboarding.router)
 app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(geography.router)

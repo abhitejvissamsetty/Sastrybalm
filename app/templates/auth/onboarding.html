@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Initial System Onboarding &amp; Security Setup{% endblock %}
+
+{% block content %}
+<div class="min-h-[85vh] flex items-center justify-center py-8">
+  <div class="w-full max-w-2xl space-y-8">
+
+    <!-- Header Banner -->
+    <div class="text-center space-y-3">
+      <div class="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 mb-2">
+        <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751A11.959 11.959 0 0 1 12 2.714Z" />
+        </svg>
+      </div>
+      <h1 class="text-3xl font-extrabold text-white tracking-tight">Sastrybalm SFA First Bootup Onboarding</h1>
+      <p class="text-slate-400 text-sm max-w-md mx-auto">Set up your Administrator account password and optionally restore system data from a database backup.</p>
+    </div>
+
+    {% if error %}
+    <div class="rounded-xl bg-red-950/80 border border-red-800 p-4 text-sm text-red-300 font-medium flex items-center gap-3 shadow-lg">
+      <svg class="h-5 w-5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-9 3.75h.008v.008H12v-.008z" />
+      </svg>
+      <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Onboarding Form Card -->
+    <div class="glass rounded-3xl p-8 border border-white/10 shadow-2xl space-y-6">
+      <form action="/onboarding" method="post" enctype="multipart/form-data" class="space-y-6">
+
+        <!-- Step 1: Admin Account Setup -->
+        <div class="space-y-4">
+          <h3 class="text-base font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-2">
+            <span class="h-6 w-6 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center">1</span>
+            System Administrator Account
+          </h3>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Admin Username <span class="text-red-400">*</span></label>
+              <input type="text" name="username" value="{{ form_data.username if form_data else 'admin' }}" required
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Full Name <span class="text-red-400">*</span></label>
+              <input type="text" name="full_name" value="{{ form_data.full_name if form_data else 'System Administrator' }}" required
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Email Address <span class="text-red-400">*</span></label>
+              <input type="email" name="email" value="{{ form_data.email if form_data else 'admin@sastrybalm.com' }}" required
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Phone Number <span class="text-red-400">* (10 digits)</span></label>
+              <input type="tel" name="phone" value="{{ form_data.phone if form_data else '9999999999' }}" required placeholder="10-digit mobile"
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Set Password <span class="text-red-400">*</span></label>
+              <input type="password" name="password" required minlength="6" placeholder="Min 6 characters"
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Confirm Password <span class="text-red-400">*</span></label>
+              <input type="password" name="confirm_password" required minlength="6" placeholder="Re-enter password"
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+        </div>
+
+        <hr class="border-white/10">
+
+        <!-- Step 2: Database Backup & Data Restoration (Optional) -->
+        <div class="space-y-4">
+          <h3 class="text-base font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-2">
+            <span class="h-6 w-6 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center">2</span>
+            Database Backup &amp; Data Restoration (Optional)
+          </h3>
+          <p class="text-xs text-slate-400">Choose whether to initialize a clean system or load existing data from a <code class="font-mono text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">.sql</code> database backup file.</p>
+
+          <div class="space-y-3">
+            <label class="flex items-start space-x-3 p-3 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 cursor-pointer transition-colors">
+              <input type="radio" name="restore_choice" value="none" checked onclick="toggleBackupOptions('none')"
+                     class="mt-1 h-4 w-4 border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+              <div>
+                <span class="block text-sm font-bold text-white">Clean Installation</span>
+                <span class="block text-xs text-slate-400">Initialize system with standard empty database tables.</span>
+              </div>
+            </label>
+
+            {% if existing_backups %}
+            <label class="flex items-start space-x-3 p-3 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 cursor-pointer transition-colors">
+              <input type="radio" name="restore_choice" value="existing" onclick="toggleBackupOptions('existing')"
+                     class="mt-1 h-4 w-4 border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+              <div class="w-full">
+                <span class="block text-sm font-bold text-white">Restore from Server Backup (.sql)</span>
+                <span class="block text-xs text-slate-400 mb-2">Select an existing backup file found in the server backup folder.</span>
+
+                <select id="existing_backup_select" name="selected_backup" disabled
+                        class="w-full rounded-lg bg-slate-950 border border-slate-700 text-white px-3 py-2 text-xs font-mono focus:outline-none">
+                  {% for b in existing_backups %}
+                  <option value="{{ b.filename }}">{{ b.filename }} ({{ b.size_display }}, {{ b.created_at }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </label>
+            {% endif %}
+
+            <label class="flex items-start space-x-3 p-3 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 cursor-pointer transition-colors">
+              <input type="radio" name="restore_choice" value="upload" onclick="toggleBackupOptions('upload')"
+                     class="mt-1 h-4 w-4 border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+              <div class="w-full">
+                <span class="block text-sm font-bold text-white">Upload New Database Backup (.sql)</span>
+                <span class="block text-xs text-slate-400 mb-2">Upload a <code class="font-mono text-indigo-300">.sql</code> database dump file from your computer.</span>
+
+                <input type="file" id="backup_file_upload" name="backup_file" accept=".sql" disabled
+                       class="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500">
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit"
+                class="w-full premium-btn inline-flex items-center justify-center gap-x-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-base font-bold text-white shadow-xl shadow-indigo-600/30 hover:bg-indigo-500 transition-all">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          Complete Onboarding &amp; Save Admin Password
+        </button>
+
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function toggleBackupOptions(mode) {
+    const select = document.getElementById('existing_backup_select');
+    const upload = document.getElementById('backup_file_upload');
+    if (select) select.disabled = (mode !== 'existing');
+    if (upload) upload.disabled = (mode !== 'upload');
+  }
+</script>
+{% endblock %}

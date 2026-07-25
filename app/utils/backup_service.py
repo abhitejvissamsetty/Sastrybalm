@@ -156,3 +156,42 @@ def list_existing_backups() -> list:
             })
     files.sort(key=lambda x: x["filename"], reverse=True)
     return files
+
+
+def restore_sql_backup(sql_filepath: str) -> None:
+    """Execute a .sql backup file into the MySQL database and run db_migrate.py to sync schema."""
+    if not os.path.exists(sql_filepath):
+        raise FileNotFoundError(f"Backup file not found at '{sql_filepath}'")
+
+    db: Session = SessionLocal()
+    try:
+        db.execute(text("SET FOREIGN_KEY_CHECKS=0;"))
+        with open(sql_filepath, "r", encoding="utf-8", errors="ignore") as f:
+            sql_content = f.read()
+
+        statement_buffer = []
+        for line in sql_content.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("--") or stripped.startswith("/*"):
+                continue
+            statement_buffer.append(line)
+            if stripped.endswith(";"):
+                stmt = "\n".join(statement_buffer).strip()
+                if stmt:
+                    try:
+                        db.execute(text(stmt))
+                    except Exception as e:
+                        logger.warning("Error executing restore SQL statement: %s", e)
+                statement_buffer = []
+
+        db.execute(text("SET FOREIGN_KEY_CHECKS=1;"))
+        db.commit()
+        logger.info("Successfully executed restore script: %s", sql_filepath)
+    finally:
+        db.close()
+
+    try:
+        from db_migrate import run_migrations
+        run_migrations()
+    except Exception as e:
+        logger.warning("Error running db_migrate post-restore: %s", e)
