@@ -44,6 +44,20 @@
     </div>
 
     <div>
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Assigned Region (Geography)</label>
+      <select name="geography_id"
+              class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">None / Unassigned</option>
+        {% for r in regions %}
+        <option value="{{ r.id }}" {% if item and item.geography_id == r.id %}selected{% endif %}>
+          {{ r.name }} ({{ r.code }})
+        </option>
+        {% endfor %}
+      </select>
+      <p class="mt-1 text-xs text-slate-400">Territory Managers assigned to this Region automatically manage this warehouse.</p>
+    </div>
+
+    <div>
       <label class="block text-sm font-medium text-slate-300 mb-1.5">Full Address</label>
       <textarea name="address" rows="3"
                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ item.address if item and item.address else '' }}</textarea>

@@ -19,17 +19,22 @@ router = APIRouter(prefix="/users", tags=["users"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+from app.models.warehouse import Warehouse
+
+
 def _form_context(db: Session, for_role: str = "") -> dict:
     positions_query = db.query(Position).filter(Position.is_active == True)
     if for_role == UserRole.field_rep.value:
         positions_query = positions_query.filter(Position.level == "L1")
     geographies = db.query(Geography).filter(Geography.is_active == True).order_by(Geography.name).all()
     vendors = db.query(Vendor).filter(Vendor.status == VendorStatus.active).order_by(Vendor.name).all()
+    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
     company_profiles = db.query(CompanyProfile).filter(CompanyProfile.is_active == True).order_by(CompanyProfile.name).all()
     return {
         "positions": positions_query.order_by(Position.name).all(),
         "geographies": geographies,
         "vendors": vendors,
+        "warehouses": warehouses,
         "company_profiles": company_profiles,
         "UserRole": UserRole,
         "ModuleName": ModuleName,
@@ -125,12 +130,13 @@ async def user_list(
 @router.get("/new", response_class=HTMLResponse)
 async def user_new(
     request: Request,
+    role: Optional[str] = Query(default=None),
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse("users/form.html", {
         "request": request, "current_user": current_user,
-        "item": None, "error": None, **_form_context(db),
+        "item": None, "error": None, "preselected_role": role, **_form_context(db),
     })
 
 
@@ -151,6 +157,7 @@ async def user_create(
     geography_id: Optional[str] = Form(default=None),
     vendor_id: Optional[str] = Form(default=None),
     qc_vendor_ids: list[str] = Form(default=[]),
+    warehouse_ids: list[str] = Form(default=[]),
     modules: list[str] = Form(default=[]),
 ):
     import re
@@ -203,6 +210,10 @@ async def user_create(
         qc_v_objs = db.query(Vendor).filter(Vendor.id.in_(qc_vendor_ids)).all()
         user.qc_vendors.extend(qc_v_objs)
 
+    if role == UserRole.territory_manager.value and warehouse_ids:
+        wh_objs = db.query(Warehouse).filter(Warehouse.id.in_([int(w) for w in warehouse_ids if str(w).isdigit()])).all()
+        user.scoped_warehouses.extend(wh_objs)
+
     db.add(user)
     db.flush()
     
@@ -247,6 +258,7 @@ async def user_update(
     geography_id: Optional[str] = Form(default=None),
     vendor_id: Optional[str] = Form(default=None),
     qc_vendor_ids: list[str] = Form(default=[]),
+    warehouse_ids: list[str] = Form(default=[]),
     is_active: Optional[str] = Form(default=None),
     new_password: Optional[str] = Form(default=None),
     modules: list[str] = Form(default=[]),
@@ -302,6 +314,11 @@ async def user_update(
     if role == UserRole.qc_manager.value and qc_vendor_ids:
         qc_v_objs = db.query(Vendor).filter(Vendor.id.in_(qc_vendor_ids)).all()
         item.qc_vendors.extend(qc_v_objs)
+
+    item.scoped_warehouses.clear()
+    if role == UserRole.territory_manager.value and warehouse_ids:
+        wh_objs = db.query(Warehouse).filter(Warehouse.id.in_([int(w) for w in warehouse_ids if str(w).isdigit()])).all()
+        item.scoped_warehouses.extend(wh_objs)
 
     # Refresh module access — flush first to clear session state before re-inserting
     db.query(UserModuleAccess).filter(UserModuleAccess.user_id == user_id).delete(synchronize_session='fetch')

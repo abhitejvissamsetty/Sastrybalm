@@ -40,6 +40,9 @@ async def geo_list(
     })
 
 
+from app.models.warehouse import Warehouse
+
+
 @router.get("/new", response_class=HTMLResponse)
 async def geo_new(
     request: Request,
@@ -47,9 +50,10 @@ async def geo_new(
     db: Session = Depends(get_db),
 ):
     parents = db.query(Geography).filter(Geography.is_active == True).order_by(Geography.level, Geography.name).all()
+    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
     return templates.TemplateResponse("geography/form.html", {
         "request": request, "current_user": current_user,
-        "item": None, "parents": parents, "GeoLevel": GeoLevel, "error": None,
+        "item": None, "parents": parents, "warehouses": warehouses, "GeoLevel": GeoLevel, "error": None,
     })
 
 
@@ -63,6 +67,7 @@ async def geo_create(
     level: str = Form(...),
     parent_id: Optional[str] = Form(default=None),
     erp_id: Optional[str] = Form(default=None),
+    warehouse_ids: list[str] = Form(default=[]),
 ):
     parent_id_int = int(parent_id) if parent_id else None
     err = _validate_hierarchy(db, GeoLevel(level), parent_id_int)
@@ -70,11 +75,23 @@ async def geo_create(
         err = f"Code '{code.upper()}' already exists."
     if err:
         parents = db.query(Geography).filter(Geography.is_active == True).order_by(Geography.level, Geography.name).all()
+        warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
         return templates.TemplateResponse("geography/form.html", {
             "request": request, "current_user": current_user,
-            "item": None, "parents": parents, "GeoLevel": GeoLevel, "error": err,
+            "item": None, "parents": parents, "warehouses": warehouses, "GeoLevel": GeoLevel, "error": err,
         })
-    db.add(Geography(name=name, code=code.upper(), level=GeoLevel(level), parent_id=parent_id_int, erp_id=erp_id or None))
+
+    geo = Geography(name=name, code=code.upper(), level=GeoLevel(level), parent_id=parent_id_int, erp_id=erp_id or None)
+    db.add(geo)
+    db.flush()
+
+    if level == GeoLevel.region.value:
+        selected_wh_ids = [int(w) for w in warehouse_ids if w and str(w).isdigit()]
+        if selected_wh_ids:
+            whs = db.query(Warehouse).filter(Warehouse.id.in_(selected_wh_ids)).all()
+            for wh in whs:
+                wh.geography_id = geo.id
+
     db.commit()
     set_flash_success(request, f"Geography '{name}' created.")
     return RedirectResponse("/geography", status_code=302)
@@ -94,9 +111,10 @@ async def geo_edit(
         set_flash_error(request, "Cannot edit a deactivated geography.")
         return RedirectResponse("/geography", status_code=302)
     parents = db.query(Geography).filter(Geography.is_active == True, Geography.id != geo_id).order_by(Geography.level, Geography.name).all()
+    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
     return templates.TemplateResponse("geography/form.html", {
         "request": request, "current_user": current_user,
-        "item": item, "parents": parents, "GeoLevel": GeoLevel, "error": None,
+        "item": item, "parents": parents, "warehouses": warehouses, "GeoLevel": GeoLevel, "error": None,
     })
 
 
@@ -110,6 +128,7 @@ async def geo_update(
     level: str = Form(...),
     parent_id: Optional[str] = Form(default=None),
     erp_id: Optional[str] = Form(default=None),
+    warehouse_ids: list[str] = Form(default=[]),
 ):
     item = db.query(Geography).filter(Geography.id == geo_id).first()
     if not item:
@@ -137,9 +156,10 @@ async def geo_update(
 
     if err:
         parents = db.query(Geography).filter(Geography.is_active == True, Geography.id != geo_id).order_by(Geography.level, Geography.name).all()
+        warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
         return templates.TemplateResponse("geography/form.html", {
             "request": request, "current_user": current_user,
-            "item": item, "parents": parents, "GeoLevel": GeoLevel, "error": err,
+            "item": item, "parents": parents, "warehouses": warehouses, "GeoLevel": GeoLevel, "error": err,
         })
 
     item.name = name
@@ -147,6 +167,24 @@ async def geo_update(
     item.level = GeoLevel(level)
     item.parent_id = parent_id_int
     item.erp_id = erp_id or None
+
+    if level == GeoLevel.region.value:
+        form_data = await request.form()
+        raw_wh_ids = form_data.getlist("warehouse_ids")
+        selected_wh_ids = [int(w) for w in (raw_wh_ids or warehouse_ids) if w and str(w).isdigit()]
+        
+        # Clear warehouses previously mapped to this region if unselected
+        old_whs = db.query(Warehouse).filter(Warehouse.geography_id == item.id).all()
+        for ow in old_whs:
+            if ow.id not in selected_wh_ids:
+                ow.geography_id = None
+                
+        # Assign new warehouses
+        if selected_wh_ids:
+            new_whs = db.query(Warehouse).filter(Warehouse.id.in_(selected_wh_ids)).all()
+            for nw in new_whs:
+                nw.geography_id = item.id
+
     db.commit()
     set_flash_success(request, f"Geography '{name}' updated.")
     return RedirectResponse("/geography", status_code=302)

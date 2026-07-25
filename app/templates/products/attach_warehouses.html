@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}Attach Warehouses - {{ item.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center gap-x-4">
+    <a href="/inventory" class="text-slate-400 hover:text-white transition-colors">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-white">Attach Warehouses to Product</h1>
+      <p class="mt-1 text-sm text-slate-400">Map multiple fulfillment warehouses and distribution depots to this product</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Left Details Pane -->
+    <div class="lg:col-span-4 rounded-2xl border border-slate-700 bg-slate-800/50 p-6 h-fit space-y-4 shadow-xl">
+      <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700 pb-2">Product Specifications</h2>
+      <div class="space-y-3.5">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Product Name</label>
+          <div class="text-base font-bold text-white mt-0.5">{{ item.name }}</div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">SKU / Code</label>
+          <div class="text-sm font-mono font-bold text-indigo-400 mt-0.5">{{ item.sku or item.erp_id or '—' }}</div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Category Scope</label>
+          <div class="text-sm font-semibold text-white mt-0.5">
+            <span class="inline-flex items-center rounded-full bg-indigo-900/50 px-2.5 py-0.5 text-xs font-semibold text-indigo-300 border border-indigo-700/30">
+              {{ item.category_type.value if item.category_type else 'Sales' }}
+            </span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Price to Retailer (PTR)</label>
+          <div class="text-sm font-semibold text-slate-200 mt-0.5">₹{{ item.unit_cost if item.unit_cost else '0.00' }}</div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Combined Stock</label>
+          <div class="text-sm mt-0.5">
+            <span class="inline-flex items-center rounded-full bg-emerald-950 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-800/50">
+              {{ item.stock_qty }} units
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Form Pane -->
+    <div class="lg:col-span-8">
+      <form method="post" id="attach-warehouses-form" class="space-y-6 rounded-2xl border border-slate-700 bg-slate-800/50 p-6 shadow-xl">
+        <div id="assigned-warehouses-inputs-container">
+          <!-- Hidden inputs for selected warehouse IDs will be dynamically populated here -->
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+
+          <!-- Available Warehouses Column -->
+          <div class="md:col-span-5 flex flex-col h-[420px]">
+            <label class="block text-sm font-semibold text-slate-300 mb-2">Available Warehouses</label>
+            <div class="mb-2">
+              <input type="text" id="available-search" placeholder="Search available warehouses..."
+                     class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3.5 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div id="available-warehouses-list" class="flex-1 overflow-y-auto rounded-xl bg-slate-900 border border-slate-700 p-2 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-700">
+              {% for wh in all_warehouses %}
+                {% if wh.id not in assigned_warehouse_ids %}
+                <div data-id="{{ wh.id }}" data-name="{{ wh.name }}" data-code="{{ wh.code }}"
+                     class="wh-item flex items-center justify-between rounded-lg px-3.5 py-2.5 text-sm text-slate-300 bg-slate-800/40 border border-slate-700/50 hover:bg-slate-700/60 hover:text-white cursor-pointer select-none transition-colors">
+                  <div>
+                    <span class="font-semibold block">{{ wh.name }}</span>
+                    <span class="text-xs font-mono text-slate-400">({{ wh.code }})</span>
+                  </div>
+                  <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                  </svg>
+                </div>
+                {% endif %}
+              {% endfor %}
+              <div id="no-available-message" class="text-xs text-slate-500 text-center py-12 hidden">No available warehouses match search.</div>
+            </div>
+          </div>
+
+          <!-- Arrow Controls (Visual Separator / Hint) -->
+          <div class="md:col-span-2 flex flex-col items-center justify-center gap-2">
+            <span class="text-xs text-slate-500 text-center hidden md:block">Click to add/remove</span>
+            <div class="flex md:flex-col gap-4 text-slate-500">
+              <svg class="h-6 w-6 transform rotate-90 md:rotate-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5M16.5 3 21 7.5m0 0-4.5 4.5M21 7.5H7.5" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Assigned Warehouses Column -->
+          <div class="md:col-span-5 flex flex-col h-[420px]">
+            <label class="block text-sm font-semibold text-emerald-400 mb-2">Assigned Warehouses</label>
+            <div class="mb-2">
+              <input type="text" id="assigned-search" placeholder="Search assigned warehouses..."
+                     class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3.5 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div id="assigned-warehouses-list" class="flex-1 overflow-y-auto rounded-xl bg-slate-900 border border-slate-700 p-2 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-700 border-dashed border-emerald-800/40">
+              {% for wh in all_warehouses %}
+                {% if wh.id in assigned_warehouse_ids %}
+                <div data-id="{{ wh.id }}" data-name="{{ wh.name }}" data-code="{{ wh.code }}"
+                     class="wh-item flex items-center justify-between rounded-lg px-3.5 py-2.5 text-sm text-emerald-300 bg-emerald-950/20 border border-emerald-800/30 hover:bg-emerald-900/30 hover:text-emerald-200 cursor-pointer select-none transition-colors">
+                  <div>
+                    <span class="font-semibold block">{{ wh.name }}</span>
+                    <span class="text-xs font-mono text-emerald-500">({{ wh.code }})</span>
+                  </div>
+                  <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                {% endif %}
+              {% endfor %}
+              <div id="no-assigned-message" class="text-xs text-slate-500 text-center py-12 hidden">No warehouses attached yet. Click available warehouses on the left to attach.</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="flex items-center justify-end gap-x-3 pt-4 border-t border-slate-700">
+          <a href="/inventory" class="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+          <button type="submit"
+                  class="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 transition-all">
+            Save Warehouse Mappings
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('attach-warehouses-form');
+  const availableList = document.getElementById('available-warehouses-list');
+  const assignedList = document.getElementById('assigned-warehouses-list');
+  const availableSearch = document.getElementById('available-search');
+  const assignedSearch = document.getElementById('assigned-search');
+  const inputsContainer = document.getElementById('assigned-warehouses-inputs-container');
+
+  function updateHiddenInputs() {
+    inputsContainer.innerHTML = '';
+    const assignedItems = assignedList.querySelectorAll('.wh-item');
+    assignedItems.forEach(item => {
+      const id = item.getAttribute('data-id');
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'warehouse_ids';
+      input.value = id;
+      inputsContainer.appendChild(input);
+    });
+  }
+
+  function handleMove(item, toAssigned) {
+    if (toAssigned) {
+      item.classList.remove('text-slate-300', 'bg-slate-800/40', 'border-slate-700/50', 'hover:bg-slate-700/60', 'hover:text-white');
+      item.classList.add('text-emerald-300', 'bg-emerald-950/20', 'border-emerald-800/30', 'hover:bg-emerald-900/30', 'hover:text-emerald-200');
+      
+      const icon = item.querySelector('svg');
+      icon.className.baseVal = 'h-4 w-4 text-emerald-600';
+      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />';
+
+      const codeSpan = item.querySelector('div span:nth-child(2)');
+      if (codeSpan) codeSpan.className = 'text-xs font-mono text-emerald-500';
+
+      assignedList.appendChild(item);
+    } else {
+      item.classList.remove('text-emerald-300', 'bg-emerald-950/20', 'border-emerald-800/30', 'hover:bg-emerald-900/30', 'hover:text-emerald-200');
+      item.classList.add('text-slate-300', 'bg-slate-800/40', 'border-slate-700/50', 'hover:bg-slate-700/60', 'hover:text-white');
+
+      const icon = item.querySelector('svg');
+      icon.className.baseVal = 'h-4 w-4 text-slate-500';
+      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />';
+
+      const codeSpan = item.querySelector('div span:nth-child(2)');
+      if (codeSpan) codeSpan.className = 'text-xs font-mono text-slate-400';
+
+      availableList.appendChild(item);
+    }
+    updateHiddenInputs();
+    filterLists();
+  }
+
+  // Click events using event delegation
+  availableList.addEventListener('click', function(e) {
+    const item = e.target.closest('.wh-item');
+    if (item) handleMove(item, true);
+  });
+
+  assignedList.addEventListener('click', function(e) {
+    const item = e.target.closest('.wh-item');
+    if (item) handleMove(item, false);
+  });
+
+  // Search filter
+  function filterLists() {
+    const availQuery = availableSearch.value.toLowerCase();
+    const assignQuery = assignedSearch.value.toLowerCase();
+
+    let availCount = 0;
+    availableList.querySelectorAll('.wh-item').forEach(item => {
+      const name = item.getAttribute('data-name').toLowerCase();
+      const code = item.getAttribute('data-code').toLowerCase();
+
+      if (name.includes(availQuery) || code.includes(availQuery)) {
+        item.classList.remove('hidden');
+        availCount++;
+      } else {
+        item.classList.add('hidden');
+      }
+    });
+    document.getElementById('no-available-message').classList.toggle('hidden', availCount > 0);
+
+    let assignCount = 0;
+    assignedList.querySelectorAll('.wh-item').forEach(item => {
+      const name = item.getAttribute('data-name').toLowerCase();
+      const code = item.getAttribute('data-code').toLowerCase();
+      if (name.includes(assignQuery) || code.includes(assignQuery)) {
+        item.classList.remove('hidden');
+        assignCount++;
+      } else {
+        item.classList.add('hidden');
+      }
+    });
+    document.getElementById('no-assigned-message').classList.toggle('hidden', assignCount > 0);
+  }
+
+  availableSearch.addEventListener('input', filterLists);
+  assignedSearch.addEventListener('input', filterLists);
+
+  // Initialize hidden inputs and filter states
+  updateHiddenInputs();
+  filterLists();
+});
+</script>
+{% endblock %}

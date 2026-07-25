@@ -88,7 +88,7 @@
                   class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
             {% for r in UserRole %}
             {% if r.value != 'admin' or (item and item.role == r) %}
-            <option value="{{ r.value }}" {% if item and item.role == r %}selected{% elif not item and r.value == 'field_rep' %}selected{% endif %}>
+            <option value="{{ r.value }}" {% if item and item.role == r %}selected{% elif not item and preselected_role and r.value == preselected_role %}selected{% elif not item and not preselected_role and r.value == 'field_rep' %}selected{% endif %}>
               {{ r.value.replace('_', ' ').title() }}
             </option>
             {% endif %}
@@ -110,7 +110,7 @@
         </div>
       </div>
 
-      <!-- Scoped Field: Territory Manager (Geography Assignment) -->
+      <!-- Scoped Field: Territory Manager (Geography Scope) -->
       <div id="scope-territory-manager" class="hidden rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4 space-y-2">
         <label class="block text-xs font-bold text-indigo-300 uppercase">Managing Region / Zone (Geography Scope) <span class="text-red-400">*</span></label>
         <select name="geography_id"
@@ -122,26 +122,7 @@
           </option>
           {% endfor %}
         </select>
-        <p class="text-xs text-slate-400">A Territory Manager manages all beat routes and representatives within this assigned Geography.</p>
-      </div>
-
-      <!-- Scoped Field: QC Manager (Multi Select Vendors) -->
-      <div id="scope-qc-manager" class="hidden rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 space-y-2">
-        <label class="block text-xs font-bold text-amber-300 uppercase">Attached Vendors (Multi-Select Scope) <span class="text-red-400">*</span></label>
-        <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-2">
-          {% set assigned_v_ids = item.qc_vendors | map(attribute='id') | list if item else [] %}
-          {% for v in vendors %}
-          <label class="flex items-center space-x-3 text-sm text-slate-300 hover:text-white cursor-pointer">
-            <input type="checkbox" name="qc_vendor_ids" value="{{ v.id }}" {% if v.id in assigned_v_ids %}checked{% endif %}
-                   class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-amber-600 focus:ring-amber-500">
-            <span class="font-medium">{{ v.name }}</span>
-            <span class="text-xs text-slate-500">({{ v.category or 'General' }})</span>
-          </label>
-          {% else %}
-          <p class="text-xs text-slate-500 italic">No vendors registered yet.</p>
-          {% endfor %}
-        </div>
-        <p class="text-xs text-slate-400">A QC Manager oversees quality control and material approvals across multiple attached Vendors.</p>
+        <p class="text-xs text-slate-400">A Territory Manager manages all beat routes, representatives, and attached regional warehouses within this assigned Geography.</p>
       </div>
 
       <!-- Scoped Field: Vendor Tech / Vendor Admin (Single Select Vendor) -->

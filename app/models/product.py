@@ -41,6 +41,7 @@ class Product(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     warehouse = relationship("Warehouse", back_populates="products")
+    warehouse_stocks = relationship("ProductWarehouseStock", back_populates="product", cascade="all, delete-orphan")
 
     @property
     def display_price(self) -> str:

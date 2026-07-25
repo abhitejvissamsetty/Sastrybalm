@@ -5,19 +5,11 @@
 {% block content %}
 <div class="max-w-7xl mx-auto space-y-6">
 
-  <!-- Flash Messages -->
-  {% if success %}
-  <div class="rounded-lg bg-emerald-900/40 border border-emerald-700 px-4 py-3 text-sm text-emerald-300">{{ success }}</div>
-  {% endif %}
-  {% if error %}
-  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
-  {% endif %}
-
   <!-- Header -->
   <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
     <div>
       <h1 class="text-2xl font-bold text-white">Stock Inventory &amp; Warehouses</h1>
-      <p class="mt-1 text-sm text-slate-400">Manage stock balances, warehouse assignments, and inward movements for stockable items.</p>
+      <p class="mt-1 text-sm text-slate-400">Manage multi-warehouse stock balances, location bin tracking, and inward movements.</p>
     </div>
     <div class="flex items-center gap-x-3">
       <a href="/inventory/movements" class="rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 transition-colors">
@@ -54,9 +46,8 @@
         <tr class="bg-slate-900/80 backdrop-blur-md text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
           <th class="px-6 py-4 text-left">SKU / Code</th>
           <th class="px-6 py-4 text-left">Product Name</th>
-          <th class="px-6 py-4 text-left">Assigned Warehouse</th>
-          <th class="px-6 py-4 text-left">Location / Shelf</th>
-          <th class="px-6 py-4 text-left">Stock Balance</th>
+          <th class="px-6 py-4 text-left">Attached Warehouses</th>
+          <th class="px-6 py-4 text-left">Total Stock Balance</th>
           <th class="px-6 py-4 text-right">Actions</th>
         </tr>
       </thead>
@@ -70,42 +61,51 @@
             {{ prod.name }}
             <div class="text-[10px] text-slate-400 font-normal">{{ prod.category_type.value if prod.category_type else '' }}</div>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-xs font-semibold text-white">
-            {% if prod.warehouse %}
-              <span class="inline-flex items-center gap-x-1 text-slate-200">
-                <svg class="h-4 w-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                {{ prod.warehouse.name }} ({{ prod.warehouse.code }})
-              </span>
-            {% else %}
-              <span class="text-amber-400 text-xs italic">Unassigned</span>
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-300 font-mono">
-            {{ prod.warehouse_location or '—' }}
+          <td class="px-6 py-4">
+            <div class="flex flex-wrap items-center gap-1.5 max-w-md">
+              {% if prod.warehouse_stocks %}
+                {% for ws in prod.warehouse_stocks %}
+                  {% if ws.is_active %}
+                  <span class="inline-flex items-center gap-x-1 rounded-lg bg-slate-900 border border-slate-700/80 px-2 py-1 text-[11px] font-medium text-slate-200 shadow-sm">
+                    <svg class="h-3 w-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    {{ ws.warehouse.name if ws.warehouse else 'WH' }}: <strong class="text-white font-mono">{{ ws.stock_qty }}</strong>
+                  </span>
+                  {% endif %}
+                {% endfor %}
+              {% elif prod.warehouse %}
+                <span class="inline-flex items-center gap-x-1 rounded-lg bg-slate-900 border border-slate-700/80 px-2 py-1 text-[11px] font-medium text-slate-200">
+                  {{ prod.warehouse.name }}: <strong class="text-white font-mono">{{ prod.stock_qty }}</strong>
+                </span>
+              {% else %}
+                <span class="text-amber-400 text-xs italic">No Warehouse Attached</span>
+              {% endif %}
+            </div>
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
-            {% if prod.stock_qty <= prod.reorder_level %}
-            <span class="inline-flex items-center rounded-full bg-red-950 px-2.5 py-0.5 text-xs font-bold text-red-400 border border-red-800/50">
-              Low: {{ prod.stock_qty }} units
+            <span class="inline-flex items-center rounded-full bg-indigo-950/80 px-3 py-1 text-xs font-bold text-indigo-300 border border-indigo-800/60 shadow-inner">
+              {{ prod.stock_qty }} Total Units
             </span>
-            {% else %}
-            <span class="inline-flex items-center rounded-full bg-emerald-950 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-800/50">
-              {{ prod.stock_qty }} units
-            </span>
-            {% endif %}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-xs font-medium space-x-2">
-            <button onclick="openAssignWarehouseModal('{{ prod.id }}', '{{ prod.name|escape }}', '{{ prod.warehouse_id or '' }}', '{{ prod.warehouse_location or '' }}')"
-                    class="inline-flex items-center gap-x-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700 hover:bg-slate-700 transition-colors">
-              Warehouse
+            <button onclick="openDetailsModal('{{ prod.id }}')"
+                    class="inline-flex items-center gap-x-1 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-500 transition-colors">
+              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Details
             </button>
+            <a href="/products/{{ prod.id }}/attach-warehouses"
+               class="inline-flex items-center gap-x-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors">
+              + Attach WH
+            </a>
             <button onclick="openInwardModal('{{ prod.id }}', '{{ prod.name|escape }}')"
-                    class="inline-flex items-center gap-x-1 rounded-lg bg-indigo-950 px-2.5 py-1 text-xs font-semibold text-indigo-300 border border-indigo-800/60 hover:bg-indigo-900 transition-colors">
+                    class="inline-flex items-center gap-x-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700 hover:bg-slate-700 transition-colors">
               + Inward
             </button>
-            <button onclick="openAdjustModal('{{ prod.id }}', '{{ prod.name|escape }}', {{ prod.stock_qty }})"
+            <button onclick="openAdjustModal('{{ prod.id }}', '{{ prod.name|escape }}')"
                     class="inline-flex items-center gap-x-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700 hover:bg-slate-700 transition-colors">
               Adjust
             </button>
@@ -113,7 +113,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" class="px-6 py-12 text-center text-slate-500 text-sm">
+          <td colspan="5" class="px-6 py-12 text-center text-slate-500 text-sm">
             No stockable products found in inventory. Make sure products are marked as <strong>Is Stockable</strong> in the Products section.
           </td>
         </tr>
@@ -124,18 +124,44 @@
 
 </div>
 
-<!-- Assign Warehouse Modal -->
-<div id="warehouseModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+<!-- Warehouse Details Breakdown Modal -->
+<div id="detailsModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-white/10 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+    <div class="flex items-center justify-between border-b border-white/10 pb-4">
+      <div>
+        <h3 class="text-xl font-bold text-white" id="detailsModalTitle">Warehouse Stock Details</h3>
+        <p class="text-xs text-slate-400 mt-0.5" id="detailsModalSubtitle">Product multi-warehouse inventory breakdown</p>
+      </div>
+      <button type="button" onclick="closeDetailsModal()" class="text-slate-400 hover:text-white p-1">&times;</button>
+    </div>
+
+    <div id="detailsModalContent" class="space-y-4">
+      <div class="flex items-center justify-center py-8">
+        <svg class="animate-spin h-6 w-6 text-indigo-500" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+    </div>
+
+    <div class="flex justify-end pt-3 border-t border-white/10">
+      <button type="button" onclick="closeDetailsModal()" class="px-5 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-colors">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign / Attach Warehouse Modal -->
+<div id="warehouseModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
   <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
     <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-      <h3 class="text-lg font-bold text-white" id="whModalTitle">Assign Warehouse &amp; Location</h3>
+      <h3 class="text-lg font-bold text-white" id="whModalTitle">Attach Warehouse to Product</h3>
       <button type="button" onclick="closeAssignWarehouseModal()" class="text-slate-400 hover:text-white">&times;</button>
     </div>
     <form action="/inventory/assign-warehouse" method="post" class="space-y-4">
       <input type="hidden" name="product_id" id="whModalProductId">
       <div>
-        <label class="block text-xs font-medium text-slate-300 mb-1">Select Warehouse</label>
-        <select name="warehouse_id" id="whModalWarehouseId"
+        <label class="block text-xs font-medium text-slate-300 mb-1">Select Warehouse <span class="text-red-400">*</span></label>
+        <select name="warehouse_id" id="whModalWarehouseId" required
                 class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
           <option value="">-- Select Warehouse --</option>
           {% for wh in warehouses %}
@@ -144,27 +170,42 @@
         </select>
       </div>
       <div>
-        <label class="block text-xs font-medium text-slate-300 mb-1">Warehouse Location / Shelf / Aisle</label>
+        <label class="block text-xs font-medium text-slate-300 mb-1">Location / Rack / Bin</label>
         <input type="text" name="warehouse_location" id="whModalLocation" placeholder="e.g. Rack A-4, Shelf 2"
+               class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1">Low Stock Reorder Level</label>
+        <input type="number" name="reorder_level" id="whModalReorder" value="10" min="0"
                class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
       </div>
       <div class="flex justify-end gap-x-3 pt-3 border-t border-slate-800">
         <button type="button" onclick="closeAssignWarehouseModal()" class="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white">Cancel</button>
-        <button type="submit" class="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors">Save Warehouse</button>
+        <button type="submit" class="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors">Attach Warehouse</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- Stock Inward Modal -->
-<div id="inwardModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+<div id="inwardModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
   <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
     <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-      <h3 class="text-lg font-bold text-white" id="modalTitle">Add Stock Inward</h3>
+      <h3 class="text-lg font-bold text-white" id="inwardModalTitle">Add Stock Inward</h3>
       <button type="button" onclick="closeInwardModal()" class="text-slate-400 hover:text-white">&times;</button>
     </div>
     <form action="/inventory/stock-inward" method="post" class="space-y-4">
-      <input type="hidden" name="product_id" id="modalProductId">
+      <input type="hidden" name="product_id" id="inwardModalProductId">
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1">Target Warehouse <span class="text-red-400">*</span></label>
+        <select name="warehouse_id" id="inwardModalWarehouseId" required
+                class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">-- Select Target Warehouse --</option>
+          {% for wh in warehouses %}
+          <option value="{{ wh.id }}">{{ wh.name }} ({{ wh.code }})</option>
+          {% endfor %}
+        </select>
+      </div>
       <div>
         <label class="block text-xs font-medium text-slate-300 mb-1">Inward Quantity <span class="text-red-400">*</span></label>
         <input type="number" name="quantity" min="1" required placeholder="e.g. 50"
@@ -189,7 +230,7 @@
 </div>
 
 <!-- Stock Adjust Modal -->
-<div id="adjustModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+<div id="adjustModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
   <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
     <div class="flex items-center justify-between border-b border-slate-800 pb-3">
       <h3 class="text-lg font-bold text-white" id="adjustModalTitle">Adjust Stock Balance</h3>
@@ -197,6 +238,16 @@
     </div>
     <form action="/inventory/adjust" method="post" class="space-y-4">
       <input type="hidden" name="product_id" id="adjustModalProductId">
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1">Target Warehouse <span class="text-red-400">*</span></label>
+        <select name="warehouse_id" id="adjustModalWarehouseId" required
+                class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">-- Select Target Warehouse --</option>
+          {% for wh in warehouses %}
+          <option value="{{ wh.id }}">{{ wh.name }} ({{ wh.code }})</option>
+          {% endfor %}
+        </select>
+      </div>
       <div>
         <label class="block text-xs font-medium text-slate-300 mb-1">New Exact Stock Quantity <span class="text-red-400">*</span></label>
         <input type="number" name="new_quantity" id="adjustModalNewQty" min="0" required
@@ -216,28 +267,116 @@
 </div>
 
 <script>
+async function openDetailsModal(productId) {
+  const modal = document.getElementById('detailsModal');
+  const content = document.getElementById('detailsModalContent');
+  modal.classList.remove('hidden');
+  content.innerHTML = `
+    <div class="flex items-center justify-center py-8">
+      <svg class="animate-spin h-6 w-6 text-indigo-500" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    </div>`;
+
+  try {
+    const res = await fetch(`/inventory/product/${productId}/warehouse-details`);
+    const data = await res.json();
+    document.getElementById('detailsModalTitle').innerText = data.product_name;
+    document.getElementById('detailsModalSubtitle').innerText = `SKU: ${data.sku} | Total Combined Stock: ${data.total_stock} Units`;
+
+    if (!data.warehouses || data.warehouses.length === 0) {
+      content.innerHTML = `<div class="p-6 text-center text-slate-400 text-sm">No warehouses attached to this product yet. Click "+ Attach WH" to assign a warehouse.</div>`;
+      return;
+    }
+
+    let rowsHtml = '';
+    data.warehouses.forEach(wh => {
+      const isLow = wh.stock_qty <= wh.reorder_level;
+      const statusBadge = isLow 
+        ? `<span class="inline-flex items-center rounded-full bg-red-950 px-2.5 py-0.5 text-xs font-bold text-red-400 border border-red-800/50">Low: ${wh.stock_qty}</span>`
+        : `<span class="inline-flex items-center rounded-full bg-emerald-950 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-800/50">${wh.stock_qty} units</span>`;
+
+      rowsHtml += `
+        <tr class="border-b border-white/5 hover:bg-slate-800/40 text-xs">
+          <td class="py-3 px-4 font-semibold text-white">
+            ${wh.warehouse_name} <span class="text-slate-400 font-mono text-[11px]">(${wh.warehouse_code})</span>
+          </td>
+          <td class="py-3 px-4 text-slate-300 font-mono">${wh.warehouse_location}</td>
+          <td class="py-3 px-4">${statusBadge}</td>
+          <td class="py-3 px-4 text-slate-400">${wh.reorder_level} units</td>
+          <td class="py-3 px-4 text-right space-x-1.5">
+            <button onclick="closeDetailsModal(); openInwardModal(${data.product_id}, '${data.product_name.replace(/'/g, "\\'")}', ${wh.warehouse_id})"
+                    class="rounded bg-indigo-950 px-2 py-1 text-[11px] font-semibold text-indigo-300 hover:bg-indigo-900 border border-indigo-800/50">
+              + Inward
+            </button>
+            <button onclick="closeDetailsModal(); openAdjustModal(${data.product_id}, '${data.product_name.replace(/'/g, "\\'")}', ${wh.warehouse_id}, ${wh.stock_qty})"
+                    class="rounded bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-300 hover:bg-slate-700 border border-slate-700">
+              Adjust
+            </button>
+            <form action="/inventory/remove-warehouse" method="post" class="inline" onsubmit="return confirmSubmit(event, 'Unassign ${wh.warehouse_name} from this product?', 'Remove Warehouse', 'danger')">
+              <input type="hidden" name="product_id" value="${data.product_id}">
+              <input type="hidden" name="warehouse_id" value="${wh.warehouse_id}">
+              <button type="submit" class="rounded bg-red-950/60 px-2 py-1 text-[11px] font-semibold text-red-400 hover:bg-red-900 border border-red-800/40">
+                Remove
+              </button>
+            </form>
+          </td>
+        </tr>`;
+    });
+
+    content.innerHTML = `
+      <div class="overflow-x-auto rounded-xl border border-white/10 bg-slate-950/50">
+        <table class="min-w-full text-left">
+          <thead class="bg-slate-900 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-white/10">
+            <tr>
+              <th class="py-3 px-4">Warehouse</th>
+              <th class="py-3 px-4">Location / Rack</th>
+              <th class="py-3 px-4">Stock</th>
+              <th class="py-3 px-4">Reorder Level</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>`;
+  } catch (err) {
+    content.innerHTML = `<div class="p-6 text-center text-red-400 text-sm">Failed to load warehouse stock details.</div>`;
+  }
+}
+
+function closeDetailsModal() {
+  document.getElementById('detailsModal').classList.add('hidden');
+}
+
 function openAssignWarehouseModal(id, name, whId, loc) {
   document.getElementById('whModalProductId').value = id;
-  document.getElementById('whModalTitle').innerText = 'Assign Warehouse — ' + name;
-  document.getElementById('whModalWarehouseId').value = whId || '';
-  document.getElementById('whModalLocation').value = loc || '';
+  document.getElementById('whModalTitle').innerText = 'Attach Warehouse — ' + name;
+  if (whId) document.getElementById('whModalWarehouseId').value = whId;
+  if (loc) document.getElementById('whModalLocation').value = loc;
   document.getElementById('warehouseModal').classList.remove('hidden');
 }
 function closeAssignWarehouseModal() {
   document.getElementById('warehouseModal').classList.add('hidden');
 }
-function openInwardModal(id, name) {
-  document.getElementById('modalProductId').value = id;
-  document.getElementById('modalTitle').innerText = 'Add Stock Inward — ' + name;
+
+function openInwardModal(id, name, whId) {
+  document.getElementById('inwardModalProductId').value = id;
+  document.getElementById('inwardModalTitle').innerText = 'Add Stock Inward — ' + name;
+  if (whId) document.getElementById('inwardModalWarehouseId').value = whId;
   document.getElementById('inwardModal').classList.remove('hidden');
 }
 function closeInwardModal() {
   document.getElementById('inwardModal').classList.add('hidden');
 }
-function openAdjustModal(id, name, currentQty) {
+
+function openAdjustModal(id, name, whId, currentQty) {
   document.getElementById('adjustModalProductId').value = id;
-  document.getElementById('adjustModalNewQty').value = currentQty;
   document.getElementById('adjustModalTitle').innerText = 'Adjust Stock — ' + name;
+  if (whId) document.getElementById('adjustModalWarehouseId').value = whId;
+  if (currentQty !== undefined) document.getElementById('adjustModalNewQty').value = currentQty;
   document.getElementById('adjustModal').classList.remove('hidden');
 }
 function closeAdjustModal() {
@@ -245,4 +384,3 @@ function closeAdjustModal() {
 }
 </script>
 {% endblock %}
-

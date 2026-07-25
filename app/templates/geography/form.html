@@ -70,7 +70,24 @@
              placeholder="Optional ERP reference">
     </div>
 
-
+    <!-- Attached Warehouses Container (Visible for Region Level) -->
+    <div id="warehouse-selection-container" class="hidden space-y-2 rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4">
+      <label class="block text-xs font-bold text-indigo-300 uppercase">Attached Warehouses for this Region</label>
+      <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-2">
+        {% set assigned_wh_ids = item.warehouses | map(attribute='id') | list if (item and item.level.value == 'region') else [] %}
+        {% for wh in warehouses %}
+        <label class="flex items-center space-x-3 text-sm text-slate-300 hover:text-white cursor-pointer">
+          <input type="checkbox" name="warehouse_ids" value="{{ wh.id }}" {% if wh.id in assigned_wh_ids %}checked{% endif %}
+                 class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+          <span class="font-medium">{{ wh.name }}</span>
+          <span class="text-xs font-mono text-indigo-400">({{ wh.code }})</span>
+        </label>
+        {% else %}
+        <p class="text-xs text-slate-500 italic">No warehouses registered in system.</p>
+        {% endfor %}
+      </div>
+      <p class="text-xs text-slate-400">Territory Managers assigned to this Region will automatically manage all attached warehouses.</p>
+    </div>
 
     <div class="flex items-center justify-end gap-x-3 pt-2 border-t border-slate-700">
       <a href="/geography" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
@@ -90,12 +107,22 @@ document.addEventListener('DOMContentLoaded', function() {
   const levelSelect = document.getElementById('geo-level');
   const parentSelect = document.getElementById('geo-parent');
   const parentContainer = document.getElementById('parent-field-container');
+  const warehouseContainer = document.getElementById('warehouse-selection-container');
   // Clone all options from the server-rendered list before any DOM manipulation
   const allParentOptions = Array.from(parentSelect.options).map(o => o.cloneNode(true));
 
   function filterParents() {
     const selectedLevel = levelSelect.value;
     const currentVal = parentSelect.value;
+
+    // Toggle warehouse container visibility based on whether level is Region
+    if (warehouseContainer) {
+      if (selectedLevel === 'region') {
+        warehouseContainer.classList.remove('hidden');
+      } else {
+        warehouseContainer.classList.add('hidden');
+      }
+    }
 
     // Rebuild the dropdown from the original cloned options
     parentSelect.innerHTML = '';

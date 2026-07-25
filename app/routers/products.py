@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_web_auth, require_web_roles
 from app.models.product import Product, ProductCategory
+from app.models.product_warehouse import ProductWarehouseStock
 from app.models.warehouse import Warehouse
 from app.models.user import User, UserRole
 from app.utils.csv_import import parse_csv_bytes
@@ -208,3 +209,99 @@ async def product_delete(
         db.commit()
         set_flash_success(request, f"Product '{item.name}' deactivated successfully.")
     return RedirectResponse("/products", status_code=302)
+
+
+@router.get("/{product_id}/attach-warehouses", response_class=HTMLResponse)
+async def product_attach_warehouses_get(
+    product_id: int,
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+):
+    item = db.query(Product).filter(Product.id == product_id).first()
+    if not item or not item.is_active:
+        set_flash_error(request, "Active product not found.")
+        return RedirectResponse("/inventory", status_code=302)
+
+    all_warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
+    assigned_stocks = db.query(ProductWarehouseStock).filter(
+        ProductWarehouseStock.product_id == product_id,
+        ProductWarehouseStock.is_active == True
+    ).all()
+    assigned_warehouse_ids = [s.warehouse_id for s in assigned_stocks]
+
+    # Include legacy warehouse assignment if not in product_warehouse_stocks
+    if item.warehouse_id and item.warehouse_id not in assigned_warehouse_ids:
+        assigned_warehouse_ids.append(item.warehouse_id)
+
+    return templates.TemplateResponse("products/attach_warehouses.html", {
+        "request": request,
+        "current_user": current_user,
+        "item": item,
+        "all_warehouses": all_warehouses,
+        "assigned_warehouse_ids": assigned_warehouse_ids,
+        **get_flash(request),
+    })
+
+
+@router.post("/{product_id}/attach-warehouses")
+async def product_attach_warehouses_post(
+    product_id: int,
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+    warehouse_ids: list[str] = Form(default=[]),
+):
+    item = db.query(Product).filter(Product.id == product_id).first()
+    if not item or not item.is_active:
+        set_flash_error(request, "Active product not found.")
+        return RedirectResponse("/inventory", status_code=302)
+
+    form_data = await request.form()
+    raw_wh_ids = form_data.getlist("warehouse_ids")
+    target_ids = [int(w) for w in (raw_wh_ids or warehouse_ids) if w and str(w).isdigit()]
+
+    existing_stocks = db.query(ProductWarehouseStock).filter(
+        ProductWarehouseStock.product_id == product_id
+    ).all()
+
+    existing_dict = {s.warehouse_id: s for s in existing_stocks}
+
+    # 1. Attach/Activate new warehouses
+    for wh_id in target_ids:
+        if wh_id in existing_dict:
+            existing_dict[wh_id].is_active = True
+        else:
+            new_pws = ProductWarehouseStock(
+                product_id=product_id,
+                warehouse_id=wh_id,
+                stock_qty=0,
+                is_active=True
+            )
+            db.add(new_pws)
+
+    # 2. Deactivate/Remove warehouses not in target_ids
+    for wh_id, pws in existing_dict.items():
+        if wh_id not in target_ids and pws.is_active:
+            if pws.stock_qty > 0:
+                wh_obj = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
+                wh_name = wh_obj.name if wh_obj else f"ID {wh_id}"
+                set_flash_error(
+                    request,
+                    f"Cannot remove warehouse '{wh_name}'. Stock is present ({pws.stock_qty} units). Please clear inventory stock first."
+                )
+                return RedirectResponse(f"/products/{product_id}/attach-warehouses", status_code=302)
+            db.delete(pws)
+
+    db.commit()
+
+    # Recalculate total product stock
+    all_stocks = db.query(ProductWarehouseStock).filter(
+        ProductWarehouseStock.product_id == product_id,
+        ProductWarehouseStock.is_active == True
+    ).all()
+    item.stock_qty = sum(s.stock_qty for s in all_stocks)
+    db.commit()
+
+    set_flash_success(request, f"Warehouse attachments updated for product '{item.name}'.")
+    return RedirectResponse("/inventory", status_code=302)

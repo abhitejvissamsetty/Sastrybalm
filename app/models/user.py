@@ -56,6 +56,14 @@ user_vendors = Table(
     Column("vendor_id", Integer, ForeignKey("vendors.id", ondelete="CASCADE"), primary_key=True),
 )
 
+# Many-to-many: User (Territory Manager) ↔ Warehouses
+user_warehouses = Table(
+    "user_warehouses",
+    Base.metadata,
+    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("warehouse_id", Integer, ForeignKey("warehouses.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 class User(Base):
     __tablename__ = "users"
@@ -94,6 +102,7 @@ class User(Base):
     geography = relationship("Geography", foreign_keys=[geography_id])
     vendor = relationship("Vendor", foreign_keys=[vendor_id])
     qc_vendors = relationship("Vendor", secondary=user_vendors)
+    scoped_warehouses = relationship("Warehouse", secondary=user_warehouses)
     module_access = relationship(
         "UserModuleAccess", back_populates="user", cascade="all, delete-orphan"
     )

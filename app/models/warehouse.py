@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -17,4 +17,8 @@ class Warehouse(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # Region assignment (Geography)
+    geography_id = Column(Integer, ForeignKey("geographies.id", ondelete="SET NULL"), nullable=True)
+
+    geography = relationship("Geography", foreign_keys=[geography_id])
     products = relationship("Product", back_populates="warehouse")

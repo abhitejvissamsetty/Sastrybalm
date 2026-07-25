@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_web_roles
+from app.models.geography import Geography, GeoLevel
 from app.models.warehouse import Warehouse
 from app.models.product import Product
 from app.models.user import User, UserRole
@@ -17,6 +18,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/warehouses", tags=["warehouses"])
 templates = Jinja2Templates(directory="app/templates")
+
+
+def _get_regions(db: Session):
+    return db.query(Geography).filter(Geography.level == GeoLevel.region, Geography.is_active == True).order_by(Geography.name).all()
 
 
 @router.get("", response_class=HTMLResponse)
@@ -47,12 +52,14 @@ async def warehouse_list(
 async def warehouse_new(
     request: Request,
     current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse("warehouses/form.html", {
         "request": request,
         "current_user": current_user,
         "item": None,
         "error": None,
+        "regions": _get_regions(db),
     })
 
 
@@ -65,6 +72,7 @@ async def warehouse_create(
     code: str = Form(...),
     pincode: Optional[str] = Form(default=None),
     address: Optional[str] = Form(default=None),
+    geography_id: Optional[str] = Form(default=None),
 ):
     if db.query(Warehouse).filter(Warehouse.code == code.upper()).first():
         return templates.TemplateResponse("warehouses/form.html", {
@@ -72,6 +80,7 @@ async def warehouse_create(
             "current_user": current_user,
             "item": None,
             "error": f"Warehouse code '{code.upper()}' already exists.",
+            "regions": _get_regions(db),
         })
 
     wh = Warehouse(
@@ -79,6 +88,7 @@ async def warehouse_create(
         code=code.upper(),
         pincode=pincode or None,
         address=address or None,
+        geography_id=int(geography_id) if geography_id else None,
     )
     db.add(wh)
     db.commit()
@@ -103,6 +113,7 @@ async def warehouse_edit(
         "current_user": current_user,
         "item": item,
         "error": None,
+        "regions": _get_regions(db),
     })
 
 
@@ -116,6 +127,7 @@ async def warehouse_update(
     code: str = Form(...),
     pincode: Optional[str] = Form(default=None),
     address: Optional[str] = Form(default=None),
+    geography_id: Optional[str] = Form(default=None),
     is_active: Optional[str] = Form(default=None),
 ):
     item = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
@@ -129,12 +141,14 @@ async def warehouse_update(
             "current_user": current_user,
             "item": item,
             "error": f"Warehouse code '{code.upper()}' already in use.",
+            "regions": _get_regions(db),
         })
 
     item.name = name
     item.code = code.upper()
     item.pincode = pincode or None
     item.address = address or None
+    item.geography_id = int(geography_id) if geography_id else None
     item.is_active = is_active == "on"
 
     db.commit()

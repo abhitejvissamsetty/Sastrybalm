@@ -65,6 +65,12 @@ def run_migrations():
         except Exception as e:
             print(f"Users pre-migration error: {e}")
             
+        if conn.engine.name != "sqlite":
+            try:
+                conn.execute(text("ALTER TABLE users MODIFY COLUMN role VARCHAR(50) NOT NULL DEFAULT 'field_rep'"))
+            except Exception as e:
+                print(f"Error modifying users.role column: {e}")
+            
         add_column_safely(conn, "users", "employee_id", "VARCHAR(100) NULL")
         add_column_safely(conn, "users", "phone", "VARCHAR(20) NULL")
         add_column_safely(conn, "users", "imei", "VARCHAR(50) NULL")
@@ -109,6 +115,12 @@ def run_migrations():
         add_column_safely(conn, "products", "warehouse_id", "INT NULL")
         add_column_safely(conn, "products", "warehouse_location", "VARCHAR(100) NULL")
         add_column_safely(conn, "products", "is_stockable", "BOOLEAN NOT NULL DEFAULT 1")
+
+        # Stock Movements
+        add_column_safely(conn, "stock_movements", "warehouse_id", "INT NULL")
+
+        # Warehouses
+        add_column_safely(conn, "warehouses", "geography_id", "INT NULL")
 
         # System Configuration - Default row
         conn.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))

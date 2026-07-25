@@ -3,6 +3,7 @@ from app.models import geography        # no deps
 from app.models import company          # no deps
 from app.models import warehouse        # no deps
 from app.models import product_mapping  # references CompanyProfile, Product
+from app.models import product_warehouse
 from app.models import product          # references CompanyProfile, Warehouse
 from app.models import vendor           # no deps (vendor before asset_cap)
 from app.models import user             # defines user_positions junction; references Position, CompanyProfile
