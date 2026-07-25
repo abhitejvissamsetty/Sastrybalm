@@ -108,6 +108,7 @@ def run_migrations():
         add_column_safely(conn, "products", "category_type", "VARCHAR(50) NOT NULL DEFAULT 'Sales'")
         add_column_safely(conn, "products", "warehouse_id", "INT NULL")
         add_column_safely(conn, "products", "warehouse_location", "VARCHAR(100) NULL")
+        add_column_safely(conn, "products", "is_stockable", "BOOLEAN NOT NULL DEFAULT 1")
 
         # System Configuration - Default row
         conn.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))

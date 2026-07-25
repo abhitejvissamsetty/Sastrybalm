@@ -35,6 +35,7 @@ class Product(Base):
     warehouse_location = Column(String(100), nullable=True)
     gst_rate = Column(Numeric(5, 2), default=0)   # e.g. 18.00 means 18 %
     must_sell = Column(Boolean, default=False, nullable=False)
+    is_stockable = Column(Boolean, default=True, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

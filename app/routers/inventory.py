@@ -20,6 +20,9 @@ router = APIRouter(prefix="/inventory", tags=["inventory"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+from app.models.warehouse import Warehouse
+
+
 @router.get("", response_class=HTMLResponse)
 async def inventory_list(
     request: Request,
@@ -28,8 +31,8 @@ async def inventory_list(
     query_str: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    """View products catalogue and current stock inventory balances."""
-    query = db.query(Product).filter(Product.is_active == True)
+    """View inventory balances and warehouse assignments for stockable products."""
+    query = db.query(Product).filter(Product.is_active == True, Product.is_stockable == True)
     if query_str:
         query = query.filter(
             Product.name.ilike(f"%{query_str}%") | 
@@ -38,14 +41,38 @@ async def inventory_list(
         )
     query = query.order_by(Product.name.asc())
     pagination = paginate(query, page)
+    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
 
     return templates.TemplateResponse("inventory/list.html", {
         "request": request,
         "current_user": current_user,
         "pagination": pagination,
         "query_str": query_str,
+        "warehouses": warehouses,
         **get_flash(request),
     })
+
+
+@router.post("/assign-warehouse")
+async def inventory_assign_warehouse(
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+    product_id: int = Form(...),
+    warehouse_id: Optional[str] = Form(default=None),
+    warehouse_location: Optional[str] = Form(default=None),
+):
+    """Assign warehouse and location for a stockable product."""
+    product = db.query(Product).filter(Product.id == product_id, Product.is_stockable == True).first()
+    if not product:
+        set_flash_error(request, "Stockable product not found.")
+        return RedirectResponse("/inventory", status_code=302)
+
+    product.warehouse_id = int(warehouse_id) if warehouse_id else None
+    product.warehouse_location = warehouse_location or None
+    db.commit()
+    set_flash_success(request, f"Warehouse assignment updated for '{product.name}'.")
+    return RedirectResponse("/inventory", status_code=302)
 
 
 @router.post("/stock-inward")

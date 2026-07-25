@@ -82,6 +82,7 @@ async def product_create(
     warehouse_location: Optional[str] = Form(default=None),
     gst_rate: Optional[str] = Form(default=None),
     must_sell: Optional[str] = Form(default=None),
+    is_stockable: Optional[str] = Form(default=None),
 ):
     warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
     try:
@@ -104,12 +105,14 @@ async def product_create(
         stock_qty=stock_qty, reorder_level=reorder_level,
         warehouse_id=int(warehouse_id) if warehouse_id else None,
         warehouse_location=warehouse_location or None,
-        gst_rate=gst_val, must_sell=must_sell == "on",
+        gst_rate=gst_val,
+        must_sell=must_sell == "on",
+        is_stockable=is_stockable == "on",
     )
     db.add(product)
     db.commit()
     set_flash_success(request, f"Product '{name}' created.")
-    return RedirectResponse("/inventory", status_code=302)
+    return RedirectResponse("/products", status_code=302)
 
 
 @router.get("/{product_id}/edit", response_class=HTMLResponse)
@@ -148,6 +151,7 @@ async def product_update(
     warehouse_location: Optional[str] = Form(default=None),
     gst_rate: Optional[str] = Form(default=None),
     must_sell: Optional[str] = Form(default=None),
+    is_stockable: Optional[str] = Form(default=None),
     is_active: Optional[str] = Form(default=None),
 ):
     item = db.query(Product).filter(Product.id == product_id).first()
@@ -179,11 +183,12 @@ async def product_update(
     item.warehouse_id = int(warehouse_id) if warehouse_id else None
     item.warehouse_location = warehouse_location or None
     item.must_sell = must_sell == "on"
+    item.is_stockable = is_stockable == "on"
     item.is_active = is_active == "on"
 
     db.commit()
     set_flash_success(request, f"Product '{name}' updated.")
-    return RedirectResponse("/inventory", status_code=302)
+    return RedirectResponse("/products", status_code=302)
 
 
 @router.post("/{product_id}/delete")
@@ -197,4 +202,4 @@ async def product_delete(
         item.is_active = False
         db.commit()
         set_flash_success(request, f"'{item.name}' deactivated.")
-    return RedirectResponse("/inventory", status_code=302)
+    return RedirectResponse("/products", status_code=302)
