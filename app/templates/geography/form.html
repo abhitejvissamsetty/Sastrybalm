@@ -72,7 +72,7 @@
 
     <!-- Attached Warehouses Container (Visible for Region Level) -->
     <div id="warehouse-selection-container" class="hidden space-y-2 rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4">
-      <label class="block text-xs font-bold text-indigo-300 uppercase">Attached Warehouses for this Region</label>
+      <label class="block text-xs font-bold text-indigo-300 uppercase">Attached Warehouses for this Region <span class="text-red-400 font-bold">* (Mandatory: select at least 1)</span></label>
       <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-2">
         {% set assigned_wh_ids = item.warehouses | map(attribute='id') | list if (item and item.level.value == 'region') else [] %}
         {% for wh in warehouses %}
@@ -83,10 +83,10 @@
           <span class="text-xs font-mono text-indigo-400">({{ wh.code }})</span>
         </label>
         {% else %}
-        <p class="text-xs text-slate-500 italic">No warehouses registered in system.</p>
+        <p class="text-xs text-slate-500 italic">No warehouses registered in system. Please create a warehouse first before creating a region.</p>
         {% endfor %}
       </div>
-      <p class="text-xs text-slate-400">Territory Managers assigned to this Region will automatically manage all attached warehouses.</p>
+      <p class="text-xs text-slate-400">Every Region must have at least one Warehouse attached mandatorily. Territory Managers assigned to this Region automatically manage all attached warehouses.</p>
     </div>
 
     <div class="flex items-center justify-end gap-x-3 pt-2 border-t border-slate-700">

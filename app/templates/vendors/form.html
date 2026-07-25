@@ -46,15 +46,15 @@
     <div class="rounded-xl border border-indigo-500/30 bg-slate-800/50 p-6 space-y-5">
       <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Vendor Scopes (Geography &amp; Product Supply)</h2>
 
-      <!-- Geography Scope -->
+      <!-- Geography Scope (Region Only) -->
       <div>
-        <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5">Geography Scope <span class="text-indigo-400 font-normal lowercase">(Scopes Material Requests to this region)</span></label>
+        <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5">Region Scope <span class="text-indigo-400 font-normal lowercase">(Scopes Material Requests to selected region)</span></label>
         <select name="geography_id"
                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          <option value="">All Geographies / Unscoped</option>
+          <option value="">All Regions / Unscoped</option>
           {% for g in geographies %}
           <option value="{{ g.id }}" {% if item and item.geography_id == g.id %}selected{% endif %}>
-            {{ g.name }} ({{ g.level.value.title() }})
+            {{ g.name }} (Region)
           </option>
           {% endfor %}
         </select>

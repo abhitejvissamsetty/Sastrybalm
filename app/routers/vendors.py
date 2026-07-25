@@ -47,12 +47,17 @@ async def vendor_list(
     })
 
 
-from app.models.geography import Geography
+from app.models.geography import Geography, GeoLevel
 from app.models.product import Product, ProductCategory
 
 
 def _vendor_form_context(db: Session) -> dict:
-    geographies = db.query(Geography).filter(Geography.is_active == True).order_by(Geography.name).all()
+    geographies = (
+        db.query(Geography)
+        .filter(Geography.is_active == True, Geography.level == GeoLevel.region)
+        .order_by(Geography.name)
+        .all()
+    )
     products = db.query(Product).filter(
         Product.is_active == True,
         Product.category_type == ProductCategory.marketing_procurement

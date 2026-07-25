@@ -57,7 +57,7 @@ erDiagram
 
 ### Regional Warehouses & Permission Resolution
 - Warehouses are assigned directly at the **Region** level (`Geography.level == GeoLevel.region`).
-- When creating or editing a Region (`/geography/new` or `/geography/{id}/edit`), multiple warehouses can be attached to that Region.
+- **Mandatory Region Warehouse Rule**: A Region **MUST** contain at least one attached Warehouse mandatorily during creation (`/geography/new`) and editing (`/geography/{id}/edit`). Saving a Region without selecting at least one warehouse is rejected with a validation error.
 - **Territory Manager Warehouse Resolution**: Permission to access, inward, and adjust inventory for warehouses is resolved directly from the **Region** (`geography_id`) assigned to the Territory Manager. Any warehouse attached to that Region (`Warehouse.geography_id == User.geography_id`) is automatically accessible by that Territory Manager, eliminating the need for direct per-user warehouse assignments.
 
 ---
@@ -103,7 +103,8 @@ When an **Outlet** places an Order, Asset Request, or Material Request:
 ## 🏬 4. Vendors & Scope Control
 
 - **Vendor Product Scope**: Restricted strictly to products with `category_type == ProductCategory.marketing_procurement`.
-- **Geography & Regional Scope Resolution**: Vendors managed by a **Territory Manager** are resolved and filtered directly by the `geography_id` (Region) field on the `Vendor` model (`Vendor.geography_id == User.geography_id`). Vendors created by a Territory Manager are automatically tagged with their assigned Region.
+- **Vendor Geography Scope**: Vendor geography scope is strictly limited to **Regions** (`GeoLevel.region`). Forms and dropdowns filter available geographies exclusively to Region-level nodes.
+- **Regional Scope Resolution**: Vendors managed by a **Territory Manager** are resolved and filtered directly by the `geography_id` (Region) field on the `Vendor` model (`Vendor.geography_id == User.geography_id`). Vendors created by a Territory Manager are automatically tagged with their assigned Region.
 - **Vendor Users**: Mobile and web logins for `Vendor Admin` and `Vendor Technician` roles.
 
 ---

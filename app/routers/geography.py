@@ -71,6 +71,12 @@ async def geo_create(
 ):
     parent_id_int = int(parent_id) if parent_id else None
     err = _validate_hierarchy(db, GeoLevel(level), parent_id_int)
+    form_data = await request.form()
+    raw_wh_ids = form_data.getlist("warehouse_ids") or warehouse_ids
+    selected_wh_ids = [int(w) for w in raw_wh_ids if str(w).isdigit()]
+    if not err and level == GeoLevel.region.value and not selected_wh_ids:
+        err = "A Region must be assigned at least one Warehouse mandatorily."
+
     if not err and db.query(Geography).filter(Geography.code == code.upper()).first():
         err = f"Code '{code.upper()}' already exists."
     if err:
@@ -86,7 +92,6 @@ async def geo_create(
     db.flush()
 
     if level == GeoLevel.region.value:
-        selected_wh_ids = [int(w) for w in warehouse_ids if w and str(w).isdigit()]
         if selected_wh_ids:
             whs = db.query(Warehouse).filter(Warehouse.id.in_(selected_wh_ids)).all()
             for wh in whs:
@@ -139,6 +144,13 @@ async def geo_update(
         return RedirectResponse("/geography", status_code=302)
     parent_id_int = int(parent_id) if parent_id else None
     err = _validate_hierarchy(db, GeoLevel(level), parent_id_int)
+
+    form_data = await request.form()
+    raw_wh_ids = form_data.getlist("warehouse_ids") or warehouse_ids
+    selected_wh_ids = [int(w) for w in raw_wh_ids if str(w).isdigit()]
+    if not err and level == GeoLevel.region.value and not selected_wh_ids:
+        err = "A Region must be assigned at least one Warehouse mandatorily."
+
     if not err and db.query(Geography).filter(Geography.code == code.upper(), Geography.id != geo_id).first():
         err = f"Code '{code.upper()}' already in use."
     
