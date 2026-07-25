@@ -26,7 +26,7 @@
     <!-- Header -->
     <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-4">
       <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Order Details</h2>
-      <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1.5">Outlet <span class="text-red-400">*</span></label>
           <select name="outlet_id" required
@@ -34,6 +34,16 @@
             <option value="">Select outlet…</option>
             {% for o in outlets %}
             <option value="{{ o.id }}">{{ o.name }}{% if o.code %} ({{ o.code }}){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Channel Partner (Fulfillment) <span class="text-red-400">*</span></label>
+          <select name="channel_partner_id" required
+                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Select Channel Partner…</option>
+            {% for cp in channel_partners %}
+            <option value="{{ cp.id }}">{{ cp.name }} ({{ cp.partner_type }})</option>
             {% endfor %}
           </select>
         </div>

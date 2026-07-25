@@ -43,6 +43,7 @@
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Geography Scope</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Sales Channels</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Contact</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Notifications</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
           <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
         </tr>
@@ -85,6 +86,23 @@
             {{ item.contact_person or '—' }}
             {% if item.mobile %}<div class="text-xs text-slate-500">{{ item.mobile }}</div>{% endif %}
           </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+            <div class="flex flex-col gap-1 items-start">
+              {% if item.notification_preference == 'instant' %}
+                <span class="inline-flex items-center rounded-md bg-sky-950 px-2 py-0.5 text-xs font-semibold text-sky-300 border border-sky-800">⚡ Instant</span>
+              {% elif item.notification_preference == 'daily_summary' %}
+                <span class="inline-flex items-center rounded-md bg-emerald-950 px-2 py-0.5 text-xs font-semibold text-emerald-300 border border-emerald-800">📊 Daily CSV</span>
+              {% elif item.notification_preference == 'both' %}
+                <span class="inline-flex items-center rounded-md bg-teal-950 px-2 py-0.5 text-xs font-semibold text-teal-300 border border-teal-800">⚡ + 📊 Both</span>
+              {% else %}
+                <span class="inline-flex items-center rounded-md bg-slate-900 px-2 py-0.5 text-xs font-semibold text-slate-500 border border-slate-700">Disabled</span>
+              {% endif %}
+              
+              {% if item.notification_preference != 'none' %}
+                <span class="text-[10px] font-medium text-slate-400 font-mono">Via {{ item.notification_channel_label }}</span>
+              {% endif %}
+            </div>
+          </td>
           <td class="px-6 py-4 whitespace-nowrap">
             {% if item.is_active %}
             <span class="inline-flex items-center gap-x-1.5 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
@@ -97,12 +115,38 @@
             {% endif %}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-            <a href="/channel-partners/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300">Edit</a>
+            <div class="flex items-center justify-end gap-x-2">
+              <a href="/channel-partners/{{ item.id }}/export-daily-orders-csv" title="Download Consolidated Daily Orders CSV"
+                 class="rounded-md bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all flex items-center gap-1">
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                CSV
+              </a>
+              <a href="/channel-partners/{{ item.id }}/edit"
+                 class="rounded-md bg-indigo-500/10 px-2.5 py-1 text-xs font-semibold text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20 transition-all">
+                Edit
+              </a>
+              {% if item.is_active %}
+              <form method="post" action="/channel-partners/{{ item.id }}/deactivate" class="inline"
+                    onsubmit="return confirmSubmit(event, 'Deactivate Channel Partner {{ item.name }}?', 'Deactivate Partner', 'danger')">
+                <button type="submit" class="rounded-md bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 transition-all">
+                  Deactivate
+                </button>
+              </form>
+              {% else %}
+              <form method="post" action="/channel-partners/{{ item.id }}/activate" class="inline">
+                <button type="submit" class="rounded-md bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all">
+                  Activate
+                </button>
+              </form>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" class="px-6 py-12 text-center text-slate-500">No channel partners found.</td>
+          <td colspan="7" class="px-6 py-12 text-center text-slate-500">No channel partners found.</td>
         </tr>
         {% endfor %}
       </tbody>

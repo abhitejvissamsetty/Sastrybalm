@@ -459,9 +459,174 @@ async def webhook_test(
 async def whatsapp_settings_form(
     request: Request,
     current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
 ):
+    from app.models.company import SystemConfiguration
+    sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
+    if not sys_config:
+        sys_config = SystemConfiguration(id=1)
+        db.add(sys_config)
+        db.commit()
+
+    api_key = sys_config.whatsapp_api_key or ""
+    if api_key.startswith("gAAAAA"):
+        try:
+            api_key = decrypt(api_key)
+        except Exception:
+            pass
+
+    wa_config = {
+        "whatsapp_api_key": api_key,
+        "whatsapp_phone_number_id": sys_config.whatsapp_phone_number_id or "",
+        "whatsapp_business_account_id": sys_config.whatsapp_business_account_id or "",
+        "whatsapp_is_enabled": bool(sys_config.whatsapp_is_enabled),
+    }
+
     return templates.TemplateResponse("settings/whatsapp.html", {
         "request": request,
         "current_user": current_user,
+        "config": wa_config,
         **get_flash(request),
     })
+
+
+@router.post("/whatsapp")
+async def whatsapp_settings_save(
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+    whatsapp_api_key: Optional[str] = Form(default=""),
+    whatsapp_phone_number_id: Optional[str] = Form(default=""),
+    whatsapp_business_account_id: Optional[str] = Form(default=""),
+    whatsapp_is_enabled: Optional[bool] = Form(default=False),
+):
+    from app.models.company import SystemConfiguration
+    sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
+    if not sys_config:
+        sys_config = SystemConfiguration(id=1)
+        db.add(sys_config)
+
+    key = whatsapp_api_key.strip() if whatsapp_api_key else ""
+    if key and not key.startswith("gAAAAA"):
+        sys_config.whatsapp_api_key = encrypt(key)
+    elif key:
+        sys_config.whatsapp_api_key = key
+
+    sys_config.whatsapp_phone_number_id = whatsapp_phone_number_id.strip() if whatsapp_phone_number_id else None
+    sys_config.whatsapp_business_account_id = whatsapp_business_account_id.strip() if whatsapp_business_account_id else None
+    sys_config.whatsapp_is_enabled = bool(whatsapp_is_enabled)
+
+    db.commit()
+    status_msg = "enabled" if sys_config.whatsapp_is_enabled else "disabled"
+    set_flash_success(request, f"WhatsApp Business API settings saved to database! API is {status_msg}.")
+    return RedirectResponse("/settings/whatsapp", status_code=302)
+
+
+from app.models.company import SystemConfiguration
+
+
+@router.get("/approval-rules", response_class=HTMLResponse)
+async def approval_rules_form(
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
+    if not sys_config:
+        sys_config = SystemConfiguration(id=1, auto_approval_cutoff_hours=24)
+        db.add(sys_config)
+        db.commit()
+
+    return templates.TemplateResponse("settings/config.html", {
+        "request": request,
+        "current_user": current_user,
+        "config": sys_config,
+        **get_flash(request),
+    })
+
+
+@router.post("/approval-rules")
+async def approval_rules_save(
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+    auto_approval_cutoff_hours: int = Form(24),
+):
+    sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
+    if not sys_config:
+        sys_config = SystemConfiguration(id=1, auto_approval_cutoff_hours=auto_approval_cutoff_hours)
+        db.add(sys_config)
+    sys_config.auto_approval_cutoff_hours = max(1, auto_approval_cutoff_hours)
+    db.commit()
+    set_flash_success(request, f"Order auto-approval cutoff time updated to {sys_config.auto_approval_cutoff_hours} hours.")
+    return RedirectResponse("/settings/approval-rules", status_code=302)
+
+
+@router.get("/s3", response_class=HTMLResponse)
+async def s3_settings_form(
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    from app.utils.s3_service import get_s3_config
+    s3_config = get_s3_config(db)
+    return templates.TemplateResponse("settings/s3.html", {
+        "request": request,
+        "current_user": current_user,
+        "config": s3_config,
+        **get_flash(request),
+    })
+
+
+@router.post("/s3")
+async def s3_settings_save(
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+    s3_endpoint_url: Optional[str] = Form(default=""),
+    s3_bucket_name: Optional[str] = Form(default=""),
+    s3_access_key_id: Optional[str] = Form(default=""),
+    s3_secret_access_key: Optional[str] = Form(default=""),
+    s3_region_name: Optional[str] = Form(default="us-west-004"),
+    s3_public_url_prefix: Optional[str] = Form(default=""),
+    s3_is_enabled: Optional[bool] = Form(default=False),
+):
+    sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
+    if not sys_config:
+        sys_config = SystemConfiguration(id=1)
+        db.add(sys_config)
+
+    sys_config.s3_endpoint_url = s3_endpoint_url.strip() if s3_endpoint_url else None
+    sys_config.s3_bucket_name = s3_bucket_name.strip() if s3_bucket_name else None
+    sys_config.s3_access_key_id = s3_access_key_id.strip() if s3_access_key_id else None
+
+    sec = s3_secret_access_key.strip() if s3_secret_access_key else ""
+    if sec and not sec.startswith("gAAAAA"):
+        sys_config.s3_secret_access_key = encrypt(sec)
+    elif sec:
+        sys_config.s3_secret_access_key = sec
+
+    sys_config.s3_region_name = s3_region_name.strip() if s3_region_name else "us-west-004"
+    sys_config.s3_public_url_prefix = s3_public_url_prefix.strip() if s3_public_url_prefix else None
+    sys_config.s3_is_enabled = bool(s3_is_enabled)
+
+    db.commit()
+    status_msg = "enabled & active" if sys_config.s3_is_enabled else "disabled (local disk fallback active)"
+    set_flash_success(request, f"Backblaze B2 S3 storage settings saved! Storage is {status_msg}.")
+    return RedirectResponse("/settings/s3", status_code=302)
+
+
+@router.post("/s3/test")
+async def s3_settings_test(
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    from app.utils.s3_service import get_s3_config, test_s3_connection
+    config = get_s3_config(db)
+    success, msg = test_s3_connection(config)
+    if success:
+        set_flash_success(request, msg)
+    else:
+        set_flash_error(request, msg)
+    return RedirectResponse("/settings/s3", status_code=302)

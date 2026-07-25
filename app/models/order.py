@@ -44,6 +44,7 @@ class Order(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     beat_id = Column(Integer, ForeignKey("beats.id", ondelete="SET NULL"), nullable=True)
     company_profile_id = Column(Integer, ForeignKey("company_profiles.id", ondelete="SET NULL"), nullable=True)
+    channel_partner_id = Column(Integer, ForeignKey("local_channel_partners.id", ondelete="SET NULL"), nullable=True, index=True)
     status = Column(Enum(OrderStatus), default=OrderStatus.draft, nullable=False)
     flow_type = Column(Enum(FlowType), default=FlowType.zap_invoice, nullable=False)
     sync_status = Column(Enum(SyncStatus), default=SyncStatus.not_applicable, nullable=False)
@@ -64,8 +65,10 @@ class Order(Base):
     user = relationship("User", foreign_keys=[user_id], back_populates="orders")
     beat = relationship("Beat", foreign_keys=[beat_id])
     company_profile = relationship("CompanyProfile", foreign_keys=[company_profile_id])
+    channel_partner = relationship("LocalChannelPartner", foreign_keys=[channel_partner_id])
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="order")
+    history_logs = relationship("OrderHistoryLog", back_populates="order", cascade="all, delete-orphan", order_by="OrderHistoryLog.created_at.desc()")
 
     @property
     def subtotal(self) -> float:
@@ -173,3 +176,21 @@ class OrderItem(Base):
     def sgst_amount(self) -> float:
         """State GST (half of total GST for intra-state)."""
         return round(self.gst_amount - self.cgst_amount, 2)  # avoids rounding drift
+
+
+class OrderHistoryLog(Base):
+    __tablename__ = "order_history_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    action = Column(String(100), nullable=False)  # e.g. 'created', 'status_changed', 'channel_partner_allocated'
+    old_status = Column(String(50), nullable=True)
+    new_status = Column(String(50), nullable=True)
+    channel_partner_id = Column(Integer, ForeignKey("local_channel_partners.id", ondelete="SET NULL"), nullable=True)
+    performed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    order = relationship("Order", back_populates="history_logs")
+    channel_partner = relationship("LocalChannelPartner", foreign_keys=[channel_partner_id])
+    performed_by = relationship("User", foreign_keys=[performed_by_id])

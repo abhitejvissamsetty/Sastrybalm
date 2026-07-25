@@ -41,21 +41,61 @@
     {% endif %}
   </div>
 
-  <!-- Item Details -->
-  <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-5 space-y-3">
-    <h3 class="text-sm font-bold text-white uppercase tracking-wider">Marketing Procurement Item Details</h3>
-    <p class="text-sm text-slate-300">{{ item.item_details or item.description or '—' }}</p>
-    {% if item.notes %}
-    <p class="text-xs text-slate-400 italic">Notes: {{ item.notes }}</p>
-    {% endif %}
+  <!-- Header & Item Details Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- Item Details Card -->
+    <div class="md:col-span-2 rounded-xl border border-slate-700 bg-slate-800/50 p-5 space-y-3">
+      <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Marketing Procurement Item Details</h3>
+      <p class="text-sm font-semibold text-white">{{ item.item_details or item.description or '—' }}</p>
+      {% if item.notes %}
+      <p class="text-xs text-slate-400 italic">Notes: {{ item.notes }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Assigned Vendor Card -->
+    <div class="rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold text-indigo-300 uppercase tracking-wider">Assigned Vendor</h3>
+        <span class="text-[10px] text-slate-400 font-mono">Scope: Region+</span>
+      </div>
+      {% if item.vendor %}
+      <div>
+        <p class="text-sm font-bold text-white">{{ item.vendor.full_name }}</p>
+        <p class="text-xs text-indigo-300">{{ item.vendor.email or item.vendor.mobile or 'Vendor Account' }}</p>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500 italic">No vendor assigned</p>
+      {% endif %}
+
+      {% if current_user.role.value in ['admin', 'territory_manager'] %}
+        {% if can_map_vendor %}
+        <form method="post" action="/material-requests/{{ item.id }}/assign-vendor" class="space-y-2 pt-2 border-t border-indigo-900/60">
+          <label class="block text-[10px] font-semibold text-slate-300 uppercase">Assign / Reassign Vendor</label>
+          <div class="flex items-center gap-1.5">
+            <select name="vendor_id" required class="w-full text-xs rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+              <option value="">Select Vendor…</option>
+              {% for v in available_vendors %}
+              <option value="{{ v.id }}" {% if item.vendor_id == v.id %}selected{% endif %}>{{ v.full_name }} ({{ v.email or v.username }})</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors">Assign</button>
+          </div>
+        </form>
+        {% else %}
+        <p class="text-[10px] text-amber-400 bg-amber-950/40 p-2 rounded border border-amber-800/50">
+          Vendor mapping requires Regional or Zonal management scope.
+        </p>
+        {% endif %}
+      {% endif %}
+    </div>
   </div>
 
-  <!-- Vendor Quotations Section -->
+  <!-- Vendor Quotations & Work Orders Section -->
   <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-6">
     <div class="flex items-center justify-between border-b border-slate-700 pb-4">
       <div>
-        <h3 class="text-base font-bold text-white">Vendor Quotations</h3>
-        <p class="text-xs text-slate-400">Bids submitted by registered procurement vendors.</p>
+        <h3 class="text-base font-bold text-white">Vendor Quotations &amp; Work Orders</h3>
+        <p class="text-xs text-slate-400">Bids submitted by assigned vendors and active work orders.</p>
       </div>
       {% if current_user.role.value in ['vendor_technician', 'vendor_admin', 'admin'] %}
       <button type="button" onclick="document.getElementById('quote-form').classList.toggle('hidden')"
@@ -123,7 +163,7 @@
         </div>
         {% endif %}
 
-        <!-- Work Order & QC Verification section if quote is approved -->
+        <!-- Work Order & QC Photo Verification section -->
         {% if q.work_order %}
         {% set wo = q.work_order[0] if q.work_order is sequence else q.work_order %}
         <div class="mt-3 pt-3 border-t border-slate-800 bg-slate-950 p-4 rounded-xl space-y-3">
@@ -137,21 +177,46 @@
             </span>
           </div>
 
-          {% if wo.status.value == 'Issued' and current_user.role.value in ['admin', 'territory_manager', 'qc_manager'] %}
-          <div class="flex items-center justify-end gap-x-2 pt-2 border-t border-slate-800">
-            <form method="post" action="/material-requests/work-orders/{{ wo.id }}/qc" class="inline">
-              <input type="hidden" name="qc_result" value="passed">
-              <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500">
-                QC Verify &amp; Itemize Stock (Convert to Marketing Asset)
-              </button>
-            </form>
-            <form method="post" action="/material-requests/work-orders/{{ wo.id }}/qc" class="inline">
-              <input type="hidden" name="qc_result" value="failed">
-              <button type="submit" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500">
-                QC Fail
-              </button>
-            </form>
+          {% if wo.qc_photo_url %}
+          <div class="flex items-center gap-3 p-2 bg-slate-900 rounded-lg border border-slate-800">
+            <img src="{{ wo.qc_photo_url }}" alt="QC Inspection Photo" class="h-16 w-16 object-cover rounded-lg border border-slate-700">
+            <div>
+              <p class="text-xs font-bold text-emerald-400">QC Photo Verified</p>
+              <p class="text-[11px] text-slate-400">{{ wo.qc_notes or 'Photo inspection uploaded.' }}</p>
+              {% if wo.qc_verified_by %}
+              <p class="text-[10px] text-slate-500">Inspected by: {{ wo.qc_verified_by.full_name }}</p>
+              {% endif %}
+            </div>
           </div>
+          {% endif %}
+
+          {% if wo.status.value == 'Issued' and current_user.role.value in ['admin', 'territory_manager', 'qc_manager'] %}
+          <form method="post" action="/material-requests/work-orders/{{ wo.id }}/qc" enctype="multipart/form-data" class="space-y-3 pt-3 border-t border-slate-800 bg-slate-900/80 p-3 rounded-lg">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">QC Manager Photo Verification &amp; Approval</span>
+              <span class="text-[10px] text-amber-400 font-medium">Camera / Upload Photo Required</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] text-slate-400 uppercase font-semibold mb-1">Inspection Photo</label>
+                <input type="file" name="qc_photo" accept="image/*" capture="environment"
+                       class="w-full text-xs text-slate-300 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 uppercase font-semibold mb-1">Inspection Notes</label>
+                <input type="text" name="qc_notes" placeholder="QC inspection details..."
+                       class="w-full text-xs bg-slate-950 border border-slate-700 text-white rounded px-2.5 py-1 focus:outline-none">
+              </div>
+            </div>
+            <div class="flex items-center justify-end gap-x-2 pt-1">
+              <button type="submit" name="qc_result" value="passed" class="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500">
+                ✓ Pass QC &amp; Itemize Stock (Convert to Asset)
+              </button>
+              <button type="submit" name="qc_result" value="failed" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500">
+                ✕ Fail QC
+              </button>
+            </div>
+          </form>
           {% endif %}
         </div>
         {% endif %}
@@ -163,6 +228,71 @@
     <p class="text-xs text-slate-500 italic text-center py-2">No vendor quotations placed yet.</p>
     {% endif %}
   </div>
+
+  <!-- Material Request Life-Cycle Audit Log -->
+  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50 space-y-3 p-5">
+    <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
+      <div>
+        <h2 class="text-base font-bold text-white tracking-tight">Material Request Life-Cycle Audit Log</h2>
+        <p class="text-xs text-slate-400">Complete historical timeline of request creation, vendor assignments/reassignments, and QC verifications.</p>
+      </div>
+      <span class="inline-flex items-center rounded-md bg-indigo-950 px-2.5 py-1 text-xs font-semibold text-indigo-300 border border-indigo-800">
+        {{ item.history_logs|length }} Events
+      </span>
+    </div>
+
+    {% if item.history_logs %}
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-700/50 text-left">
+        <thead>
+          <tr class="bg-slate-900/60">
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Timestamp</th>
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Action Event</th>
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Performed By</th>
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status Shift</th>
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assigned Vendor</th>
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Details / Notes</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700/30">
+          {% for log in item.history_logs %}
+          <tr class="hover:bg-slate-700/20 transition-colors">
+            <td class="px-4 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">
+              {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '—' }}
+            </td>
+            <td class="px-4 py-3 text-xs font-bold text-white whitespace-nowrap">
+              <span class="inline-flex items-center rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-indigo-300 border border-slate-700">
+                {{ log.action.replace('_',' ').title() }}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-300 whitespace-nowrap">
+              {{ log.performed_by.full_name if log.performed_by else 'System' }}
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-300 whitespace-nowrap">
+              {% if log.old_status or log.new_status %}
+                <span class="text-slate-400">{{ log.old_status.title() if log.old_status else 'None' }}</span> → <span class="font-bold text-indigo-300">{{ log.new_status.title() if log.new_status else 'None' }}</span>
+              {% else %}
+                <span class="text-slate-500">—</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-300 whitespace-nowrap">
+              {{ log.vendor.full_name if log.vendor else 'Unassigned' }}
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-400">
+              {{ log.notes or '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-xs text-slate-500 italic py-2 text-center">No history logs recorded for this material request.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
 
 </div>
 {% endblock %}

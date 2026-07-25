@@ -83,6 +83,7 @@ def run_migrations():
         # Orders
         add_column_safely(conn, "orders", "payment_settlement", "VARCHAR(50) NOT NULL DEFAULT 'unpaid'")
         add_column_safely(conn, "orders", "connect_ref", "VARCHAR(100) NULL")
+        add_column_safely(conn, "orders", "channel_partner_id", "INT NULL")
             
         # Order Items
         add_column_safely(conn, "order_items", "gst_rate", "DECIMAL(5, 2) NOT NULL DEFAULT 0")
@@ -113,6 +114,8 @@ def run_migrations():
         add_column_safely(conn, "local_channel_partners", "mobile", "VARCHAR(20) NULL")
         add_column_safely(conn, "local_channel_partners", "address", "TEXT NULL")
         add_column_safely(conn, "local_channel_partners", "erp_id", "VARCHAR(100) NULL")
+        add_column_safely(conn, "local_channel_partners", "notification_preference", "VARCHAR(50) NOT NULL DEFAULT 'none'")
+        add_column_safely(conn, "local_channel_partners", "notification_channel", "VARCHAR(50) NOT NULL DEFAULT 'email'")
 
         # Products
         add_column_safely(conn, "products", "unit_cost", "DECIMAL(10, 2) NOT NULL DEFAULT 0")
@@ -135,11 +138,32 @@ def run_migrations():
         # System Configuration - Default row
         conn.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))
 
-        # System Configuration - SMTP Settings
+        # Material Requests & Vendors
+        add_column_safely(conn, "material_requests", "vendor_id", "INT NULL")
+
+        # Work Orders
+        add_column_safely(conn, "work_orders", "material_request_id", "INT NULL")
+        add_column_safely(conn, "work_orders", "vendor_id", "INT NULL")
+        add_column_safely(conn, "work_orders", "qc_photo_url", "TEXT NULL")
+        add_column_safely(conn, "work_orders", "qc_notes", "TEXT NULL")
+        add_column_safely(conn, "work_orders", "qc_verified_at", "DATETIME NULL")
+        add_column_safely(conn, "work_orders", "qc_verified_by_id", "INT NULL")
         add_column_safely(conn, "system_configuration", "smtp_host", "VARCHAR(255) NULL")
         add_column_safely(conn, "system_configuration", "smtp_port", "INT NOT NULL DEFAULT 587")
         add_column_safely(conn, "system_configuration", "smtp_user", "VARCHAR(255) NULL")
         add_column_safely(conn, "system_configuration", "smtp_password", "TEXT NULL")
+        add_column_safely(conn, "system_configuration", "auto_approval_cutoff_hours", "INT NOT NULL DEFAULT 24")
+        add_column_safely(conn, "system_configuration", "s3_endpoint_url", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "s3_bucket_name", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "s3_access_key_id", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "s3_secret_access_key", "TEXT NULL")
+        add_column_safely(conn, "system_configuration", "s3_region_name", "VARCHAR(100) NULL DEFAULT 'us-west-004'")
+        add_column_safely(conn, "system_configuration", "s3_is_enabled", "BOOLEAN NOT NULL DEFAULT 0")
+        add_column_safely(conn, "system_configuration", "s3_public_url_prefix", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "whatsapp_api_key", "TEXT NULL")
+        add_column_safely(conn, "system_configuration", "whatsapp_phone_number_id", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "whatsapp_business_account_id", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "whatsapp_is_enabled", "BOOLEAN NOT NULL DEFAULT 0")
         add_column_safely(conn, "system_configuration", "smtp_from", "VARCHAR(255) NULL")
         add_column_safely(conn, "system_configuration", "smtp_use_tls", "BOOLEAN NOT NULL DEFAULT 1")
 

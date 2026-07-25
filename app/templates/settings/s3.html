@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Backblaze B2 S3 Storage Configuration{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl space-y-6">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Backblaze B2 S3 Storage</h1>
+      <p class="mt-1 text-sm text-slate-400">Configure Cloud Object Storage for outlet photos, material requests, QC inspections, and asset images.</p>
+    </div>
+    <form method="post" action="/settings/s3/test" class="inline">
+      <button type="submit" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-xs font-semibold text-indigo-300 hover:bg-slate-700 transition-colors">
+        ⚡ Test S3 Connection
+      </button>
+    </form>
+  </div>
+
+  {% if success %}
+  <div class="rounded-lg bg-emerald-900/40 border border-emerald-700 px-4 py-3 text-sm text-emerald-300">{{ success }}</div>
+  {% endif %}
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="/settings/s3" class="space-y-6 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+    <div class="flex items-center justify-between p-4 rounded-xl bg-slate-900/80 border border-slate-700/60">
+      <div>
+        <p class="text-sm font-bold text-white">Enable Backblaze B2 S3 Storage</p>
+        <p class="text-xs text-slate-400">When enabled, all newly uploaded images across the system are stored in Backblaze B2 bucket.</p>
+      </div>
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" name="s3_is_enabled" value="true" class="sr-only peer" {% if config.s3_is_enabled %}checked{% endif %}>
+        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+      </label>
+    </div>
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1">Backblaze B2 S3 Endpoint URL</label>
+        <input type="text" name="s3_endpoint_url" value="{{ config.s3_endpoint_url or '' }}"
+               placeholder="e.g. https://s3.us-west-004.backblazeb2.com"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+        <p class="mt-1 text-[11px] text-slate-500">Backblaze S3 compatible API endpoint URL.</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1">B2 Bucket Name</label>
+        <input type="text" name="s3_bucket_name" value="{{ config.s3_bucket_name or '' }}"
+               placeholder="e.g. sastrybalm-media-bucket"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1">Key ID / Access Key</label>
+        <input type="text" name="s3_access_key_id" value="{{ config.s3_access_key_id or '' }}"
+               placeholder="e.g. 004123456789abc0000000001"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1">Application Key / Secret Key</label>
+        <input type="password" name="s3_secret_access_key" value="{{ config.s3_secret_access_key or '' }}"
+               placeholder="••••••••••••••••••••••••"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1">Region Name</label>
+        <input type="text" name="s3_region_name" value="{{ config.s3_region_name or 'us-west-004' }}"
+               placeholder="us-west-004"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1">Public CDN / URL Prefix (Optional)</label>
+        <input type="text" name="s3_public_url_prefix" value="{{ config.s3_public_url_prefix or '' }}"
+               placeholder="e.g. https://f004.backblazeb2.com/file/sastrybalm-media-bucket"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+        <p class="mt-1 text-[11px] text-slate-500">Custom CDN domain or Backblaze public URL prefix.</p>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-x-3 pt-4 border-t border-slate-700">
+      <button type="submit"
+              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        Save S3 Configuration
+      </button>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

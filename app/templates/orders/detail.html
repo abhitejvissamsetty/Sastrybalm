@@ -80,7 +80,7 @@
   </div>
 
   <!-- Info Grid -->
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
       <p class="text-xs text-slate-500 uppercase tracking-wider">Field Rep</p>
       <p class="mt-1 text-sm font-medium text-white">{{ item.user.full_name if item.user else '—' }}</p>
@@ -89,6 +89,31 @@
       <p class="text-xs text-slate-500 uppercase tracking-wider">Outlet</p>
       <p class="mt-1 text-sm font-medium text-white">{{ item.outlet.name if item.outlet else '—' }}</p>
       <p class="text-xs text-slate-500">{{ item.outlet.mobile if item.outlet and item.outlet.mobile else '' }}</p>
+    </div>
+    <div class="rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4">
+      <div class="flex items-center justify-between">
+        <p class="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Allocated Channel Partner</p>
+      </div>
+      {% if item.channel_partner %}
+      <p class="mt-1 text-sm font-bold text-white">{{ item.channel_partner.name }}</p>
+      <p class="text-xs text-indigo-300 font-medium">{{ item.channel_partner.partner_type }} · {{ item.channel_partner.contact_person or 'No Contact' }} ({{ item.channel_partner.mobile or 'N/A' }})</p>
+      {% else %}
+      <p class="mt-1 text-sm text-slate-500 italic">Unallocated</p>
+      {% endif %}
+
+      {% if current_user.role.value in ['admin', 'territory_manager'] %}
+      <form method="post" action="/orders/{{ item.id }}/allocate-channel-partner" class="mt-2 flex items-center gap-2">
+        <select name="channel_partner_id" class="w-full text-xs rounded bg-slate-900 border border-slate-700 text-white px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          <option value="">-- Select Channel Partner --</option>
+          {% for cp in available_channel_partners %}
+          <option value="{{ cp.id }}" {% if item.channel_partner_id == cp.id %}selected{% endif %}>
+            {{ cp.name }} ({{ cp.partner_type }})
+          </option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="rounded bg-indigo-600 px-2 py-1 text-xs font-semibold text-white hover:bg-indigo-500 transition-all">Save</button>
+      </form>
+      {% endif %}
     </div>
     <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
       <p class="text-xs text-slate-500 uppercase tracking-wider">Order Total</p>
@@ -311,6 +336,68 @@ function toggleDenominations() {
     {% endif %}
   </div>
   {% endif %}
+
+  <!-- Order Life-Cycle Audit & History Log -->
+  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50 space-y-3 p-5">
+    <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
+      <div>
+        <h2 class="text-base font-bold text-white tracking-tight">Order Life-Cycle Audit Log</h2>
+        <p class="text-xs text-slate-400">Complete historical timeline of order placement, status transitions, and fulfillment allocations.</p>
+      </div>
+      <span class="inline-flex items-center rounded-md bg-indigo-950 px-2.5 py-1 text-xs font-semibold text-indigo-300 border border-indigo-800">
+        {{ item.history_logs|length }} Events
+      </span>
+    </div>
+
+    {% if item.history_logs %}
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-700/50 text-left">
+        <thead>
+          <tr class="bg-slate-900/60">
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Timestamp</th>
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Action Event</th>
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Performed By</th>
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status Shift</th>
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fulfillment Partner</th>
+            <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Details / Notes</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700/30">
+          {% for log in item.history_logs %}
+          <tr class="hover:bg-slate-700/20 transition-colors">
+            <td class="px-4 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">
+              {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '—' }}
+            </td>
+            <td class="px-4 py-3 text-xs font-bold text-white whitespace-nowrap">
+              <span class="inline-flex items-center rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-indigo-300 border border-slate-700">
+                {{ log.action.replace('_',' ').title() }}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-300 whitespace-nowrap">
+              {{ log.performed_by.full_name if log.performed_by else 'System' }}
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-300 whitespace-nowrap">
+              {% if log.old_status or log.new_status %}
+                <span class="text-slate-400">{{ log.old_status.title() if log.old_status else 'None' }}</span> → <span class="font-bold text-indigo-300">{{ log.new_status.title() if log.new_status else 'None' }}</span>
+              {% else %}
+                <span class="text-slate-500">—</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-300 whitespace-nowrap">
+              {{ log.channel_partner.name if log.channel_partner else 'Unassigned' }}
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-400">
+              {{ log.notes or '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-xs text-slate-500 italic py-2 text-center">No history logs recorded for this order.</p>
+    {% endif %}
+  </div>
 
 </div>
 {% endblock %}

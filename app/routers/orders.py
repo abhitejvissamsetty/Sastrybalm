@@ -93,9 +93,18 @@ async def order_new(
 ):
     outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
     products = db.query(Product).filter(Product.is_active == True).order_by(Product.name).all()
+    from app.models.local_distribution import LocalChannelPartner
+    cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
+    if current_user.role == UserRole.territory_manager:
+        from app.routers.channel_partners import _get_tm_allowed_geo_ids
+        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+        cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_ids))
+    channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
+
     return templates.TemplateResponse("orders/form.html", {
         "request": request, "current_user": current_user,
         "item": None, "outlets": outlets, "products": products,
+        "channel_partners": channel_partners,
         "FlowType": FlowType, "error": None,
     })
 
@@ -108,6 +117,7 @@ async def order_create(
 ):
     form = await request.form()
     outlet_id = form.get("outlet_id")
+    channel_partner_id = form.get("channel_partner_id")
     notes = form.get("notes", "")
     flow_type_val = form.get("flow_type", "zap_invoice")
     product_ids = form.getlist("product_id[]")
@@ -116,14 +126,23 @@ async def order_create(
     gst_rates = form.getlist("gst_rate[]")
     discount_pcts = form.getlist("discount_pct[]")
 
-    if not outlet_id or not product_ids:
+    from app.models.local_distribution import LocalChannelPartner
+    cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
+    if current_user.role == UserRole.territory_manager:
+        from app.routers.channel_partners import _get_tm_allowed_geo_ids
+        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+        cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_ids))
+    channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
+
+    if not outlet_id or not channel_partner_id or not product_ids:
         outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
         products = db.query(Product).filter(Product.is_active == True).order_by(Product.name).all()
         return templates.TemplateResponse("orders/form.html", {
             "request": request, "current_user": current_user,
             "item": None, "outlets": outlets, "products": products,
+            "channel_partners": channel_partners,
             "FlowType": FlowType,
-            "error": "Outlet and at least one product are required.",
+            "error": "Outlet, Channel Partner (Fulfillment), and at least one product are required.",
         })
 
     try:
@@ -132,14 +151,16 @@ async def order_create(
         ft = FlowType.zap_invoice
 
     ord_num = order_number(db, Order)
+    cp_id_int = int(channel_partner_id) if channel_partner_id and str(channel_partner_id).isdigit() else None
     o = Order(
         order_number=ord_num,
         outlet_id=int(outlet_id),
         user_id=current_user.id,
+        channel_partner_id=cp_id_int,
         company_profile_id=current_user.company_profile_id,
         flow_type=ft,
         sync_status=SyncStatus.not_applicable,
-        status=OrderStatus.draft,
+        status=OrderStatus.submitted,  # Submitted, pending TM approval or auto-approval cutoff
         notes=notes or None,
     )
     db.add(o)
@@ -161,8 +182,23 @@ async def order_create(
             continue
 
     db.commit()
-    set_flash_success(request, f"Order {ord_num} created.")
-    return RedirectResponse("/orders", status_code=302)
+    db.refresh(o)
+
+    # Auto-allocate channel partner & record creation history log
+    from app.services.channel_partner_notification import auto_allocate_channel_partner_for_order, record_order_history_log
+    auto_allocate_channel_partner_for_order(db, o)
+    record_order_history_log(
+        db=db,
+        order_id=o.id,
+        action="created",
+        performed_by_id=current_user.id,
+        new_status=o.status.value,
+        channel_partner_id=o.channel_partner_id,
+        notes=f"Order {o.order_number} created for outlet {o.outlet.name if o.outlet else 'N/A'}"
+    )
+
+    set_flash_success(request, f"Order {ord_num} created successfully.")
+    return RedirectResponse(f"/orders/{o.id}", status_code=302)
 
 
 @router.get("/{order_id}", response_class=HTMLResponse)
@@ -178,6 +214,20 @@ async def order_detail(
     if not item:
         set_flash_error(request, "Order not found.")
         return RedirectResponse("/orders", status_code=302)
+
+    # Ensure channel partner is auto-allocated if missing
+    if not item.channel_partner_id:
+        from app.services.channel_partner_notification import auto_allocate_channel_partner_for_order
+        auto_allocate_channel_partner_for_order(db, item)
+
+    from app.models.local_distribution import LocalChannelPartner
+    cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
+    if current_user.role == UserRole.territory_manager:
+        from app.routers.channel_partners import _get_tm_allowed_geo_ids
+        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+        cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_ids))
+    available_channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
+
     from app.models.payment import Payment
     payments = db.query(Payment).filter(Payment.order_id == order_id).order_by(Payment.created_at.desc()).all()
     total_paid = sum(p.amount for p in payments) if payments else Decimal("0")
@@ -185,6 +235,7 @@ async def order_detail(
     return templates.TemplateResponse("orders/detail.html", {
         "request": request, "current_user": current_user,
         "item": item, "payments": payments, "total_paid": total_paid,
+        "available_channel_partners": available_channel_partners,
         "OrderStatus": OrderStatus, "FlowType": FlowType, "SyncStatus": SyncStatus,
         **get_flash(request),
     })
@@ -262,7 +313,26 @@ async def order_update_status(
         set_flash_error(request, "Order not found.")
         return RedirectResponse("/orders", status_code=302)
     try:
+        old_status_val = item.status.value if item.status else None
         item.status = OrderStatus(new_status)
+
+        # Trigger instant notification to channel partners upon approval ('confirmed')
+        if new_status == "confirmed":
+            from app.services.channel_partner_notification import trigger_instant_order_notification
+            trigger_instant_order_notification(db, item)
+
+        # Record History Log
+        from app.services.channel_partner_notification import record_order_history_log
+        record_order_history_log(
+            db=db,
+            order_id=item.id,
+            action="status_changed",
+            performed_by_id=current_user.id,
+            old_status=old_status_val,
+            new_status=new_status,
+            channel_partner_id=item.channel_partner_id,
+            notes=f"Order status updated from '{old_status_val}' to '{new_status}' by {current_user.full_name}"
+        )
 
         # Auto-trigger CONNECT sync when confirming a CONNECT order
         if new_status == "confirmed" and item.flow_type == FlowType.connect:
@@ -275,6 +345,49 @@ async def order_update_status(
         set_flash_success(request, f"Order {item.order_number} status → {new_status}.")
     except ValueError:
         set_flash_error(request, f"Invalid status '{new_status}'.")
+    return RedirectResponse(f"/orders/{order_id}", status_code=302)
+
+
+@router.post("/{order_id}/allocate-channel-partner")
+async def order_allocate_channel_partner(
+    order_id: int, request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+    channel_partner_id: Optional[str] = Form(default=None),
+    notes: Optional[str] = Form(default=None),
+):
+    item = db.query(Order).filter(Order.id == order_id).first()
+    if not item:
+        set_flash_error(request, "Order not found.")
+        return RedirectResponse("/orders", status_code=302)
+
+    cp_id_int = int(channel_partner_id) if channel_partner_id and str(channel_partner_id).isdigit() else None
+    from app.models.local_distribution import LocalChannelPartner
+    cp = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id_int).first() if cp_id_int else None
+
+    old_cp_id = item.channel_partner_id
+    item.channel_partner_id = cp.id if cp else None
+    db.commit()
+
+    from app.services.channel_partner_notification import record_order_history_log, trigger_instant_order_notification
+    cp_name = cp.name if cp else "Unassigned"
+    action_type = "channel_partner_reassigned_post_approval" if item.status == OrderStatus.confirmed else "channel_partner_allocated"
+    record_order_history_log(
+        db=db,
+        order_id=item.id,
+        action=action_type,
+        performed_by_id=current_user.id,
+        old_status=item.status.value,
+        new_status=item.status.value,
+        channel_partner_id=item.channel_partner_id,
+        notes=notes or f"Fulfillment allocated/reassigned to Channel Partner: '{cp_name}' by {current_user.full_name}"
+    )
+
+    # If order is already approved ('confirmed'), trigger notification to the newly assigned channel partner
+    if item.status == OrderStatus.confirmed:
+        trigger_instant_order_notification(db, item)
+
+    set_flash_success(request, f"Fulfillment allocated to Channel Partner '{cp_name}'.")
     return RedirectResponse(f"/orders/{order_id}", status_code=302)
 
 

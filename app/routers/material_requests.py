@@ -101,6 +101,16 @@ async def mr_create(
     return RedirectResponse("/material-requests", status_code=302)
 
 
+def _can_manage_vendor_mapping(user: User) -> bool:
+    """Territory Managers whose geography level is >= Region (region or zone) or Admins can map vendors."""
+    if user.role == UserRole.admin:
+        return True
+    if user.role == UserRole.territory_manager:
+        if user.geography and user.geography.level and user.geography.level.value in ["region", "zone"]:
+            return True
+    return False
+
+
 @router.get("/{mr_id}", response_class=HTMLResponse)
 async def mr_detail(
     mr_id: int, request: Request,
@@ -114,13 +124,77 @@ async def mr_detail(
         return RedirectResponse("/material-requests", status_code=302)
 
     quotations = db.query(VendorQuotation).filter(VendorQuotation.material_request_id == mr_id).all()
+    available_vendors = db.query(User).filter(
+        User.role.in_([UserRole.vendor_admin, UserRole.vendor_technician]),
+        User.is_active == True
+    ).order_by(User.full_name).all()
+
+    can_map_vendor = _can_manage_vendor_mapping(current_user)
 
     return templates.TemplateResponse("material_requests/detail.html", {
         "request": request, "current_user": current_user,
-        "item": item, "quotations": quotations,
+        "item": item, "quotations": quotations, "available_vendors": available_vendors,
+        "can_map_vendor": can_map_vendor,
         "MRStatus": MRStatus, "MRSyncStatus": MRSyncStatus,
         **get_flash(request),
     })
+
+
+@router.post("/{mr_id}/assign-vendor")
+async def mr_assign_vendor(
+    mr_id: int, request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+    vendor_id: Optional[str] = Form(default=None),
+    notes: Optional[str] = Form(default=None),
+):
+    mr = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
+    if not mr:
+        set_flash_error(request, "Material request not found.")
+        return RedirectResponse("/material-requests", status_code=302)
+
+    # Authority Check: TM must have Regional or Zonal management scope
+    if not _can_manage_vendor_mapping(current_user):
+        set_flash_error(request, "Vendor mapping requires Regional or Zonal management scope.")
+        return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+
+    # Check if Work Order is already completed / QC approved
+    for wo in mr.work_orders:
+        if wo.qc_status == QCStatus.passed or wo.status == WorkOrderStatus.concluded:
+            set_flash_error(request, "Cannot reassign vendor after QC Manager approval / Work Order completion.")
+            return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+
+    v_id_int = int(vendor_id) if vendor_id and str(vendor_id).isdigit() else None
+    vendor = db.query(User).filter(User.id == v_id_int).first() if v_id_int else None
+
+    old_v_id = mr.vendor_id
+    is_reassignment = old_v_id is not None and old_v_id != v_id_int
+    mr.vendor_id = vendor.id if vendor else None
+    db.commit()
+
+    from app.services.channel_partner_notification import (
+        record_material_request_history_log,
+        trigger_vendor_material_request_notification,
+    )
+    v_name = vendor.full_name if vendor else "Unassigned"
+    action_type = "vendor_reassigned" if is_reassignment else "vendor_assigned"
+    record_material_request_history_log(
+        db=db,
+        material_request_id=mr.id,
+        action=action_type,
+        performed_by_id=current_user.id,
+        old_status=mr.status.value if mr.status else None,
+        new_status=mr.status.value if mr.status else None,
+        vendor_id=mr.vendor_id,
+        notes=notes or f"Material Request assigned to Vendor: '{v_name}' by {current_user.full_name}"
+    )
+
+    # Trigger notification to assigned vendor if MR is in an active/approved state
+    if mr.vendor_id:
+        trigger_vendor_material_request_notification(db, mr, is_reassignment=is_reassignment)
+
+    set_flash_success(request, f"Vendor '{v_name}' assigned to Material Request {mr.mr_number}.")
+    return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
 
 
 @router.post("/{mr_id}/status")
@@ -135,10 +209,31 @@ async def mr_update_status(
         set_flash_error(request, "Material request not found.")
         return RedirectResponse("/material-requests", status_code=302)
 
+    old_st = item.status.value if item.status else None
     if new_status in ["Approved", "Rejected", "Held", "approved", "rejected", "held"]:
-        st_map = {"approved": MRStatus.approved, "rejected": MRStatus.rejected, "held": MRStatus.submitted}
-        item.status = st_map.get(new_status.lower(), MRStatus.approved)
+        st_map = {"approved": MRStatus.acknowledged, "rejected": MRStatus.cancelled, "held": MRStatus.submitted}
+        item.status = st_map.get(new_status.lower(), MRStatus.acknowledged)
         db.commit()
+
+        from app.services.channel_partner_notification import (
+            record_material_request_history_log,
+            trigger_vendor_material_request_notification,
+        )
+        record_material_request_history_log(
+            db=db,
+            material_request_id=item.id,
+            action="status_changed",
+            performed_by_id=current_user.id,
+            old_status=old_st,
+            new_status=item.status.value,
+            vendor_id=item.vendor_id,
+            notes=f"Status updated from '{old_st}' to '{item.status.value}' by {current_user.full_name}"
+        )
+
+        # Notify vendor if approved
+        if item.status == MRStatus.acknowledged and item.vendor_id:
+            trigger_vendor_material_request_notification(db, item)
+
         set_flash_success(request, f"Material Request status updated to '{new_status.title()}'.")
     else:
         set_flash_error(request, f"Invalid status '{new_status}'.")
@@ -149,7 +244,7 @@ async def mr_update_status(
 @router.post("/{mr_id}/quote")
 async def mr_submit_quote(
     mr_id: int, request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.vendor_admin, UserRole.vendor_technician)),
     db: Session = Depends(get_db),
     quote_amount: str = Form(...),
     lead_time_days: int = Form(7),
@@ -171,6 +266,19 @@ async def mr_submit_quote(
     )
     db.add(quote)
     db.commit()
+
+    from app.services.channel_partner_notification import record_material_request_history_log
+    record_material_request_history_log(
+        db=db,
+        material_request_id=mr.id,
+        action="quotation_submitted",
+        performed_by_id=current_user.id,
+        old_status=mr.status.value,
+        new_status=mr.status.value,
+        vendor_id=current_user.id,
+        notes=f"Quotation of ₹{Decimal(quote_amount):.2f} submitted by Vendor {current_user.full_name}"
+    )
+
     set_flash_success(request, "Quotation submitted successfully.")
     return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
 
@@ -188,21 +296,46 @@ async def quote_review(
         set_flash_error(request, "Quotation not found.")
         return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
 
+    mr = quote.material_request
+    from app.services.channel_partner_notification import record_material_request_history_log
+
     if decision.lower() == "approved":
         quote.status = QuotationStatus.approved
         import uuid
         wo = WorkOrder(
             quotation_id=quote.id,
+            material_request_id=mr_id,
+            vendor_id=quote.vendor_id,
             wo_number=f"WO-{uuid.uuid4().hex[:6].upper()}",
             status=WorkOrderStatus.issued,
             qc_status=QCStatus.pending,
         )
         db.add(wo)
+        if mr:
+            mr.status = MRStatus.in_progress
         db.commit()
+
+        record_material_request_history_log(
+            db=db,
+            material_request_id=mr_id,
+            action="work_order_created",
+            performed_by_id=current_user.id,
+            old_status=mr.status.value if mr else None,
+            new_status=MRStatus.in_progress.value,
+            vendor_id=quote.vendor_id,
+            notes=f"Quotation of ₹{quote.quote_amount:.2f} approved and Work Order {wo.wo_number} issued to Vendor."
+        )
         set_flash_success(request, f"Quotation approved! Work Order {wo.wo_number} issued.")
     elif decision.lower() == "rejected":
         quote.status = QuotationStatus.rejected
         db.commit()
+        record_material_request_history_log(
+            db=db,
+            material_request_id=mr_id,
+            action="quotation_rejected",
+            performed_by_id=current_user.id,
+            notes=f"Quotation from Vendor rejected by {current_user.full_name}."
+        )
         set_flash_success(request, "Quotation rejected.")
     else:
         quote.status = QuotationStatus.held
@@ -212,69 +345,124 @@ async def quote_review(
     return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
 
 
+from fastapi import File, UploadFile
+import os
+import shutil
+
+
 @router.post("/work-orders/{wo_id}/qc")
 async def work_order_qc(
     wo_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager, UserRole.qc_manager)),
     db: Session = Depends(get_db),
-    qc_result: str = Form(...), # passed, failed
+    qc_result: str = Form("passed"), # passed, failed
+    qc_notes: Optional[str] = Form(default=None),
+    qc_photo: Optional[UploadFile] = File(default=None),
 ):
-    """Conclude Work Order, perform QC, Itemize Stock Inward, and Convert to Marketing Asset."""
+    """Conclude Work Order, perform QC with Photo Inspection, Itemize Stock Inward, and Convert to Marketing Asset."""
     wo = db.query(WorkOrder).filter(WorkOrder.id == wo_id).first()
     if not wo:
         set_flash_error(request, "Work order not found.")
         return RedirectResponse("/material-requests", status_code=302)
 
+    photo_path = None
+    if qc_photo and qc_photo.filename:
+        file_bytes = await qc_photo.read()
+        if file_bytes:
+            from app.utils.s3_service import upload_image_file
+            photo_path = upload_image_file(
+                db=db,
+                file_bytes=file_bytes,
+                original_filename=qc_photo.filename,
+                folder_prefix="qc_photos",
+                content_type=qc_photo.content_type or "image/jpeg"
+            )
+
+    if photo_path:
+        wo.qc_photo_url = photo_path
+
+    wo.qc_notes = qc_notes or None
+    wo.qc_verified_at = datetime.utcnow()
+    wo.qc_verified_by_id = current_user.id
+
+    from app.services.channel_partner_notification import record_material_request_history_log
+    mr = wo.material_request or (wo.quotation.material_request if wo.quotation else None)
+
     if qc_result.lower() == "passed":
         wo.qc_status = QCStatus.passed
         wo.status = WorkOrderStatus.concluded
 
-        # Parse Material Request item details
-        mr = wo.quotation.material_request
-        details = {}
-        try:
-            details = json.loads(mr.item_details or "{}")
-        except Exception:
-            pass
+        if mr:
+            old_st = mr.status.value
+            mr.status = MRStatus.completed
+            record_material_request_history_log(
+                db=db,
+                material_request_id=mr.id,
+                action="qc_approved",
+                performed_by_id=current_user.id,
+                old_status=old_st,
+                new_status=MRStatus.completed.value,
+                vendor_id=mr.vendor_id,
+                notes=f"QC Verification Passed by {current_user.full_name} with photo inspection."
+            )
 
-        prod_id = details.get("product_id")
-        qty = details.get("qty", 1)
+            # Parse Material Request item details
+            details = {}
+            try:
+                details = json.loads(mr.item_details or "{}")
+            except Exception:
+                pass
 
-        if prod_id:
-            prod = db.query(Product).filter(Product.id == prod_id).first()
-            if prod:
-                # 1. Itemised Stock Inward (adds to Marketing - Stock)
-                prod.stock_qty += qty
-                prod.category_type = ProductCategory.marketing_stock
-                movement = StockMovement(
-                    product_id=prod.id,
-                    movement_type="INWARD",
-                    quantity=qty,
-                    reference_no=wo.wo_number,
-                    notes="Work Order QC Verification Inward",
-                    created_by_id=current_user.id,
-                )
-                db.add(movement)
+            prod_id = details.get("product_id")
+            qty = details.get("qty", 1)
 
-                # 2. Automatically Convert to Marketing Asset
-                import uuid
-                asset = AssetCapitalization(
-                    ac_number=f"AC-{uuid.uuid4().hex[:6].upper()}",
-                    user_id=mr.user_id,
-                    outlet_id=mr.outlet_id if mr.outlet_id else 1,
-                    item_name=prod.name,
-                    item_code=prod.sku or f"SKU-{prod.id}",
-                    quantity=qty,
-                    status=ACStatus.deployed,
-                    notes=f"Converted from Work Order {wo.wo_number}",
-                )
-                db.add(asset)
+            if prod_id:
+                prod = db.query(Product).filter(Product.id == prod_id).first()
+                if prod:
+                    # Itemised Stock Inward
+                    prod.stock_qty += qty
+                    prod.category_type = ProductCategory.marketing_stock
+                    movement = StockMovement(
+                        product_id=prod.id,
+                        movement_type="INWARD",
+                        quantity=qty,
+                        reference_no=wo.wo_number,
+                        notes="Work Order QC Verification Inward",
+                        created_by_id=current_user.id,
+                    )
+                    db.add(movement)
+
+                    # Convert to Marketing Asset
+                    import uuid
+                    asset = AssetCapitalization(
+                        ac_number=f"AC-{uuid.uuid4().hex[:6].upper()}",
+                        user_id=mr.user_id,
+                        outlet_id=mr.outlet_id if mr.outlet_id else 1,
+                        item_name=prod.name,
+                        item_code=prod.sku or f"SKU-{prod.id}",
+                        quantity=qty,
+                        status=ACStatus.deployed,
+                        notes=f"Converted from Work Order {wo.wo_number}",
+                    )
+                    db.add(asset)
 
         db.commit()
         set_flash_success(request, f"Work Order {wo.wo_number} QC Passed! Stock itemized and converted to Marketing Asset.")
     else:
         wo.qc_status = QCStatus.failed
+        if mr:
+            record_material_request_history_log(
+                db=db,
+                material_request_id=mr.id,
+                action="qc_failed",
+                performed_by_id=current_user.id,
+                old_status=mr.status.value,
+                new_status=mr.status.value,
+                vendor_id=mr.vendor_id,
+                notes=f"QC Verification marked Failed by {current_user.full_name}."
+            )
         db.commit()
-        set_flash_error(request, f"Work Order {wo.wo_number} QC Failed.")
+        set_flash_error(request, f"Work Order {wo.wo_number} QC Marked as Failed.")
 
-    return RedirectResponse(f"/material-requests/{wo.quotation.material_request_id}", status_code=302)
+    mr_id = mr.id if mr else 1
+    return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)

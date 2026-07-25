@@ -113,5 +113,23 @@ class SystemConfiguration(Base):
     # Global payment settings
     payment_mode = Column(SAEnum(PaymentMode), nullable=True, default=PaymentMode.cash_only)
     denomination_mandatory = Column(Boolean, default=False, nullable=False)
-    
+
+    # Order Auto-Approval Cutoff Setting
+    auto_approval_cutoff_hours = Column(Integer, default=24, nullable=False)
+
+    # Backblaze B2 S3 Object Storage Configuration
+    s3_endpoint_url = Column(String(255), nullable=True)
+    s3_bucket_name = Column(String(255), nullable=True)
+    s3_access_key_id = Column(String(255), nullable=True)
+    s3_secret_access_key = Column(Text, nullable=True)
+    s3_region_name = Column(String(100), default="us-west-004", nullable=True)
+    s3_is_enabled = Column(Boolean, default=False, nullable=False)
+    s3_public_url_prefix = Column(String(255), nullable=True)
+
+    # WhatsApp Business API Configuration
+    whatsapp_api_key = Column(Text, nullable=True)
+    whatsapp_phone_number_id = Column(String(255), nullable=True)
+    whatsapp_business_account_id = Column(String(255), nullable=True)
+    whatsapp_is_enabled = Column(Boolean, default=False, nullable=False)
+
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -9,7 +9,14 @@
     <p class="mt-1 text-sm text-slate-400">Configure automated customer receipt and order confirmation WhatsApp notifications.</p>
   </div>
 
-  <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-4">
+  {% if success %}
+  <div class="rounded-lg bg-emerald-900/40 border border-emerald-700 px-4 py-3 text-sm text-emerald-300">{{ success }}</div>
+  {% endif %}
+  {% if error %}
+  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="/settings/whatsapp" class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
     <div class="flex items-center justify-between border-b border-slate-700 pb-4">
       <div>
         <h3 class="text-base font-semibold text-white">WhatsApp Business Account (WABA)</h3>
@@ -18,39 +25,41 @@
       <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800">Meta Cloud API</span>
     </div>
 
+    <div class="flex items-center justify-between p-4 rounded-xl bg-slate-900/80 border border-slate-700/60">
+      <div>
+        <p class="text-sm font-bold text-white">Enable WhatsApp Business API Notifications</p>
+        <p class="text-xs text-slate-400">Automatically dispatch WhatsApp notifications for approved orders &amp; material requests.</p>
+      </div>
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" name="whatsapp_is_enabled" value="true" class="sr-only peer" {% if config.whatsapp_is_enabled %}checked{% endif %}>
+        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+      </label>
+    </div>
+
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label class="block text-sm font-medium text-slate-300 mb-1.5">Phone Number ID</label>
-        <input type="text" placeholder="1092837465019"
-               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <input type="text" name="whatsapp_phone_number_id" value="{{ config.whatsapp_phone_number_id or '' }}" placeholder="1092837465019"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
       </div>
       <div>
         <label class="block text-sm font-medium text-slate-300 mb-1.5">WhatsApp Business Account ID</label>
-        <input type="text" placeholder="waba_883019283"
-               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <input type="text" name="whatsapp_business_account_id" value="{{ config.whatsapp_business_account_id or '' }}" placeholder="waba_883019283"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
       </div>
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-slate-300 mb-1.5">Permanent Access Token</label>
-      <input type="password" placeholder="EAAG..."
-             class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <label class="block text-sm font-medium text-slate-300 mb-1.5">Permanent API Access Token</label>
+      <input type="password" name="whatsapp_api_key" value="{{ config.whatsapp_api_key or '' }}" placeholder="EAAG..."
+             class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
     </div>
 
-    <div class="space-y-2 pt-2">
-      <label class="flex items-center space-x-2 text-sm text-slate-300">
-        <input type="checkbox" checked class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
-        <span>Send order confirmation receipts automatically to retailer WhatsApp</span>
-      </label>
-      <label class="flex items-center space-x-2 text-sm text-slate-300">
-        <input type="checkbox" checked class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
-        <span>Send payment collection receipts to retailer WhatsApp</span>
-      </label>
+    <div class="flex justify-end pt-2 border-t border-slate-700">
+      <button type="submit" class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+        Save Configuration to Database
+      </button>
     </div>
-
-    <div class="flex justify-end pt-2">
-      <button type="button" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Save Configuration</button>
-    </div>
-  </div>
+  </form>
 </div>
 {% endblock %}

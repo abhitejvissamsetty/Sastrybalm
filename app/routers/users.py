@@ -155,7 +155,7 @@ async def user_list(
 async def user_new(
     request: Request,
     role: Optional[str] = Query(default=None),
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse("users/form.html", {
@@ -167,7 +167,7 @@ async def user_new(
 @router.post("/new")
 async def user_create(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     full_name: str = Form(...),
     email: str = Form(...),
@@ -186,8 +186,6 @@ async def user_create(
 ):
     import re
     err = None
-    if current_user.role == UserRole.territory_manager and role != UserRole.field_rep.value:
-        err = "Territory Managers can only create Field Representative users."
 
     phone_clean = phone.strip() if phone else ""
     if not err and not phone_clean:
@@ -197,7 +195,7 @@ async def user_create(
     elif not err and db.query(User).filter(User.phone == phone_clean).first():
         err = f"Phone number '{phone_clean}' already registered."
     elif not err and role == UserRole.admin.value and db.query(User).filter(User.role == UserRole.admin).first():
-        err = "Only one System Administrator is permitted for this software setup. Admin credentials are configured in .env."
+        err = "Only one System Administrator is permitted for this software setup."
     elif not err and db.query(User).filter(User.email == email).first():
         err = f"Email '{email}' already registered."
     elif not err and db.query(User).filter(User.username == username).first():
@@ -257,7 +255,7 @@ async def user_create(
 @router.get("/{user_id}/edit", response_class=HTMLResponse)
 async def user_edit(
     user_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     item = db.query(User).filter(User.id == user_id).first()
@@ -273,7 +271,7 @@ async def user_edit(
 @router.post("/{user_id}/edit")
 async def user_update(
     user_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     full_name: str = Form(...),
     email: str = Form(...),
@@ -328,7 +326,8 @@ async def user_update(
     item.company_profile_id = int(company_profile_id) if company_profile_id else None
     item.geography_id = int(geography_id) if geography_id and role == UserRole.territory_manager.value else None
     item.vendor_id = int(vendor_id) if vendor_id and role in [UserRole.vendor_technician.value, UserRole.vendor_admin.value] else None
-    item.is_active = is_active == "on"
+    if is_active is not None:
+        item.is_active = is_active == "on"
     if new_password:
         item.hashed_password = hash_password(new_password)
 

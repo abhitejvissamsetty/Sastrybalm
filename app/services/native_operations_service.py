@@ -22,6 +22,11 @@ def confirm_order_natively(order: Order, db: Session) -> Order:
     db.commit()
     db.refresh(order)
     logger.info("Order %s natively confirmed locally", order.order_number)
+
+    # Trigger instant notification upon approval
+    from app.services.channel_partner_notification import trigger_instant_order_notification
+    trigger_instant_order_notification(db, order)
+
     return order
 
 

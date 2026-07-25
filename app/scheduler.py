@@ -143,8 +143,64 @@ def job_daily_backup() -> None:
         logger.error("Automated daily backup failed: %s", e)
 
 
+def job_auto_approve_orders() -> None:
+    """
+    Auto-approves submitted orders that have exceeded the auto-approval cutoff time window
+    (configured via SystemConfiguration.auto_approval_cutoff_hours).
+    Post-approval, triggers instant notification to the allocated Channel Partner.
+    """
+    db = SessionLocal()
+    try:
+        from app.models.company import SystemConfiguration
+        sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
+        cutoff_hours = sys_config.auto_approval_cutoff_hours if sys_config else 24
+
+        cutoff_time = datetime.utcnow() - timedelta(hours=cutoff_hours)
+        pending_orders = (
+            db.query(Order)
+            .filter(
+                Order.status == OrderStatus.submitted,
+                Order.created_at <= cutoff_time,
+            )
+            .all()
+        )
+
+        from app.services.channel_partner_notification import (
+            record_order_history_log,
+            trigger_instant_order_notification,
+        )
+
+        for o in pending_orders:
+            old_st = o.status.value
+            o.status = OrderStatus.confirmed
+            db.commit()
+            logger.info(
+                f"[Auto-Approval Scheduler] Order {o.order_number} auto-approved after cutoff window ({cutoff_hours}h)."
+            )
+
+            # Audit log entry
+            record_order_history_log(
+                db=db,
+                order_id=o.id,
+                action="auto_approved_cutoff",
+                performed_by_id=None,
+                old_status=old_st,
+                new_status=OrderStatus.confirmed.value,
+                channel_partner_id=o.channel_partner_id,
+                notes=f"Auto-approved by System Scheduler post {cutoff_hours}-hour cutoff window."
+            )
+
+            # Trigger notification to allocated Channel Partner
+            trigger_instant_order_notification(db, o)
+
+    except Exception as exc:
+        logger.error(f"Error in job_auto_approve_orders: {exc}")
+    finally:
+        db.close()
+
+
 def start_scheduler() -> None:
-    """Start background scheduler for missing check-in, SLA alerts, and daily backups."""
+    """Start background scheduler for missing check-in, SLA alerts, auto-approvals, and daily backups."""
     # Missing check-in alert at 10:30 AM IST on working days
     scheduler.add_job(
         job_missing_checkins,
@@ -168,6 +224,14 @@ def start_scheduler() -> None:
         id="stale_orders",
         replace_existing=True,
         misfire_grace_time=3600,
+    )
+    # Auto-approve orders post cutoff time (runs every 15 minutes)
+    scheduler.add_job(
+        job_auto_approve_orders,
+        CronTrigger(minute="*/15"),
+        id="auto_approve_orders",
+        replace_existing=True,
+        misfire_grace_time=600,
     )
     # Automated daily system backup at midnight (00:00 IST)
     scheduler.add_job(

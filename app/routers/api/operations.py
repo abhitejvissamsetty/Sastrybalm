@@ -6,7 +6,7 @@ All endpoints require Bearer JWT auth.
 from datetime import date, datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -621,6 +621,88 @@ async def api_sync_mr_cmms(
 
     approve_material_request_natively(mr, db)
     return {"status": "synced", "cmms_ref": mr.cmms_ref}
+
+
+from fastapi import File, UploadFile
+import os
+import shutil
+from app.models.procurement import WorkOrder, WorkOrderStatus, QCStatus
+
+
+@router.post("/work-orders/{wo_id}/qc-approve")
+async def api_work_order_qc_approve(
+    wo_id: int,
+    qc_result: str = Form("passed"),
+    qc_notes: Optional[str] = Form(default=None),
+    qc_photo: Optional[UploadFile] = File(default=None),
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    if current_user.role not in [UserRole.admin, UserRole.territory_manager, UserRole.qc_manager]:
+        raise HTTPException(status_code=403, detail="QC approval permission required.")
+
+    wo = db.query(WorkOrder).filter(WorkOrder.id == wo_id).first()
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found.")
+
+    photo_path = None
+    if qc_photo and qc_photo.filename:
+        file_bytes = await qc_photo.read()
+        if file_bytes:
+            from app.utils.s3_service import upload_image_file
+            photo_path = upload_image_file(
+                db=db,
+                file_bytes=file_bytes,
+                original_filename=qc_photo.filename,
+                folder_prefix="qc_photos",
+                content_type=qc_photo.content_type or "image/jpeg"
+            )
+
+    if photo_path:
+        wo.qc_photo_url = photo_path
+
+    wo.qc_notes = qc_notes
+    wo.qc_verified_at = datetime.utcnow()
+    wo.qc_verified_by_id = current_user.id
+
+    from app.services.channel_partner_notification import record_material_request_history_log
+
+    mr = wo.material_request or (wo.quotation.material_request if wo.quotation else None)
+
+    if qc_result.lower() == "passed":
+        wo.qc_status = QCStatus.passed
+        wo.status = WorkOrderStatus.concluded
+        if mr:
+            old_st = mr.status.value
+            mr.status = MRStatus.completed
+            record_material_request_history_log(
+                db=db,
+                material_request_id=mr.id,
+                action="qc_approved",
+                performed_by_id=current_user.id,
+                old_status=old_st,
+                new_status=MRStatus.completed.value,
+                vendor_id=mr.vendor_id,
+                notes=f"QC Approval passed by {current_user.full_name} via Mobile App."
+            )
+        db.commit()
+        return {"status": "success", "message": f"Work Order {wo.wo_number} QC Approved.", "qc_photo_url": photo_path}
+    else:
+        wo.qc_status = QCStatus.failed
+        if mr:
+            old_st = mr.status.value
+            record_material_request_history_log(
+                db=db,
+                material_request_id=mr.id,
+                action="qc_failed",
+                performed_by_id=current_user.id,
+                old_status=old_st,
+                new_status=mr.status.value,
+                vendor_id=mr.vendor_id,
+                notes=f"QC Inspection marked Failed by {current_user.full_name} via Mobile App."
+            )
+        db.commit()
+        return {"status": "failed", "message": f"Work Order {wo.wo_number} QC Failed."}
 
 
 @router.post("/orders/{order_id}/sync-connect")

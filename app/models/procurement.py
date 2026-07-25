@@ -44,11 +44,20 @@ class WorkOrder(Base):
     __tablename__ = "work_orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    quotation_id = Column(Integer, ForeignKey("vendor_quotations.id", ondelete="CASCADE"), nullable=False)
+    quotation_id = Column(Integer, ForeignKey("vendor_quotations.id", ondelete="CASCADE"), nullable=True)
+    material_request_id = Column(Integer, ForeignKey("material_requests.id", ondelete="CASCADE"), nullable=True)
+    vendor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     wo_number = Column(String(100), unique=True, nullable=False, index=True)
     status = Column(SAEnum(WorkOrderStatus), default=WorkOrderStatus.issued, nullable=False)
     qc_status = Column(SAEnum(QCStatus), default=QCStatus.pending, nullable=False)
+    qc_photo_url = Column(Text, nullable=True)
+    qc_notes = Column(Text, nullable=True)
+    qc_verified_at = Column(DateTime, nullable=True)
+    qc_verified_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     quotation = relationship("VendorQuotation", backref="work_order")
+    material_request = relationship("MaterialRequest", backref="work_orders")
+    vendor = relationship("User", foreign_keys=[vendor_id])
+    qc_verified_by = relationship("User", foreign_keys=[qc_verified_by_id])

@@ -133,6 +133,8 @@ async def channel_partner_create(
     pincodes: Optional[str] = Form(default=None),
     address: Optional[str] = Form(default=None),
     erp_id: Optional[str] = Form(default=None),
+    notification_preference: str = Form("none"),
+    notification_channel: str = Form("email"),
 ):
     form_data = await request.form()
     raw_channels = form_data.getlist("sales_channels") or sales_channels
@@ -180,6 +182,8 @@ async def channel_partner_create(
         email=email or None,
         address=address or None,
         erp_id=erp_id or None,
+        notification_preference=notification_preference,
+        notification_channel=notification_channel,
     )
     db.add(partner)
     db.commit()
@@ -229,6 +233,8 @@ async def channel_partner_update(
     email: Optional[str] = Form(default=None),
     address: Optional[str] = Form(default=None),
     erp_id: Optional[str] = Form(default=None),
+    notification_preference: str = Form("none"),
+    notification_channel: str = Form("email"),
     is_active: Optional[str] = Form(default=None),
 ):
     item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
@@ -284,8 +290,90 @@ async def channel_partner_update(
     item.email = email or None
     item.address = address or None
     item.erp_id = erp_id or None
-    item.is_active = is_active == "on"
+    item.notification_preference = notification_preference
+    item.notification_channel = notification_channel
+    if is_active is not None:
+        item.is_active = is_active == "on"
 
     db.commit()
     set_flash_success(request, f"Channel Partner '{name}' updated.")
     return RedirectResponse("/channel-partners", status_code=302)
+
+
+@router.post("/{cp_id}/deactivate")
+async def channel_partner_deactivate(
+    cp_id: int,
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+):
+    item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
+    if not item:
+        set_flash_error(request, "Channel Partner not found.")
+        return RedirectResponse("/channel-partners", status_code=302)
+
+    if current_user.role == UserRole.territory_manager:
+        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+        if item.geography_id not in allowed_ids:
+            set_flash_error(request, "You are not authorized to deactivate Channel Partners outside your region.")
+            return RedirectResponse("/channel-partners", status_code=302)
+
+    item.is_active = False
+    db.commit()
+    set_flash_success(request, f"Channel Partner '{item.name}' deactivated.")
+    return RedirectResponse("/channel-partners", status_code=302)
+
+
+@router.post("/{cp_id}/activate")
+async def channel_partner_activate(
+    cp_id: int,
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+):
+    item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
+    if not item:
+        set_flash_error(request, "Channel Partner not found.")
+        return RedirectResponse("/channel-partners", status_code=302)
+
+    if current_user.role == UserRole.territory_manager:
+        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+        if item.geography_id not in allowed_ids:
+            set_flash_error(request, "You are not authorized to activate Channel Partners outside your region.")
+            return RedirectResponse("/channel-partners", status_code=302)
+
+    item.is_active = True
+    db.commit()
+    set_flash_success(request, f"Channel Partner '{item.name}' activated.")
+    return RedirectResponse("/channel-partners", status_code=302)
+
+
+from fastapi.responses import Response
+from app.services.channel_partner_notification import generate_channel_partner_daily_orders_csv
+
+
+@router.get("/{cp_id}/export-daily-orders-csv")
+async def export_channel_partner_daily_orders_csv(
+    cp_id: int,
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+):
+    item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
+    if not item:
+        set_flash_error(request, "Channel Partner not found.")
+        return RedirectResponse("/channel-partners", status_code=302)
+
+    if current_user.role == UserRole.territory_manager:
+        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+        if item.geography_id not in allowed_ids:
+            set_flash_error(request, "You are not authorized to export data for Channel Partners outside your region.")
+            return RedirectResponse("/channel-partners", status_code=302)
+
+    csv_data = generate_channel_partner_daily_orders_csv(db, item)
+    filename = f"channel_partner_{item.code or item.id}_daily_orders.csv"
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

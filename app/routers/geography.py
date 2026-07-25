@@ -15,6 +15,31 @@ router = APIRouter(prefix="/geography", tags=["geography"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+def _get_tm_allowed_geo_ids(user: User, db: Session) -> list[int]:
+    """Retrieve allowed geography IDs for Territory Manager (their assigned Region + child Territories)."""
+    if not user or user.role != UserRole.territory_manager:
+        return []
+    
+    region_id = user.geography_id
+    if not region_id:
+        from app.models.user_position import UserPosition
+        from app.models.position import Position
+        up = db.query(UserPosition).filter(UserPosition.user_id == user.id, UserPosition.is_active == True).first()
+        if up and up.position and up.position.geography_id:
+            pos_geo = db.query(Geography).filter(Geography.id == up.position.geography_id).first()
+            if pos_geo:
+                if pos_geo.level == GeoLevel.region:
+                    region_id = pos_geo.id
+                elif pos_geo.level == GeoLevel.territory and pos_geo.parent_id:
+                    region_id = pos_geo.parent_id
+
+    if not region_id:
+        return []
+
+    child_ids = [g.id for g in db.query(Geography).filter(Geography.parent_id == region_id, Geography.is_active == True).all()]
+    return [region_id] + child_ids
+
+
 @router.get("", response_class=HTMLResponse)
 async def geo_list(
     request: Request,
@@ -25,6 +50,10 @@ async def geo_list(
     page: int = Query(default=1, ge=1),
 ):
     query = db.query(Geography)
+    if current_user.role == UserRole.territory_manager:
+        allowed_geo_ids = _get_tm_allowed_geo_ids(current_user, db)
+        query = query.filter(Geography.id.in_(allowed_geo_ids))
+
     if q:
         query = query.filter(
             Geography.name.ilike(f"%{q}%") | Geography.code.ilike(f"%{q}%")

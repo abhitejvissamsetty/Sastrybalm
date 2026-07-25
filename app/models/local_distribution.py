@@ -23,11 +23,33 @@ class LocalChannelPartner(Base):
     email = Column(String(255), nullable=True)
     address = Column(Text, nullable=True)
     erp_id = Column(String(100), nullable=True)
+    notification_preference = Column(String(50), default="none", nullable=False)  # 'none', 'instant', 'daily_summary', 'both'
+    notification_channel = Column(String(50), default="email", nullable=False)  # 'email', 'whatsapp', 'both', 'webhook'
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     geography = relationship("Geography", foreign_keys=[geography_id])
+
+    @property
+    def notification_preference_label(self) -> str:
+        labels = {
+            "none": "None (Disabled)",
+            "instant": "Instant Order Notification",
+            "daily_summary": "Consolidated Daily CSV",
+            "both": "Instant + Consolidated Daily CSV",
+        }
+        return labels.get(self.notification_preference, "None (Disabled)")
+
+    @property
+    def notification_channel_label(self) -> str:
+        labels = {
+            "email": "Email (SMTP)",
+            "whatsapp": "WhatsApp API",
+            "both": "Email & WhatsApp",
+            "webhook": "Webhook API",
+        }
+        return labels.get(self.notification_channel, "Email (SMTP)")
 
     @property
     def sales_channels_list(self) -> list:

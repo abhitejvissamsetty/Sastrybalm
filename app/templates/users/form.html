@@ -81,33 +81,18 @@
     <div class="glass rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-5">
       <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">System Role &amp; Role-Specific Scopes</h2>
 
-      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div>
-          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">System Role <span class="text-red-400">*</span></label>
-          <select name="role" id="roleSelect" onchange="updateRoleScopedFields()" required
-                  class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            {% for r in UserRole %}
-            {% if r.value != 'admin' or (item and item.role == r) %}
-            <option value="{{ r.value }}" {% if item and item.role == r %}selected{% elif not item and preselected_role and r.value == preselected_role %}selected{% elif not item and not preselected_role and r.value == 'field_rep' %}selected{% endif %}>
-              {{ r.value.replace('_', ' ').title() }}
-            </option>
-            {% endif %}
-            {% endfor %}
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">Company Profile</label>
-          <select name="company_profile_id"
-                  class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="">None / Unassigned</option>
-            {% for cp in company_profiles %}
-            <option value="{{ cp.id }}" {% if item and item.company_profile_id == cp.id %}selected{% endif %}>
-              {{ cp.name }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-300 mb-1.5 uppercase">System Role <span class="text-red-400">*</span></label>
+        <select name="role" id="roleSelect" onchange="updateRoleScopedFields()" required
+                class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          {% for r in UserRole %}
+          {% if r.value != 'admin' or (item and item.role == r) %}
+          <option value="{{ r.value }}" {% if item and item.role == r %}selected{% elif not item and preselected_role and r.value == preselected_role %}selected{% elif not item and not preselected_role and r.value == 'field_rep' %}selected{% endif %}>
+            {{ r.value.replace('_', ' ').title() }}
+          </option>
+          {% endif %}
+          {% endfor %}
+        </select>
       </div>
 
       <!-- Scoped Field: Territory Manager (Geography Scope) -->
@@ -137,24 +122,22 @@
           </option>
           {% endfor %}
         </select>
-        <p class="text-xs text-slate-400">Vendor Technicians and Vendor Admins are scoped exclusively to their single assigned Vendor.</p>
       </div>
-
-      {% if item %}
-      <div class="flex items-center gap-x-3 pt-2">
-        <input type="checkbox" name="is_active" id="is_active" value="on" {% if item.is_active %}checked{% endif %}
-               class="h-4 w-4 rounded border-slate-600 bg-slate-950 text-indigo-600 focus:ring-indigo-500">
-        <label for="is_active" class="text-sm font-medium text-slate-300">Active User Account</label>
-      </div>
-      {% endif %}
     </div>
 
     <!-- Position Hierarchy Assignment -->
     <div id="position-hierarchy-container" class="glass rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-4">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Assigned Positions (Hierarchy)</h2>
           <p class="text-xs text-slate-400 mt-1">L1 positions are assignable to Field Reps &amp; Territory Managers. L2/L3/L4 positions are restricted to Territory Managers.</p>
+        </div>
+        <div class="relative w-full sm:w-64">
+          <input type="text" id="position-search-input" onkeyup="filterPositions()" placeholder="Search positions (e.g. Sales, L1)..."
+                 class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <svg class="h-4 w-4 absolute left-3 top-2 text-slate-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
         </div>
       </div>
 
@@ -317,10 +300,30 @@
       if (posContainer) posContainer.classList.remove('hidden');
     }
 
-    // Filter position levels for non-Territory Managers
+    // Run position filter (level restriction + search query)
+    filterPositions();
+  }
+
+  function filterPositions() {
+    const searchInput = document.getElementById('position-search-input');
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const roleSelect = document.getElementById('roleSelect');
+    const role = roleSelect ? roleSelect.value : '';
+
     const posItems = document.querySelectorAll('.position-item');
     posItems.forEach(item => {
       const level = item.getAttribute('data-level');
+      const text = item.textContent.toLowerCase();
+      const matchesSearch = !query || text.includes(query);
+
+      // Visibility based on search query
+      if (!matchesSearch) {
+        item.classList.add('hidden');
+      } else {
+        item.classList.remove('hidden');
+      }
+
+      // Interactivity based on role level restriction
       const cb = item.querySelector('.position-checkbox');
       if (role === 'field_rep' && (level === 'L2' || level === 'L3' || level === 'L4')) {
         item.classList.add('opacity-40', 'pointer-events-none');
