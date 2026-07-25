@@ -92,7 +92,7 @@ async def product_create(
     except Exception:
         return templates.TemplateResponse("products/form.html", {
             "request": request, "current_user": current_user, "item": None, "warehouses": warehouses, "ProductCategory": ProductCategory,
-            "error": "MRP, Unit cost, and GST rate must be valid numbers.",
+            "error": "MRP, Price to Retailer (PTR), and GST rate must be valid numbers.",
         })
 
     product = Product(
@@ -167,7 +167,7 @@ async def product_update(
     except Exception:
         return templates.TemplateResponse("products/form.html", {
             "request": request, "current_user": current_user, "item": item, "warehouses": warehouses, "ProductCategory": ProductCategory,
-            "error": "MRP, Unit cost, and GST rate must be valid numbers.",
+            "error": "MRP, Price to Retailer (PTR), and GST rate must be valid numbers.",
         })
 
     item.name = name
