@@ -305,8 +305,9 @@ async def position_attach_beats_get(
     if other_mapped_beat_ids:
         query = query.filter(~Beat.id.in_(other_mapped_beat_ids))
 
-    if item.territory_id:
-        pos_territory = db.query(Geography).filter(Geography.id == item.territory_id).first()
+    territory_id = getattr(item, "territory_id", None)
+    if territory_id:
+        pos_territory = db.query(Geography).filter(Geography.id == territory_id).first()
         if pos_territory and pos_territory.parent_id:
             # Resolved Region ID from Territory
             resolved_region_id = pos_territory.parent_id
@@ -347,8 +348,10 @@ async def position_attach_beats_post(
         
     item.beats.clear()
     if beat_ids:
-        beat_objs = db.query(Beat).filter(Beat.id.in_(beat_ids)).all()
-        item.beats.extend(beat_objs)
+        int_ids = [int(i) for i in beat_ids if i]
+        if int_ids:
+            beat_objs = db.query(Beat).filter(Beat.id.in_(int_ids)).all()
+            item.beats.extend(beat_objs)
         
     db.commit()
     set_flash_success(request, f"Beats mapping updated for position '{item.name}'.")
