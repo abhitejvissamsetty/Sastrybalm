@@ -94,57 +94,74 @@ async def position_list(
     })
 
 
+from app.models.warehouse import Warehouse
+
+
 @router.get("/new", response_class=HTMLResponse)
 async def position_new(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
     managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1).order_by(Position.name).all()
     beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
     users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
+    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
     return templates.TemplateResponse("positions/form.html", {
         "request": request, "current_user": current_user,
-        "item": None, "managers": managers, "beats": beats, "users": users, "PositionLevel": PositionLevel, "error": None,
+        "item": None, "managers": managers, "beats": beats, "users": users, "warehouses": warehouses,
+        "PositionLevel": PositionLevel, "error": None,
     })
 
 
 @router.post("/new")
 async def position_create(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     name: str = Form(...),
     code: str = Form(...),
     level: str = Form(...),
     reporting_to_id: Optional[str] = Form(default=None),
+    warehouse_id: Optional[str] = Form(default=None),
     beat_ids: list[str] = Form(default=[]),
     attached_user_id: Optional[str] = Form(default=None),
 ):
-    if db.query(Position).filter(Position.code == code.upper()).first():
+    def _form_context(err_msg: str):
         managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1).order_by(Position.name).all()
         beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
         users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
+        warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
         return templates.TemplateResponse("positions/form.html", {
             "request": request, "current_user": current_user,
-            "item": None, "managers": managers, "beats": beats, "users": users, "PositionLevel": PositionLevel,
-            "error": f"Code '{code.upper()}' already exists.",
+            "item": None, "managers": managers, "beats": beats, "users": users, "warehouses": warehouses,
+            "PositionLevel": PositionLevel, "error": err_msg,
         })
+
+    if current_user.role == UserRole.territory_manager and level != PositionLevel.L1.value:
+        return _form_context("Territory Managers are authorized to create L1 Positions only.")
+
+    if db.query(Position).filter(Position.code == code.upper()).first():
+        return _form_context(f"Code '{code.upper()}' already exists.")
         
     err = validate_position_hierarchy(db, level, reporting_to_id)
     if err:
-        managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1).order_by(Position.name).all()
-        beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-        users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
-        return templates.TemplateResponse("positions/form.html", {
-            "request": request, "current_user": current_user,
-            "item": None, "managers": managers, "beats": beats, "users": users, "PositionLevel": PositionLevel,
-            "error": err,
-        })
+        return _form_context(err)
 
     rid = int(reporting_to_id) if (reporting_to_id and reporting_to_id.strip() != "") else None
-    
-    pos = Position(name=name, code=code.upper(), level=PositionLevel(level), reporting_to_id=rid)
+    wid = int(warehouse_id) if (warehouse_id and warehouse_id.strip() != "") else None
+
+    # L1 Position Warehouse Validation
+    if level == PositionLevel.L1.value:
+        if not wid:
+            if rid:
+                parent = db.query(Position).filter(Position.id == rid).first()
+                if not parent or not parent.resolve_warehouse(db):
+                    return _form_context("L1 Position requires a valid Warehouse assigned directly or inherited from its reporting parent hierarchy (L2/L3/L4).")
+            else:
+                return _form_context("L1 Position requires a valid Warehouse assigned.")
+
+    pos = Position(name=name, code=code.upper(), level=PositionLevel(level), reporting_to_id=rid, warehouse_id=wid)
     if attached_user_id and attached_user_id.strip() != "":
         user_obj = db.query(User).filter(User.id == int(attached_user_id)).first()
         if user_obj:
@@ -158,31 +175,37 @@ async def position_create(
 @router.get("/{pos_id}/edit", response_class=HTMLResponse)
 async def position_edit(
     pos_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
     item = db.query(Position).filter(Position.id == pos_id).first()
     if not item:
         set_flash_error(request, "Position not found.")
         return RedirectResponse("/positions", status_code=302)
+    if current_user.role == UserRole.territory_manager and item.level != PositionLevel.L1:
+        set_flash_error(request, "Territory Managers are authorized to edit L1 Positions only.")
+        return RedirectResponse("/positions", status_code=302)
     managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1, Position.id != pos_id).order_by(Position.name).all()
     beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
     users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
+    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
     return templates.TemplateResponse("positions/form.html", {
         "request": request, "current_user": current_user,
-        "item": item, "managers": managers, "beats": beats, "users": users, "PositionLevel": PositionLevel, "error": None,
+        "item": item, "managers": managers, "beats": beats, "users": users, "warehouses": warehouses,
+        "PositionLevel": PositionLevel, "error": None,
     })
 
 
 @router.post("/{pos_id}/edit")
 async def position_update(
     pos_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     name: str = Form(...),
     code: str = Form(...),
     level: str = Form(...),
     reporting_to_id: Optional[str] = Form(default=None),
+    warehouse_id: Optional[str] = Form(default=None),
     is_active: Optional[str] = Form(default=None),
     beat_ids: list[str] = Form(default=[]),
     attached_user_id: Optional[str] = Form(default=None),
@@ -191,33 +214,46 @@ async def position_update(
     if not item:
         set_flash_error(request, "Position not found.")
         return RedirectResponse("/positions", status_code=302)
-    if db.query(Position).filter(Position.code == code.upper(), Position.id != pos_id).first():
+
+    def _form_context(err_msg: str):
         managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1, Position.id != pos_id).order_by(Position.name).all()
         beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
         users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
+        warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
         return templates.TemplateResponse("positions/form.html", {
             "request": request, "current_user": current_user,
-            "item": item, "managers": managers, "beats": beats, "users": users, "PositionLevel": PositionLevel,
-            "error": f"Code '{code.upper()}' already in use.",
+            "item": item, "managers": managers, "beats": beats, "users": users, "warehouses": warehouses,
+            "PositionLevel": PositionLevel, "error": err_msg,
         })
+
+    if current_user.role == UserRole.territory_manager and (item.level != PositionLevel.L1 or level != PositionLevel.L1.value):
+        return _form_context("Territory Managers are authorized to edit L1 Positions only.")
+
+    if db.query(Position).filter(Position.code == code.upper(), Position.id != pos_id).first():
+        return _form_context(f"Code '{code.upper()}' already in use.")
         
     err = validate_position_hierarchy(db, level, reporting_to_id, current_pos_id=pos_id)
     if err:
-        managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1, Position.id != pos_id).order_by(Position.name).all()
-        beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-        users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
-        return templates.TemplateResponse("positions/form.html", {
-            "request": request, "current_user": current_user,
-            "item": item, "managers": managers, "beats": beats, "users": users, "PositionLevel": PositionLevel,
-            "error": err,
-        })
+        return _form_context(err)
+
+    rid = int(reporting_to_id) if (reporting_to_id and reporting_to_id.strip() != "") else None
+    wid = int(warehouse_id) if (warehouse_id and warehouse_id.strip() != "") else None
+
+    # L1 Position Warehouse Validation
+    if level == PositionLevel.L1.value:
+        if not wid:
+            if rid:
+                parent = db.query(Position).filter(Position.id == rid).first()
+                if not parent or not parent.resolve_warehouse(db):
+                    return _form_context("L1 Position requires a valid Warehouse assigned directly or inherited from its reporting parent hierarchy (L2/L3/L4).")
+            else:
+                return _form_context("L1 Position requires a valid Warehouse assigned.")
 
     item.name = name
     item.code = code.upper()
     item.level = PositionLevel(level)
-    item.reporting_to_id = int(reporting_to_id) if (reporting_to_id and reporting_to_id.strip() != "") else None
-    
-    # Beats mapping is done via a separate interface, not in the edit form.
+    item.reporting_to_id = rid
+    item.warehouse_id = wid
 
     item.users.clear()
     if attached_user_id and attached_user_id.strip() != "":
@@ -281,7 +317,7 @@ async def position_delete(
 @router.get("/{pos_id}/attach-beats", response_class=HTMLResponse)
 async def position_attach_beats_get(
     pos_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
     item = db.query(Position).filter(Position.id == pos_id).first()
@@ -334,7 +370,7 @@ async def position_attach_beats_get(
 @router.post("/{pos_id}/attach-beats")
 async def position_attach_beats_post(
     pos_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     beat_ids: list[str] = Form(default=[]),
 ):

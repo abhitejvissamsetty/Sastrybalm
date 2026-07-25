@@ -240,6 +240,15 @@ async def inventory_stock_inward(
     try:
         wh_id = int(warehouse_id)
         wh = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
+        if not wh or not wh.is_active:
+            set_flash_error(request, "Selected warehouse is inactive or not found.")
+            return RedirectResponse("/inventory", status_code=302)
+
+        if current_user.role == UserRole.territory_manager:
+            if current_user.geography_id and wh.geography_id != current_user.geography_id:
+                set_flash_error(request, "Access denied. Territory Managers can only inward stock for warehouses in their assigned region.")
+                return RedirectResponse("/inventory", status_code=302)
+
         record_stock_movement(
             db=db,
             product_id=product_id,
@@ -250,7 +259,7 @@ async def inventory_stock_inward(
             notes=notes,
             created_by_id=current_user.id
         )
-        set_flash_success(request, f"Added {quantity} units to '{wh.name if wh else 'Warehouse'}'.")
+        set_flash_success(request, f"Added {quantity} units to '{wh.name}'.")
     except Exception as exc:
         set_flash_error(request, f"Failed to record stock inward: {exc}")
 
@@ -260,7 +269,7 @@ async def inventory_stock_inward(
 @router.post("/adjust")
 async def inventory_stock_adjust(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     product_id: int = Form(...),
     warehouse_id: Optional[str] = Form(default=None),
@@ -275,6 +284,15 @@ async def inventory_stock_adjust(
     try:
         wh_id = int(warehouse_id)
         wh = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
+        if not wh or not wh.is_active:
+            set_flash_error(request, "Selected warehouse is inactive or not found.")
+            return RedirectResponse("/inventory", status_code=302)
+
+        if current_user.role == UserRole.territory_manager:
+            if current_user.geography_id and wh.geography_id != current_user.geography_id:
+                set_flash_error(request, "Access denied. Territory Managers can only adjust stock for warehouses in their assigned region.")
+                return RedirectResponse("/inventory", status_code=302)
+
         record_stock_movement(
             db=db,
             product_id=product_id,
@@ -284,7 +302,7 @@ async def inventory_stock_adjust(
             notes=notes,
             created_by_id=current_user.id
         )
-        set_flash_success(request, f"Adjusted stock in '{wh.name if wh else 'Warehouse'}' to {new_quantity} units.")
+        set_flash_success(request, f"Adjusted stock in '{wh.name}' to {new_quantity} units.")
     except Exception as exc:
         set_flash_error(request, f"Failed to adjust stock: {exc}")
 

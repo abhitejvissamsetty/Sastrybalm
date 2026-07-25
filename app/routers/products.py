@@ -54,7 +54,7 @@ async def product_list(
 @router.get("/new", response_class=HTMLResponse)
 async def product_new(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
@@ -66,7 +66,7 @@ async def product_new(
 @router.post("/new")
 async def product_create(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     name: str = Form(...),
     erp_id: Optional[str] = Form(default=None),
@@ -119,7 +119,7 @@ async def product_create(
 @router.get("/{product_id}/edit", response_class=HTMLResponse)
 async def product_edit(
     product_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     item = db.query(Product).filter(Product.id == product_id).first()
@@ -135,7 +135,7 @@ async def product_edit(
 @router.post("/{product_id}/edit")
 async def product_update(
     product_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     name: str = Form(...),
     erp_id: Optional[str] = Form(default=None),
@@ -159,12 +159,12 @@ async def product_update(
         set_flash_error(request, "Product not found.")
         return RedirectResponse("/products", status_code=302)
 
-    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
     try:
-        item.mrp = Decimal(mrp) if mrp else Decimal("0")
-        item.unit_cost = Decimal(unit_cost) if unit_cost else Decimal("0")
-        item.gst_rate = Decimal(gst_rate) if gst_rate else Decimal("0")
+        mrp_val = Decimal(mrp) if mrp else Decimal("0")
+        cost_val = Decimal(unit_cost) if unit_cost else Decimal("0")
+        gst_val = Decimal(gst_rate) if gst_rate else Decimal("0")
     except Exception:
+        warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
         return templates.TemplateResponse("products/form.html", {
             "request": request, "current_user": current_user, "item": item, "warehouses": warehouses, "ProductCategory": ProductCategory,
             "error": "MRP, Price to Retailer (PTR), and GST rate must be valid numbers.",
@@ -174,14 +174,16 @@ async def product_update(
     item.erp_id = erp_id or None
     item.sku = sku or None
     item.division = division or None
-    if category_type in [c.value for c in ProductCategory]:
-        item.category_type = ProductCategory(category_type)
+    item.category_type = ProductCategory(category_type) if category_type in [c.value for c in ProductCategory] else ProductCategory.sales
     item.primary_category = primary_category or None
     item.secondary_category = secondary_category or None
+    item.mrp = mrp_val
+    item.unit_cost = cost_val
     item.stock_qty = stock_qty
     item.reorder_level = reorder_level
     item.warehouse_id = int(warehouse_id) if warehouse_id else None
     item.warehouse_location = warehouse_location or None
+    item.gst_rate = gst_val
     item.must_sell = must_sell == "on"
     item.is_stockable = is_stockable == "on"
 
@@ -198,11 +200,19 @@ async def product_delete(
 ):
     item = db.query(Product).filter(Product.id == product_id).first()
     if item:
-        if item.stock_qty > 0:
-            set_flash_error(
-                request,
-                f"Cannot deactivate product '{item.name}'. Stock is present ({item.stock_qty} units available). Please clear inventory stock first."
-            )
+        # Check stock quantity in product model
+        total_stock = item.stock_qty or 0
+        
+        # Check total stock quantity across all attached warehouses
+        wh_stocks = db.query(ProductWarehouseStock).filter(
+            ProductWarehouseStock.product_id == product_id,
+            ProductWarehouseStock.is_active == True
+        ).all()
+        if wh_stocks:
+            total_stock += sum(s.stock_qty for s in wh_stocks)
+            
+        if total_stock > 0:
+            set_flash_error(request, f"Cannot deactivate product '{item.name}' because stock ({total_stock} units) is present. Clear or adjust stock to 0 before deactivation.")
             return RedirectResponse("/products", status_code=302)
 
         item.is_active = False
@@ -215,7 +225,7 @@ async def product_delete(
 async def product_attach_warehouses_get(
     product_id: int,
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     item = db.query(Product).filter(Product.id == product_id).first()
@@ -248,7 +258,7 @@ async def product_attach_warehouses_get(
 async def product_attach_warehouses_post(
     product_id: int,
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     warehouse_ids: list[str] = Form(default=[]),
 ):

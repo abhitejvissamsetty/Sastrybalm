@@ -60,9 +60,9 @@
         </select>
       </div>
 
-      <!-- Product Scope (Multi Select) -->
+      <!-- Product Scope (Multi Select - Marketing Procurement Only) -->
       <div>
-        <label class="block text-xs font-bold text-slate-300 uppercase mb-2">Product Supply Scope <span class="text-indigo-400 font-normal lowercase">(Multi-select specialized product catalogue)</span></label>
+        <label class="block text-xs font-bold text-slate-300 uppercase mb-2">Product Supply Scope <span class="text-indigo-400 font-normal lowercase">(Marketing - Procurement items only)</span></label>
         {% set assigned_p_ids = item.supplied_products | map(attribute='id') | list if item else [] %}
         <div class="max-h-48 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 p-3 space-y-2">
           {% for p in products %}
@@ -70,10 +70,10 @@
             <input type="checkbox" name="product_ids" value="{{ p.id }}" {% if p.id in assigned_p_ids %}checked{% endif %}
                    class="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500">
             <span class="font-medium">{{ p.name }}</span>
-            <span class="text-xs text-slate-500">({{ p.category_type or 'Sales' }})</span>
+            <span class="text-xs text-purple-400 font-semibold">(Marketing - Procurement)</span>
           </label>
           {% else %}
-          <p class="text-xs text-slate-500 italic">No products registered yet.</p>
+          <p class="text-xs text-slate-500 italic">No Marketing - Procurement products registered yet.</p>
           {% endfor %}
         </div>
       </div>

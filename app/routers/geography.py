@@ -46,7 +46,7 @@ from app.models.warehouse import Warehouse
 @router.get("/new", response_class=HTMLResponse)
 async def geo_new(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     parents = db.query(Geography).filter(Geography.is_active == True).order_by(Geography.level, Geography.name).all()
@@ -60,7 +60,7 @@ async def geo_new(
 @router.post("/new")
 async def geo_create(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     name: str = Form(...),
     code: str = Form(...),
@@ -100,7 +100,7 @@ async def geo_create(
 @router.get("/{geo_id}/edit", response_class=HTMLResponse)
 async def geo_edit(
     geo_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     item = db.query(Geography).filter(Geography.id == geo_id).first()
@@ -121,7 +121,7 @@ async def geo_edit(
 @router.post("/{geo_id}/edit")
 async def geo_update(
     geo_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     name: str = Form(...),
     code: str = Form(...),

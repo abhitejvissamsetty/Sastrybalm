@@ -150,7 +150,7 @@
     </div>
 
     <!-- Position Hierarchy Assignment -->
-    <div class="glass rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-4">
+    <div id="position-hierarchy-container" class="glass rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-4">
       <div class="flex items-center justify-between">
         <div>
           <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Assigned Positions (Hierarchy)</h2>
@@ -296,6 +296,7 @@
     const territoryDiv = document.getElementById('scope-territory-manager');
     const qcDiv = document.getElementById('scope-qc-manager');
     const vendorSingleDiv = document.getElementById('scope-vendor-single');
+    const posContainer = document.getElementById('position-hierarchy-container');
 
     if (territoryDiv) territoryDiv.classList.add('hidden');
     if (qcDiv) qcDiv.classList.add('hidden');
@@ -307,6 +308,13 @@
       if (qcDiv) qcDiv.classList.remove('hidden');
     } else if (role === 'vendor_technician' || role === 'vendor_admin') {
       if (vendorSingleDiv) vendorSingleDiv.classList.remove('hidden');
+    }
+
+    // Hide position hierarchy for QC Manager, Vendor Admin, Vendor Tech
+    if (role === 'qc_manager' || role === 'vendor_admin' || role === 'vendor_technician') {
+      if (posContainer) posContainer.classList.add('hidden');
+    } else {
+      if (posContainer) posContainer.classList.remove('hidden');
     }
 
     // Filter position levels for non-Territory Managers

@@ -35,7 +35,7 @@
       </li>
 
       <!-- Master Data -->
-      {% if current_user.role.value in ['admin', 'territory_manager'] %}
+      {% if current_user and current_user.role and current_user.role.value in ['admin', 'territory_manager'] %}
       <li>
         <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Master Data</p>
         <ul class="space-y-0.5">
@@ -49,7 +49,7 @@
               Geography
             </a>
           </li>
-          {% if current_user.role.value == 'admin' %}
+          {% if current_user and current_user.role and current_user.role.value == 'admin' %}
           <li>
             <a href="/users"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
@@ -101,6 +101,7 @@
               Channel Partners
             </a>
           </li>
+          {% if current_user and current_user.role and current_user.role.value in ['admin', 'territory_manager'] %}
           <li>
             <a href="/vendors"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
@@ -111,6 +112,7 @@
               Vendors
             </a>
           </li>
+          {% endif %}
         </ul>
       </li>
       {% endif %}

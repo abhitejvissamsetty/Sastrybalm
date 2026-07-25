@@ -32,12 +32,33 @@ class Position(Base):
     code = Column(String(100), unique=True, nullable=False, index=True)
     level = Column(SAEnum(PositionLevel), nullable=False, default=PositionLevel.L1)
     reporting_to_id = Column(Integer, ForeignKey("positions.id"), nullable=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
     reporting_to = relationship("Position", remote_side=[id], backref="direct_reports")
+    warehouse = relationship("Warehouse", foreign_keys=[warehouse_id])
     beats = relationship("Beat", secondary=position_beats, back_populates="positions")
     users = relationship("User", secondary=user_positions, back_populates="positions")
+
+    def resolve_warehouse(self, db=None):
+        """
+        Resolves warehouse for this position up the reporting hierarchy:
+        Checks L1 warehouse -> L2 warehouse -> L3 warehouse -> L4 warehouse.
+        """
+        curr = self
+        visited = set()
+        while curr and curr.id not in visited:
+            visited.add(curr.id)
+            if curr.warehouse and curr.warehouse.is_active:
+                return curr.warehouse
+            if curr.warehouse_id and db:
+                from app.models.warehouse import Warehouse
+                wh = db.query(Warehouse).filter(Warehouse.id == curr.warehouse_id, Warehouse.is_active == True).first()
+                if wh:
+                    return wh
+            curr = curr.reporting_to
+        return None
 
     @property
     def level_code(self) -> str:

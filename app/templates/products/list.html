@@ -76,6 +76,7 @@
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Category Scope</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Stockable</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">MRP / PTR</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Total Stock</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
           {% if current_user.role.value in ['admin', 'territory_manager'] %}
           <th class="px-6 py-4 text-right text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Actions</th>
@@ -123,9 +124,6 @@
               {{ item.stock_qty }} units
             </span>
             {% endif %}
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-400 hidden lg:table-cell">
-            {{ item.warehouse.name if item.warehouse else 'Central Depot' }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
             {% if item.is_active %}

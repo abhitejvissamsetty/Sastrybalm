@@ -122,6 +122,9 @@ def run_migrations():
         # Warehouses
         add_column_safely(conn, "warehouses", "geography_id", "INT NULL")
 
+        # Positions
+        add_column_safely(conn, "positions", "warehouse_id", "INT NULL")
+
         # System Configuration - Default row
         conn.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))
 

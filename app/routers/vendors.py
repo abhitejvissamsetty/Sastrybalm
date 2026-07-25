@@ -19,7 +19,7 @@ from app.utils.security import hash_password
 router = APIRouter(prefix="/vendors", tags=["vendors"])
 templates = Jinja2Templates(directory="app/templates")
 
-_ADMIN = require_web_roles(UserRole.admin)
+_ADMIN = require_web_roles(UserRole.admin, UserRole.territory_manager)
 
 
 @router.get("", response_class=HTMLResponse)
@@ -32,6 +32,8 @@ async def vendor_list(
     page: int = Query(default=1, ge=1),
 ):
     query = db.query(Vendor)
+    if current_user.role == UserRole.territory_manager and current_user.geography_id:
+        query = query.filter(Vendor.geography_id == current_user.geography_id)
     if q:
         query = query.filter(Vendor.name.ilike(f"%{q}%") | Vendor.mobile.ilike(f"%{q}%"))
     if status and status in [s.value for s in VendorStatus]:
@@ -46,12 +48,15 @@ async def vendor_list(
 
 
 from app.models.geography import Geography
-from app.models.product import Product
+from app.models.product import Product, ProductCategory
 
 
 def _vendor_form_context(db: Session) -> dict:
     geographies = db.query(Geography).filter(Geography.is_active == True).order_by(Geography.name).all()
-    products = db.query(Product).filter(Product.is_active == True).order_by(Product.name).all()
+    products = db.query(Product).filter(
+        Product.is_active == True,
+        Product.category_type == ProductCategory.marketing_procurement
+    ).order_by(Product.name).all()
     return {
         "geographies": geographies,
         "products": products,
@@ -92,6 +97,10 @@ async def vendor_create(
             "item": None, "error": f"Mobile '{mobile}' already registered.", **_vendor_form_context(db),
         })
 
+    assigned_geo_id = int(geography_id) if geography_id else None
+    if current_user.role == UserRole.territory_manager and current_user.geography_id:
+        assigned_geo_id = current_user.geography_id
+
     v = Vendor(
         name=name,
         contact_person=contact_person or None,
@@ -99,7 +108,7 @@ async def vendor_create(
         email=email or None,
         category=category or None,
         cmms_supplier_ref=cmms_supplier_ref or None,
-        geography_id=int(geography_id) if geography_id else None,
+        geography_id=assigned_geo_id,
         hashed_password=hash_password(password) if password else None,
         address=address or None,
     )
@@ -123,6 +132,10 @@ async def vendor_edit(
     if not item:
         set_flash_error(request, "Vendor not found.")
         return RedirectResponse("/vendors", status_code=302)
+    if current_user.role == UserRole.territory_manager and current_user.geography_id:
+        if item.geography_id and item.geography_id != current_user.geography_id:
+            set_flash_error(request, "Access denied. Territory Managers can only edit vendors assigned to their region.")
+            return RedirectResponse("/vendors", status_code=302)
     return templates.TemplateResponse("vendors/form.html", {
         "request": request, "current_user": current_user,
         "item": item, "error": None, **_vendor_form_context(db),
@@ -149,13 +162,25 @@ async def vendor_update(
     if not item:
         set_flash_error(request, "Vendor not found.")
         return RedirectResponse("/vendors", status_code=302)
+    if current_user.role == UserRole.territory_manager and current_user.geography_id:
+        if item.geography_id and item.geography_id != current_user.geography_id:
+            set_flash_error(request, "Access denied. Territory Managers can only edit vendors assigned to their region.")
+            return RedirectResponse("/vendors", status_code=302)
+
+    assigned_geo_id = int(geography_id) if geography_id else None
+    if current_user.role == UserRole.territory_manager and current_user.geography_id:
+        assigned_geo_id = current_user.geography_id
+
     item.name = name
     item.contact_person = contact_person or None
     item.mobile = mobile or None
     item.email = email or None
     item.category = category or None
     item.cmms_supplier_ref = cmms_supplier_ref or None
-    item.geography_id = int(geography_id) if geography_id else None
+    item.geography_id = assigned_geo_id
+    item.address = address or None
+    if new_password:
+        item.hashed_password = hash_password(new_password)
     item.address = address or None
     if new_password:
         item.hashed_password = hash_password(new_password)

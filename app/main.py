@@ -154,12 +154,21 @@ async def unauthorized_handler(request: Request, exc):
     return RedirectResponse("/login", status_code=302)
 
 
+from app.dependencies import get_current_web_user
+from app.database import SessionLocal
+
+
 @app.exception_handler(403)
 async def forbidden_handler(request: Request, exc):
     if request.url.path.startswith("/api/"):
         return JSONResponse({"detail": "Insufficient permissions"}, status_code=403)
+    db = SessionLocal()
+    try:
+        user = get_current_web_user(request, db)
+    finally:
+        db.close()
     return _templates.TemplateResponse(
-        "errors/403.html", {"request": request, "current_user": None}, status_code=403
+        "errors/403.html", {"request": request, "current_user": user}, status_code=403
     )
 
 
@@ -167,6 +176,11 @@ async def forbidden_handler(request: Request, exc):
 async def not_found_handler(request: Request, exc):
     if request.url.path.startswith("/api/"):
         return JSONResponse({"detail": "Not found"}, status_code=404)
+    db = SessionLocal()
+    try:
+        user = get_current_web_user(request, db)
+    finally:
+        db.close()
     return _templates.TemplateResponse(
-        "errors/404.html", {"request": request, "current_user": None}, status_code=404
+        "errors/404.html", {"request": request, "current_user": user}, status_code=404
     )
