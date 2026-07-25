@@ -139,6 +139,16 @@
               Inventory
             </a>
           </li>
+          <li>
+            <a href="/warehouses"
+               class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
+                      {% if path.startswith('/warehouses') or path.startswith('/settings/warehouses') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not (path.startswith('/warehouses') or path.startswith('/settings/warehouses')) %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5s.75 0 .75.75v1.5s0 .75-.75.75H9s-.75 0-.75-.75v-1.5s0-.75.75-.75zm6 0h1.5s.75 0 .75.75v1.5s0 .75-.75.75H15s-.75 0-.75-.75v-1.5s0-.75.75-.75zM9 12h1.5s.75 0 .75.75v1.5s0 .75-.75.75H9s-.75 0-.75-.75v-1.5s0-.75.75-.75zm6 0h1.5s.75 0 .75.75v1.5s0 .75-.75.75H15s-.75 0-.75-.75v-1.5s0-.75.75-.75z" />
+              </svg>
+              Warehouses
+            </a>
+          </li>
         </ul>
       </li>
 
@@ -156,16 +166,6 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
               Sales Channels
-            </a>
-          </li>
-          <li>
-            <a href="/settings/warehouses"
-               class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path == '/settings/warehouses' %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if path != '/settings/warehouses' %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5s.75 0 .75.75v1.5s0 .75-.75.75H9s-.75 0-.75-.75v-1.5s0-.75.75-.75zm6 0h1.5s.75 0 .75.75v1.5s0 .75-.75.75H15s-.75 0-.75-.75v-1.5s0-.75.75-.75zM9 12h1.5s.75 0 .75.75v1.5s0 .75-.75.75H9s-.75 0-.75-.75v-1.5s0-.75.75-.75zm6 0h1.5s.75 0 .75.75v1.5s0 .75-.75.75H15s-.75 0-.75-.75v-1.5s0-.75.75-.75z" />
-              </svg>
-              Warehouses
             </a>
           </li>
           <li>
