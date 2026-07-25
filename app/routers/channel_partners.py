@@ -50,19 +50,63 @@ import json
 from app.models.geography import Geography, GeoLevel
 
 
-def _cp_form_context(db: Session):
-    geographies = db.query(Geography).filter(
+def _get_tm_allowed_geo_ids(db: Session, user: User) -> list[int]:
+    if not user or user.role != UserRole.territory_manager or not user.geography_id:
+        return []
+    region_id = user.geography_id
+    territory_ids = [t.id for t in db.query(Geography).filter(Geography.parent_id == region_id, Geography.is_active == True).all()]
+    return [region_id] + territory_ids
+
+
+def _cp_form_context(db: Session, user: Optional[User] = None):
+    geo_query = db.query(Geography).filter(
         Geography.is_active == True,
         Geography.level.in_([GeoLevel.territory, GeoLevel.region])
-    ).order_by(Geography.level, Geography.name).all()
+    )
+    if user and user.role == UserRole.territory_manager:
+        allowed_ids = _get_tm_allowed_geo_ids(db, user)
+        geo_query = geo_query.filter(Geography.id.in_(allowed_ids))
+
+    geographies = geo_query.order_by(Geography.level, Geography.name).all()
     beat_types = get_all_beat_types(db)
     return {"geographies": geographies, "beat_types": beat_types}
+
+
+@router.get("", response_class=HTMLResponse)
+async def channel_partner_list(
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    db: Session = Depends(get_db),
+    q: str = Query(default=""),
+    page: int = Query(default=1, ge=1),
+):
+    query = db.query(LocalChannelPartner)
+    if current_user.role == UserRole.territory_manager:
+        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+        query = query.filter(LocalChannelPartner.geography_id.in_(allowed_ids))
+
+    if q:
+        query = query.filter(
+            LocalChannelPartner.name.ilike(f"%{q}%") |
+            LocalChannelPartner.erp_id.ilike(f"%{q}%") |
+            LocalChannelPartner.mobile.ilike(f"%{q}%")
+        )
+    query = query.order_by(LocalChannelPartner.name.asc())
+    pagination = paginate(query, page)
+
+    return templates.TemplateResponse("channel_partners/list.html", {
+        "request": request,
+        "current_user": current_user,
+        "pagination": pagination,
+        "q": q,
+        **get_flash(request),
+    })
 
 
 @router.get("/new", response_class=HTMLResponse)
 async def channel_partner_new(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse("channel_partners/form.html", {
@@ -70,14 +114,14 @@ async def channel_partner_new(
         "current_user": current_user,
         "item": None,
         "error": None,
-        **_cp_form_context(db),
+        **_cp_form_context(db, current_user),
     })
 
 
 @router.post("/new")
 async def channel_partner_create(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     name: str = Form(...),
     partner_type: str = Form("Distributor"),
@@ -102,9 +146,15 @@ async def channel_partner_create(
     if not err and not geo_id_int:
         err = "Selecting a Geography (Territory or Region) is mandatory."
     elif not err and geo_id_int:
-        geo_node = db.query(Geography).filter(Geography.id == geo_id_int, Geography.is_active == True).first()
-        if not geo_node or geo_node.level not in [GeoLevel.territory, GeoLevel.region]:
-            err = "Geography scope must be a Territory or Region."
+        if current_user.role == UserRole.territory_manager:
+            allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+            if geo_id_int not in allowed_ids:
+                err = "You can only assign Channel Partners to geographies within your assigned Region."
+
+        if not err:
+            geo_node = db.query(Geography).filter(Geography.id == geo_id_int, Geography.is_active == True).first()
+            if not geo_node or geo_node.level not in [GeoLevel.territory, GeoLevel.region]:
+                err = "Geography scope must be a Territory or Region."
 
     if err:
         return templates.TemplateResponse("channel_partners/form.html", {
@@ -112,7 +162,7 @@ async def channel_partner_create(
             "current_user": current_user,
             "item": None,
             "error": err,
-            **_cp_form_context(db),
+            **_cp_form_context(db, current_user),
         })
 
     import uuid
@@ -141,7 +191,7 @@ async def channel_partner_create(
 async def channel_partner_edit(
     cp_id: int,
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
     item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
@@ -149,12 +199,18 @@ async def channel_partner_edit(
         set_flash_error(request, "Channel Partner not found.")
         return RedirectResponse("/channel-partners", status_code=302)
 
+    if current_user.role == UserRole.territory_manager:
+        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+        if item.geography_id not in allowed_ids:
+            set_flash_error(request, "You are not authorized to edit Channel Partners outside your region.")
+            return RedirectResponse("/channel-partners", status_code=302)
+
     return templates.TemplateResponse("channel_partners/form.html", {
         "request": request,
         "current_user": current_user,
         "item": item,
         "error": None,
-        **_cp_form_context(db),
+        **_cp_form_context(db, current_user),
     })
 
 
@@ -162,7 +218,7 @@ async def channel_partner_edit(
 async def channel_partner_update(
     cp_id: int,
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     name: str = Form(...),
     partner_type: str = Form("Distributor"),
@@ -180,6 +236,12 @@ async def channel_partner_update(
         set_flash_error(request, "Channel Partner not found.")
         return RedirectResponse("/channel-partners", status_code=302)
 
+    if current_user.role == UserRole.territory_manager:
+        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+        if item.geography_id not in allowed_ids:
+            set_flash_error(request, "You are not authorized to edit Channel Partners outside your region.")
+            return RedirectResponse("/channel-partners", status_code=302)
+
     form_data = await request.form()
     raw_channels = form_data.getlist("sales_channels") or sales_channels
     selected_channels = [c for c in raw_channels if c and c.strip()]
@@ -192,9 +254,15 @@ async def channel_partner_update(
     if not err and not geo_id_int:
         err = "Selecting a Geography (Territory or Region) is mandatory."
     elif not err and geo_id_int:
-        geo_node = db.query(Geography).filter(Geography.id == geo_id_int, Geography.is_active == True).first()
-        if not geo_node or geo_node.level not in [GeoLevel.territory, GeoLevel.region]:
-            err = "Geography scope must be a Territory or Region."
+        if current_user.role == UserRole.territory_manager:
+            allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
+            if geo_id_int not in allowed_ids:
+                err = "You can only assign Channel Partners to geographies within your assigned Region."
+
+        if not err:
+            geo_node = db.query(Geography).filter(Geography.id == geo_id_int, Geography.is_active == True).first()
+            if not geo_node or geo_node.level not in [GeoLevel.territory, GeoLevel.region]:
+                err = "Geography scope must be a Territory or Region."
 
     if err:
         return templates.TemplateResponse("channel_partners/form.html", {
@@ -202,7 +270,7 @@ async def channel_partner_update(
             "current_user": current_user,
             "item": item,
             "error": err,
-            **_cp_form_context(db),
+            **_cp_form_context(db, current_user),
         })
 
     item.name = name

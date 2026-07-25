@@ -22,14 +22,34 @@ templates = Jinja2Templates(directory="app/templates")
 from app.models.warehouse import Warehouse
 
 
-def _form_context(db: Session, for_role: str = "") -> dict:
+def _get_tm_geo_scope(db: Session, user: User) -> list[int]:
+    if not user or user.role != UserRole.territory_manager or not user.geography_id:
+        return []
+    region_id = user.geography_id
+    territory_ids = [t.id for t in db.query(Geography).filter(Geography.parent_id == region_id, Geography.is_active == True).all()]
+    return [region_id] + territory_ids
+
+
+def _form_context(db: Session, user: Optional[User] = None, for_role: str = "") -> dict:
     positions_query = db.query(Position).filter(Position.is_active == True)
-    if for_role == UserRole.field_rep.value:
+    if user and user.role == UserRole.territory_manager:
         positions_query = positions_query.filter(Position.level == "L1")
-    geographies = db.query(Geography).filter(Geography.is_active == True).order_by(Geography.name).all()
+    elif for_role == UserRole.field_rep.value:
+        positions_query = positions_query.filter(Position.level == "L1")
+
+    geographies_query = db.query(Geography).filter(Geography.is_active == True)
+    if user and user.role == UserRole.territory_manager:
+        allowed_geo_ids = _get_tm_geo_scope(db, user)
+        geographies_query = geographies_query.filter(Geography.id.in_(allowed_geo_ids))
+
+    geographies = geographies_query.order_by(Geography.name).all()
     vendors = db.query(Vendor).filter(Vendor.status == VendorStatus.active).order_by(Vendor.name).all()
     warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
     company_profiles = db.query(CompanyProfile).filter(CompanyProfile.is_active == True).order_by(CompanyProfile.name).all()
+    
+    # Filter roles available in form dropdown
+    available_roles = [UserRole.field_rep] if user and user.role == UserRole.territory_manager else list(UserRole)
+
     return {
         "positions": positions_query.order_by(Position.name).all(),
         "geographies": geographies,
@@ -37,6 +57,7 @@ def _form_context(db: Session, for_role: str = "") -> dict:
         "warehouses": warehouses,
         "company_profiles": company_profiles,
         "UserRole": UserRole,
+        "available_roles": available_roles,
         "ModuleName": ModuleName,
         "PaymentMode": PaymentMode,
     }
@@ -60,7 +81,7 @@ async def user_role_matrix(
 async def user_position_view(
     user_id: int,
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
     user = db.query(User).filter(User.id == user_id).first()
@@ -105,13 +126,16 @@ async def user_position_update(
 @router.get("", response_class=HTMLResponse)
 async def user_list(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     q: str = Query(default=""),
     role: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
     query = db.query(User)
+    if current_user.role == UserRole.territory_manager:
+        query = query.filter(User.role == UserRole.field_rep)
+
     if q:
         query = query.filter(
             User.full_name.ilike(f"%{q}%") | User.username.ilike(f"%{q}%") | User.email.ilike(f"%{q}%")
@@ -131,19 +155,19 @@ async def user_list(
 async def user_new(
     request: Request,
     role: Optional[str] = Query(default=None),
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse("users/form.html", {
         "request": request, "current_user": current_user,
-        "item": None, "error": None, "preselected_role": role, **_form_context(db),
+        "item": None, "error": None, "preselected_role": role, **_form_context(db, current_user),
     })
 
 
 @router.post("/new")
 async def user_create(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     full_name: str = Form(...),
     email: str = Form(...),
@@ -162,18 +186,21 @@ async def user_create(
 ):
     import re
     err = None
+    if current_user.role == UserRole.territory_manager and role != UserRole.field_rep.value:
+        err = "Territory Managers can only create Field Representative users."
+
     phone_clean = phone.strip() if phone else ""
-    if not phone_clean:
+    if not err and not phone_clean:
         err = "Phone number is mandatory."
-    elif not re.match(r"^\d{10}$", phone_clean):
+    elif not err and not re.match(r"^\d{10}$", phone_clean):
         err = "Phone number must be exactly 10 digits."
-    elif db.query(User).filter(User.phone == phone_clean).first():
+    elif not err and db.query(User).filter(User.phone == phone_clean).first():
         err = f"Phone number '{phone_clean}' already registered."
-    elif role == UserRole.admin.value and db.query(User).filter(User.role == UserRole.admin).first():
+    elif not err and role == UserRole.admin.value and db.query(User).filter(User.role == UserRole.admin).first():
         err = "Only one System Administrator is permitted for this software setup. Admin credentials are configured in .env."
-    elif db.query(User).filter(User.email == email).first():
+    elif not err and db.query(User).filter(User.email == email).first():
         err = f"Email '{email}' already registered."
-    elif db.query(User).filter(User.username == username).first():
+    elif not err and db.query(User).filter(User.username == username).first():
         err = f"Username '{username}' already taken."
 
     # Validate Position assignment rules
@@ -188,7 +215,7 @@ async def user_create(
     if err:
         return templates.TemplateResponse("users/form.html", {
             "request": request, "current_user": current_user,
-            "item": None, "error": err, **_form_context(db),
+            "item": None, "error": err, **_form_context(db, current_user),
         })
         
     user = User(
@@ -230,7 +257,7 @@ async def user_create(
 @router.get("/{user_id}/edit", response_class=HTMLResponse)
 async def user_edit(
     user_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
     item = db.query(User).filter(User.id == user_id).first()
@@ -239,14 +266,14 @@ async def user_edit(
         return RedirectResponse("/users", status_code=302)
     return templates.TemplateResponse("users/form.html", {
         "request": request, "current_user": current_user,
-        "item": item, "error": None, **_form_context(db),
+        "item": item, "error": None, **_form_context(db, current_user),
     })
 
 
 @router.post("/{user_id}/edit")
 async def user_update(
     user_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     full_name: str = Form(...),
     email: str = Form(...),
@@ -286,11 +313,11 @@ async def user_update(
             if p_lvl in ["L2", "L3", "L4"] and role != UserRole.territory_manager.value:
                 err = f"Position '{p.name}' ({p_lvl}) can only be assigned to a Territory Manager. Field Reps can only be assigned L1 positions."
                 break
-        
+
     if err:
         return templates.TemplateResponse("users/form.html", {
             "request": request, "current_user": current_user,
-            "item": item, "error": err, **_form_context(db),
+            "item": item, "error": err, **_form_context(db, current_user),
         })
         
     item.full_name = full_name
