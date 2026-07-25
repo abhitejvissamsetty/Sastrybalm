@@ -40,6 +40,12 @@ class Position(Base):
     users = relationship("User", secondary=user_positions, back_populates="positions")
 
     @property
+    def level_code(self) -> str:
+        if hasattr(self.level, "value"):
+            return self.level.value
+        return str(self.level or "L1")
+
+    @property
     def is_vacant(self) -> bool:
         """Position is vacant if no active users are attached."""
         return not any(u.is_active for u in self.users)

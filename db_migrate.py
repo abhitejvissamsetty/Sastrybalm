@@ -11,8 +11,9 @@ def add_column_safely(conn, table, column, definition):
         conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
         print(f"Added column {column} to {table}")
     except Exception as e:
-        if "1060" in str(e) or "Duplicate column" in str(e):
-            # Already exists, ignore
+        err_str = str(e).lower()
+        if "1060" in err_str or "duplicate column" in err_str or "already exists" in err_str:
+            # Already exists, ignore cleanly
             pass
         else:
             print(f"Error adding {column} to {table}: {e}")
@@ -28,13 +29,14 @@ def run_migrations():
         # 2. Update existing tables with alter statements
         
         # Outlets
-        try:
-            # First change the enum type or use VARCHAR
-            conn.execute(text("ALTER TABLE outlets MODIFY COLUMN status VARCHAR(50) DEFAULT 'active'"))
-            conn.execute(text("UPDATE outlets SET status = 'active' WHERE status = 'approved'"))
-            conn.execute(text("UPDATE outlets SET status = 'inactive' WHERE status IN ('draft', 'rejected')"))
-        except Exception as e:
-            print(f"Outlet base migration error: {e}")
+        if conn.engine.name != "sqlite":
+            try:
+                # First change the enum type or use VARCHAR
+                conn.execute(text("ALTER TABLE outlets MODIFY COLUMN status VARCHAR(50) DEFAULT 'active'"))
+                conn.execute(text("UPDATE outlets SET status = 'active' WHERE status = 'approved'"))
+                conn.execute(text("UPDATE outlets SET status = 'inactive' WHERE status IN ('draft', 'rejected')"))
+            except Exception:
+                pass
             
         add_column_safely(conn, "outlets", "gstin", "VARCHAR(15) NULL")
         add_column_safely(conn, "outlets", "pincode", "VARCHAR(6) NULL")
@@ -108,10 +110,7 @@ def run_migrations():
         add_column_safely(conn, "products", "warehouse_location", "VARCHAR(100) NULL")
 
         # System Configuration - Default row
-        if conn.engine.name == "sqlite":
-            conn.execute(text("INSERT OR IGNORE INTO system_configuration (id) VALUES (1)"))
-        else:
-            conn.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))
+        conn.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))
 
         # System Configuration - SMTP Settings
         add_column_safely(conn, "system_configuration", "smtp_host", "VARCHAR(255) NULL")

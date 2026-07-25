@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Position Assignment — {{ user_item.full_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-x-4">
+      <a href="/users" class="rounded-xl bg-slate-900 border border-white/10 p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+        </svg>
+      </a>
+      <div>
+        <div class="flex items-center gap-x-3">
+          <h1 class="text-2xl font-bold text-white tracking-tight">{{ user_item.full_name }}</h1>
+          <span class="inline-flex items-center rounded-full px-3 py-0.5 text-xs font-bold uppercase tracking-wider
+                       {% if user_item.role.value == 'admin' %}bg-rose-500/10 text-rose-400 border border-rose-500/20
+                       {% elif user_item.role.value == 'territory_manager' %}bg-amber-500/10 text-amber-400 border border-amber-500/20
+                       {% else %}bg-blue-500/10 text-blue-400 border border-blue-500/20{% endif %}">
+            {{ user_item.role.value.replace('_', ' ').title() }}
+          </span>
+        </div>
+        <p class="mt-1 text-sm text-slate-400 font-medium">Manage position hierarchy and beat territory assignments for this user</p>
+      </div>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="rounded-xl bg-rose-500/10 border border-rose-500/20 px-4 py-3 text-sm text-rose-300">{{ error }}</div>
+  {% endif %}
+
+  <!-- User Overview & Current Positions -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- Profile Details Card -->
+    <div class="glass rounded-2xl p-6 border border-white/5 space-y-4">
+      <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">User Details</h2>
+      <div class="space-y-3 text-sm">
+        <div>
+          <span class="block text-xs text-slate-500">Username</span>
+          <span class="font-mono text-slate-300">{{ user_item.username }}</span>
+        </div>
+        <div>
+          <span class="block text-xs text-slate-500">Email</span>
+          <span class="text-slate-300">{{ user_item.email }}</span>
+        </div>
+        <div>
+          <span class="block text-xs text-slate-500">Phone</span>
+          <span class="text-slate-300">{{ user_item.phone or 'Not set' }}</span>
+        </div>
+        <div>
+          <span class="block text-xs text-slate-500">Status</span>
+          {% if user_item.is_active %}
+          <span class="text-emerald-400 font-semibold text-xs">Active</span>
+          {% else %}
+          <span class="text-slate-500 font-semibold text-xs">Inactive</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Position Assignment Form Card -->
+    <div class="md:col-span-2 glass rounded-2xl p-6 border border-white/5 space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Assign Positions</h2>
+        <span class="text-xs text-slate-500 font-medium">
+          Allowed: {% if user_item.role.value == 'field_rep' %}L1 Positions Only{% else %}L1, L2, L3, L4 Positions{% endif %}
+        </span>
+      </div>
+
+      <form method="post" class="space-y-6">
+        {% set assigned_pos_ids = user_item.positions | map(attribute='id') | list %}
+
+        <div class="space-y-3">
+          {% for pos in all_positions %}
+          {% set p_lvl = pos.level_code %}
+          {% set is_restricted = (p_lvl != 'L1' and user_item.role.value == 'field_rep') %}
+
+          <div class="rounded-xl border {% if pos.id in assigned_pos_ids %}border-indigo-500/40 bg-indigo-500/5{% else %}border-white/5 bg-slate-900/40{% endif %} p-4 transition-all hover:border-white/10">
+            <label class="flex items-start gap-x-3.5 {% if is_restricted %}opacity-40 cursor-not-allowed{% else %}cursor-pointer{% endif %}">
+              <input type="checkbox" name="position_ids" value="{{ pos.id }}"
+                     {% if pos.id in assigned_pos_ids %}checked{% endif %}
+                     {% if is_restricted %}disabled{% endif %}
+                     class="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500/50">
+              
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between gap-x-2">
+                  <div class="flex items-center gap-x-2">
+                    <span class="text-sm font-semibold text-white">{{ pos.name }}</span>
+                    <span class="inline-flex items-center rounded-md bg-slate-800 px-2 py-0.5 text-[10px] font-mono font-bold text-indigo-400 border border-white/5">
+                      {{ pos.code }}
+                    </span>
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase
+                                 {% if p_lvl == 'L1' %}bg-cyan-500/10 text-cyan-400 border border-cyan-500/20
+                                 {% elif p_lvl == 'L2' %}bg-amber-500/10 text-amber-400 border border-amber-500/20
+                                 {% else %}bg-purple-500/10 text-purple-400 border border-purple-500/20{% endif %}">
+                      {{ p_lvl }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="mt-2 text-xs text-slate-400 space-y-1">
+                  {% if pos.reporting_to %}
+                  <div><span class="text-slate-500">Reports To:</span> <span class="text-slate-300 font-medium">{{ pos.reporting_to.name }} ({{ pos.reporting_to.code }})</span></div>
+                  {% endif %}
+
+                  {% if pos.beats %}
+                  <div><span class="text-slate-500">Attached Beats:</span> <span class="text-indigo-300 font-medium">{{ pos.beats | map(attribute='name') | join(', ') }}</span></div>
+                  {% endif %}
+
+                  {% if is_restricted %}
+                  <p class="text-rose-400 text-[11px]">Cannot assign {{ p_lvl }} positions to Field Reps.</p>
+                  {% endif %}
+                </div>
+              </div>
+            </label>
+          </div>
+          {% else %}
+          <p class="text-sm text-slate-500 italic py-4">No positions created in system yet.</p>
+          {% endfor %}
+        </div>
+
+        <div class="flex items-center justify-end gap-x-3 pt-4 border-t border-white/5">
+          <a href="/users" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors">Cancel</a>
+          <button type="submit" class="premium-btn rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
+            Save Position Assignments
+          </button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

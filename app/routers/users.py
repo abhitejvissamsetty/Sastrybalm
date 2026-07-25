@@ -62,10 +62,12 @@ async def user_position_view(
     if not user:
         set_flash_error(request, "User not found.")
         return RedirectResponse("/users", status_code=302)
+    all_positions = db.query(Position).filter(Position.is_active == True).order_by(Position.name).all()
     return templates.TemplateResponse("users/position_view.html", {
         "request": request,
         "current_user": current_user,
         "user_item": user,
+        "all_positions": all_positions,
         **get_flash(request),
     })
 
