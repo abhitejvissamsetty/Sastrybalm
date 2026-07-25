@@ -88,7 +88,7 @@
                class="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">Edit</a>
             {% if current_user.role.value == 'admin' %}
             <form method="post" action="/geography/{{ item.id }}/delete" class="inline ml-3"
-                  onsubmit="return confirm('Deactivate {{ item.name }}?')">
+                  onsubmit="return confirmSubmit(event, 'Deactivate geography node {{ item.name }}?', 'Deactivate Geography', 'danger')">
               <button type="submit" class="text-red-400 hover:text-red-300 font-medium transition-colors">Deactivate</button>
             </form>
             {% endif %}

@@ -273,7 +273,7 @@ async function testZapConnection(profileId) {
   const backendCompany = document.getElementsByName('zap_backend_company')[0].value;
 
   if (!baseUrl) {
-    alert("Base URL is required to test connection.");
+    showAlert("Base URL is required to test connection.", "Validation Error", "warning");
     return;
   }
   
@@ -323,7 +323,7 @@ async function testCmmsConnection(profileId) {
   const backendCompany = document.getElementsByName('cmms_backend_company')[0].value;
 
   if (!baseUrl) {
-    alert("Base URL is required to test connection.");
+    showAlert("Base URL is required to test connection.", "Validation Error", "warning");
     return;
   }
   
@@ -369,7 +369,7 @@ async function testConnectConnection(profileId) {
   const backendCompany = document.getElementsByName('connect_backend_company')[0].value;
 
   if (!baseUrl) {
-    alert("Base URL is required to test connection.");
+    showAlert("Base URL is required to test connection.", "Validation Error", "warning");
     return;
   }
   

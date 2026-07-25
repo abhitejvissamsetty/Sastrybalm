@@ -100,7 +100,7 @@
               <a href="/positions/{{ item.id }}/attach-beats" class="text-emerald-400 hover:text-emerald-300 transition-colors">Attach Beats</a>
               {% endif %}
               <form method="post" action="/positions/{{ item.id }}/delete" class="inline"
-                    onsubmit="return confirm('Deactivate {{ item.name }}?')">
+                    onsubmit="return confirmSubmit(event, 'Deactivate position {{ item.name }}?', 'Deactivate Position', 'danger')">
                 <button type="submit" class="text-red-400 hover:text-red-300 transition-colors">Deactivate</button>
               </form>
               {% else %}

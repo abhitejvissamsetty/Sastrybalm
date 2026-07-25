@@ -276,7 +276,7 @@ function fetchAddressFromGPS() {
   const lat = document.querySelector('input[name="gps_lat"]').value;
   const lng = document.querySelector('input[name="gps_lng"]').value;
   if (!lat || !lng) {
-    alert('Please enter GPS Latitude and Longitude first.');
+    showAlert('Please enter GPS Latitude and Longitude first.', 'Coordinates Missing', 'warning');
     return;
   }
   const btn = document.getElementById('geocode-btn');
@@ -295,14 +295,14 @@ function fetchAddressFromGPS() {
           document.querySelector('input[name="pincode"]').value = data.address.postcode;
         }
       } else {
-        alert('Address not found for these coordinates.');
+        showAlert('Address not found for these coordinates.', 'Geocoding Failed', 'warning');
       }
     })
     .catch(error => {
       btn.innerHTML = originalText;
       btn.disabled = false;
       console.error(error);
-      alert('Error fetching address from OSM: ' + error.message);
+      showAlert('Error fetching address from OSM: ' + error.message, 'Geocoding Error', 'danger');
     });
 }
 </script>

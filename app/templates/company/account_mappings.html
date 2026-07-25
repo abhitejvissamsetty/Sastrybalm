@@ -91,7 +91,7 @@
                   <button type="button" onclick="toggleEdit({{ m.id }}, true)"
                           class="text-indigo-400 hover:text-indigo-300 font-medium">Edit</button>
                   <form method="post" action="/company/profiles/{{ profile.id }}/account-mappings/{{ m.id }}/delete" class="inline"
-                        onsubmit="return confirm('Remove this account mapping?')">
+                        onsubmit="return confirmSubmit(event, 'Remove this account mapping?', 'Delete Account Mapping', 'danger')">
                     <button type="submit" class="text-red-400 hover:text-red-300 font-medium">Delete</button>
                   </form>
                 </div>

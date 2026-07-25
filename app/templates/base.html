@@ -150,22 +150,36 @@
     {% set f_error = flash_error or (request.session.pop('_flash_error', None) if (request.session is defined and request.session) else None) %}
     {% if f_error %}
     <div class="px-4 sm:px-6 lg:px-8 pt-6">
-      <div class="rounded-xl bg-red-500/10 border border-red-500/20 p-4 flex items-start gap-x-3 backdrop-blur-md">
-        <svg class="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z" clip-rule="evenodd"/>
-        </svg>
-        <p class="text-sm text-red-200 font-medium">{{ f_error }}</p>
+      <div class="rounded-2xl bg-gradient-to-r from-red-950/90 via-red-900/60 to-slate-900/90 border border-red-500/30 p-4 flex items-center justify-between gap-x-4 backdrop-blur-xl shadow-2xl shadow-red-950/50">
+        <div class="flex items-center gap-x-3.5">
+          <div class="h-10 w-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <div>
+            <h4 class="text-[11px] font-bold text-red-400 uppercase tracking-widest">Action Restricted</h4>
+            <p class="text-sm text-red-100 font-medium mt-0.5">{{ f_error }}</p>
+          </div>
+        </div>
       </div>
     </div>
     {% endif %}
     {% set f_success = flash_success or (request.session.pop('_flash_success', None) if (request.session is defined and request.session) else None) %}
     {% if f_success %}
     <div class="px-4 sm:px-6 lg:px-8 pt-6">
-      <div class="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4 flex items-start gap-x-3 backdrop-blur-md">
-        <svg class="h-5 w-5 text-emerald-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/>
-        </svg>
-        <p class="text-sm text-emerald-200 font-medium">{{ f_success }}</p>
+      <div class="rounded-2xl bg-gradient-to-r from-emerald-950/90 via-emerald-900/60 to-slate-900/90 border border-emerald-500/30 p-4 flex items-center justify-between gap-x-4 backdrop-blur-xl shadow-2xl shadow-emerald-950/50">
+        <div class="flex items-center gap-x-3.5">
+          <div class="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+            <svg class="h-5 w-5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <div>
+            <h4 class="text-[11px] font-bold text-emerald-400 uppercase tracking-widest">Success</h4>
+            <p class="text-sm text-emerald-100 font-medium mt-0.5">{{ f_success }}</p>
+          </div>
+        </div>
       </div>
     </div>
     {% endif %}
@@ -177,6 +191,34 @@
       </div>
     </main>
 
+  </div>
+</div>
+
+<!-- Global Custom Glassmorphic Alert & Confirmation Modal -->
+<div id="global-custom-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-all duration-200">
+  <div class="max-w-md w-full rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-white/10 p-6 shadow-2xl shadow-black/90 space-y-5 transform transition-all scale-100">
+    <div class="flex items-start gap-x-4">
+      <div id="global-modal-icon-container" class="h-12 w-12 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center flex-shrink-0 text-red-400 shadow-inner">
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+        </svg>
+      </div>
+      <div class="flex-1 space-y-1">
+        <h3 id="global-modal-title" class="text-lg font-bold text-white tracking-tight">Confirm Action</h3>
+        <p id="global-modal-message" class="text-sm text-slate-300 font-medium leading-relaxed">Are you sure you want to proceed?</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center justify-end gap-x-3 pt-3 border-t border-white/5">
+      <button id="global-modal-cancel-btn" type="button" onclick="closeGlobalModal(false)"
+              class="rounded-xl border border-white/10 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
+        Cancel
+      </button>
+      <button id="global-modal-confirm-btn" type="button" onclick="closeGlobalModal(true)"
+              class="rounded-xl bg-red-600 hover:bg-red-500 text-white px-5 py-2.5 text-sm font-semibold shadow-lg shadow-red-600/30 transition-all border border-red-500/30">
+        Confirm
+      </button>
+    </div>
   </div>
 </div>
 
@@ -203,6 +245,78 @@
       }
     } catch (_) {}
   })();
+
+  // Global Glassmorphic Modal Controller
+  let currentModalResolve = null;
+
+  function showGlobalModal({ title, message, type = 'danger', confirmText = 'Confirm', cancelText = 'Cancel', isConfirm = true }) {
+    return new Promise((resolve) => {
+      currentModalResolve = resolve;
+      const modal = document.getElementById('global-custom-modal');
+      const iconContainer = document.getElementById('global-modal-icon-container');
+      const titleEl = document.getElementById('global-modal-title');
+      const messageEl = document.getElementById('global-modal-message');
+      const cancelBtn = document.getElementById('global-modal-cancel-btn');
+      const confirmBtn = document.getElementById('global-modal-confirm-btn');
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      confirmBtn.textContent = confirmText;
+      cancelBtn.textContent = cancelText;
+
+      if (isConfirm) {
+        cancelBtn.classList.remove('hidden');
+      } else {
+        cancelBtn.classList.add('hidden');
+      }
+
+      if (type === 'danger' || type === 'warning') {
+        iconContainer.className = 'h-12 w-12 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center flex-shrink-0 text-red-400 shadow-inner';
+        iconContainer.innerHTML = `<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>`;
+        confirmBtn.className = 'rounded-xl bg-red-600 hover:bg-red-500 text-white px-5 py-2.5 text-sm font-semibold shadow-lg shadow-red-600/30 transition-all border border-red-500/30';
+      } else if (type === 'success') {
+        iconContainer.className = 'h-12 w-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 text-emerald-400 shadow-inner';
+        iconContainer.innerHTML = `<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>`;
+        confirmBtn.className = 'rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 text-sm font-semibold shadow-lg shadow-emerald-600/30 transition-all border border-emerald-500/30';
+      } else {
+        iconContainer.className = 'h-12 w-12 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center flex-shrink-0 text-indigo-400 shadow-inner';
+        iconContainer.innerHTML = `<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>`;
+        confirmBtn.className = 'rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 text-sm font-semibold shadow-lg shadow-indigo-600/30 transition-all border border-indigo-500/30';
+      }
+
+      modal.classList.remove('hidden');
+    });
+  }
+
+  function closeGlobalModal(result) {
+    const modal = document.getElementById('global-custom-modal');
+    modal.classList.add('hidden');
+    if (currentModalResolve) {
+      currentModalResolve(result);
+      currentModalResolve = null;
+    }
+  }
+
+  window.showAlert = function(message, title = 'Notification', type = 'info') {
+    return showGlobalModal({ title, message, type, isConfirm: false, confirmText: 'OK' });
+  };
+
+  window.showConfirm = function(message, title = 'Confirm Action', type = 'danger', confirmText = 'Confirm', cancelText = 'Cancel') {
+    return showGlobalModal({ title, message, type, isConfirm: true, confirmText, cancelText });
+  };
+
+  // Helper for inline form submit handling with custom modal
+  window.confirmSubmit = function(event, message, title = 'Confirm Action', type = 'danger') {
+    event.preventDefault();
+    const form = event.target.closest('form') || event.target;
+    showConfirm(message, title, type).then(confirmed => {
+      if (confirmed) {
+        form.onsubmit = null;
+        form.submit();
+      }
+    });
+    return false;
+  };
 </script>
 {% block scripts %}{% endblock %}
 </body>

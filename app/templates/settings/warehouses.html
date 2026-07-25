@@ -68,7 +68,7 @@
             </form>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-xs font-medium">
-            <form method="post" action="/settings/warehouses/{{ wh.id }}/delete" class="inline" onsubmit="return confirm('Delete warehouse {{ wh.name }}?')">
+            <form method="post" action="/settings/warehouses/{{ wh.id }}/delete" class="inline" onsubmit="return confirmSubmit(event, 'Delete warehouse {{ wh.name }}?', 'Delete Warehouse', 'danger')">
               <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">
                 Delete
               </button>

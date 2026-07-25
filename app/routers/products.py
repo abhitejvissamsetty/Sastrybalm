@@ -152,7 +152,6 @@ async def product_update(
     gst_rate: Optional[str] = Form(default=None),
     must_sell: Optional[str] = Form(default=None),
     is_stockable: Optional[str] = Form(default=None),
-    is_active: Optional[str] = Form(default=None),
 ):
     item = db.query(Product).filter(Product.id == product_id).first()
     if not item:
@@ -184,7 +183,6 @@ async def product_update(
     item.warehouse_location = warehouse_location or None
     item.must_sell = must_sell == "on"
     item.is_stockable = is_stockable == "on"
-    item.is_active = is_active == "on"
 
     db.commit()
     set_flash_success(request, f"Product '{name}' updated.")
@@ -199,7 +197,14 @@ async def product_delete(
 ):
     item = db.query(Product).filter(Product.id == product_id).first()
     if item:
+        if item.stock_qty > 0:
+            set_flash_error(
+                request,
+                f"Cannot deactivate product '{item.name}'. Stock is present ({item.stock_qty} units available). Please clear inventory stock first."
+            )
+            return RedirectResponse("/products", status_code=302)
+
         item.is_active = False
         db.commit()
-        set_flash_success(request, f"'{item.name}' deactivated.")
+        set_flash_success(request, f"Product '{item.name}' deactivated successfully.")
     return RedirectResponse("/products", status_code=302)

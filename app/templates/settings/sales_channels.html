@@ -62,7 +62,7 @@
             </form>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-xs font-medium">
-            <form method="post" action="/settings/sales-channels/{{ item.id }}/delete" class="inline" onsubmit="return confirm('Delete sales channel {{ item.name }}?')">
+            <form method="post" action="/settings/sales-channels/{{ item.id }}/delete" class="inline" onsubmit="return confirmSubmit(event, 'Delete sales channel {{ item.name }}?', 'Delete Sales Channel', 'danger')">
               <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">
                 Delete
               </button>

@@ -121,7 +121,7 @@
                 <a href="/beats/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
                 {% if current_user.role.value in ['admin', 'territory_manager'] %}
                 <form method="post" action="/beats/{{ item.id }}/delete" class="inline"
-                      onsubmit="return confirm('Deactivate {{ item.name }}?')">
+                      onsubmit="return confirmSubmit(event, 'Deactivate beat {{ item.name }}?', 'Deactivate Beat', 'danger')">
                   <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">Deactivate</button>
                 </form>
                 {% endif %}

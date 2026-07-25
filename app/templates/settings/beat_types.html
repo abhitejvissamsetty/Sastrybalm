@@ -62,7 +62,7 @@
             </form>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-xs font-medium">
-            <form method="post" action="/settings/beat-types/{{ item.id }}/delete" class="inline" onsubmit="return confirm('Delete beat type {{ item.name }}?')">
+            <form method="post" action="/settings/beat-types/{{ item.id }}/delete" class="inline" onsubmit="return confirmSubmit(event, 'Delete beat type {{ item.name }}?', 'Delete Beat Type', 'danger')">
               <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">
                 Delete
               </button>

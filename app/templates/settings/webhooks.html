@@ -71,7 +71,7 @@
                   Test Payload
                 </button>
               </form>
-              <form method="post" action="/settings/webhooks/{{ wh.id }}/delete" class="inline" onsubmit="return confirm('Delete webhook {{ wh.name }}?')">
+              <form method="post" action="/settings/webhooks/{{ wh.id }}/delete" class="inline" onsubmit="return confirmSubmit(event, 'Delete webhook {{ wh.name }}?', 'Delete Webhook', 'danger')">
                 <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">
                   Delete
                 </button>

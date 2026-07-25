@@ -93,7 +93,7 @@
                 <a href="/company/profiles/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">Edit</a>
                 <a href="/company/profiles/{{ item.id }}/product-mappings" class="text-blue-400 hover:text-blue-300 font-semibold transition-colors">Products Map</a>
                 <a href="/company/profiles/{{ item.id }}/account-mappings" class="text-purple-400 hover:text-purple-300 font-semibold transition-colors">Accounts Map</a>
-                <form method="post" action="/company/profiles/{{ item.id }}/delete" class="inline" onsubmit="return confirm('Deactivate {{ item.name }}?')">
+                <form method="post" action="/company/profiles/{{ item.id }}/delete" class="inline" onsubmit="return confirmSubmit(event, 'Deactivate company profile {{ item.name }}?', 'Deactivate Profile', 'danger')">
                   <button type="submit" class="text-red-400 hover:text-red-300 font-semibold transition-colors">Deactivate</button>
                 </form>
               {% else %}

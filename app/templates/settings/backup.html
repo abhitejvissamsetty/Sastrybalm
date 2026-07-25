@@ -72,7 +72,7 @@
                class="inline-flex items-center gap-x-1 rounded-lg bg-indigo-950 px-3 py-1 text-xs font-semibold text-indigo-300 border border-indigo-800/60 hover:bg-indigo-900 transition-colors">
               Download ZIP
             </a>
-            <form method="post" action="/settings/backup/delete/{{ b.filename }}" class="inline" onsubmit="return confirm('Delete backup {{ b.filename }}?')">
+            <form method="post" action="/settings/backup/delete/{{ b.filename }}" class="inline" onsubmit="return confirmSubmit(event, 'Delete database backup file {{ b.filename }}?', 'Delete Backup', 'danger')">
               <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">
                 Delete
               </button>

@@ -51,7 +51,7 @@
         </button>
       </form>
       <form method="post" action="/orders/{{ item.id }}/status"
-            onsubmit="return confirm('Cancel this order? This cannot be undone.')">
+            onsubmit="return confirmSubmit(event, 'Cancel this order? This action cannot be undone.', 'Cancel Order', 'danger')">
         <input type="hidden" name="new_status" value="cancelled">
         <button type="submit"
                 class="rounded-lg border border-red-700 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-900/30 transition-colors">

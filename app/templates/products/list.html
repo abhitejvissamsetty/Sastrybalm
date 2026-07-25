@@ -146,7 +146,7 @@
               <a href="/products/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
               {% if current_user.role.value == 'admin' %}
               <form method="post" action="/products/{{ item.id }}/delete" class="inline"
-                    onsubmit="return confirm('Deactivate {{ item.name }}?')">
+                    onsubmit="return confirmSubmit(event, 'Deactivate {{ item.name }}?', 'Deactivate Product', 'danger')">
                 <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">Deactivate</button>
               </form>
               {% endif %}

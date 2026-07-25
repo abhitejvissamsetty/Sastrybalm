@@ -126,11 +126,11 @@
               <a href="/outlets/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
               {% if current_user.role.value in ['admin', 'territory_manager'] %}
                 {% if item.status.value == 'active' %}
-                  <form method="post" action="/outlets/{{ item.id }}/toggle" class="inline" onsubmit="return confirm('Disable {{ item.name }}?')">
+                  <form method="post" action="/outlets/{{ item.id }}/toggle" class="inline" onsubmit="return confirmSubmit(event, 'Disable outlet {{ item.name }}?', 'Disable Outlet', 'danger')">
                     <button type="submit" class="text-red-400 hover:text-red-300 transition-colors">Disable</button>
                   </form>
                 {% else %}
-                  <form method="post" action="/outlets/{{ item.id }}/toggle" class="inline" onsubmit="return confirm('Activate {{ item.name }}?')">
+                  <form method="post" action="/outlets/{{ item.id }}/toggle" class="inline" onsubmit="return confirmSubmit(event, 'Activate outlet {{ item.name }}?', 'Activate Outlet', 'info')">
                     <button type="submit" class="text-emerald-400 hover:text-emerald-300 transition-colors">Activate</button>
                   </form>
                 {% endif %}
