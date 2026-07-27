@@ -23,40 +23,94 @@ templates = Jinja2Templates(directory="app/templates")
 _ADMIN_MANAGER = require_web_roles(UserRole.admin, UserRole.territory_manager)
 
 
+from fastapi import HTTPException
+from app.utils.geography_scope import get_user_allowed_geography_ids
+from app.models.user_position import UserPosition
+from app.models.position import Position, PositionLevel
+from app.models.geography import GeoLevel
+from app.models.auto_flag import AutoFlag, FlagStatus
+
+
+def _check_approval_hub_permissions(user: User, db: Session):
+    """
+    Approval Hub is available for users with Position level > L2 (L3, L4, L5)
+    and user Geography scope >= Region (Region, Zone), or Admin.
+    """
+    if user.role == UserRole.admin:
+        return True
+    
+    # Check active position level
+    up = db.query(UserPosition).filter(UserPosition.user_id == user.id, UserPosition.is_active == True).first()
+    pos_level = up.position.level.value if (up and up.position) else None
+    
+    # Check allowed levels (L3, L4, L5)
+    if pos_level not in ["L3", "L4", "L5"]:
+        raise HTTPException(status_code=403, detail="Approval Hub requires Position level > L2 (L3, L4, L5).")
+
+    allowed_geo_ids = get_user_allowed_geography_ids(user, db)
+    if not allowed_geo_ids:
+        raise HTTPException(status_code=403, detail="Approval Hub requires Geography scope >= Region.")
+    return True
+
+
 @router.get("", response_class=HTMLResponse)
 async def approvals_hub(
     request: Request,
     current_user: User = Depends(_ADMIN_MANAGER),
     db: Session = Depends(get_db),
 ):
-    """Central hub showing pending counts across all approval queues."""
+    """Central hub showing pending counts across all approval queues scoped by user position & geography."""
+    _check_approval_hub_permissions(current_user, db)
+
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
 
     # Attendance approvals
-    pending_attendance = db.query(func.count(Attendance.id)).filter(
-        Attendance.approval_status == ApprovalStatus.pending,
-    ).scalar() or 0
+    att_q = db.query(func.count(Attendance.id)).filter(Attendance.approval_status == ApprovalStatus.pending)
+    if allowed_geo_ids is not None:
+        att_q = att_q.join(User, Attendance.user_id == User.id).filter(User.geography_id.in_(allowed_geo_ids))
+    pending_attendance = att_q.scalar() or 0
 
     # Timesheet approvals
-    pending_timesheets = db.query(func.count(Timesheet.id)).filter(
-        Timesheet.approval_status == TimesheetApproval.pending,
-    ).scalar() or 0
+    ts_q = db.query(func.count(Timesheet.id)).filter(Timesheet.approval_status == TimesheetApproval.pending)
+    if allowed_geo_ids is not None:
+        ts_q = ts_q.join(User, Timesheet.user_id == User.id).filter(User.geography_id.in_(allowed_geo_ids))
+    pending_timesheets = ts_q.scalar() or 0
 
     # Payment submission approvals
-    pending_submissions = db.query(func.count(PaymentSubmission.id)).filter(
-        PaymentSubmission.status == SubmissionStatus.pending,
-    ).scalar() or 0
+    ps_q = db.query(func.count(PaymentSubmission.id)).filter(PaymentSubmission.status == SubmissionStatus.pending)
+    if allowed_geo_ids is not None:
+        ps_q = ps_q.join(User, PaymentSubmission.user_id == User.id).filter(User.geography_id.in_(allowed_geo_ids))
+    pending_submissions = ps_q.scalar() or 0
 
     # Expense approvals
-    pending_expenses = db.query(func.count(Expense.id)).filter(
-        Expense.status == ExpenseStatus.submitted,
-    ).scalar() or 0
+    exp_q = db.query(func.count(Expense.id)).filter(Expense.status == ExpenseStatus.submitted)
+    if allowed_geo_ids is not None:
+        exp_q = exp_q.join(User, Expense.user_id == User.id).filter(User.geography_id.in_(allowed_geo_ids))
+    pending_expenses = exp_q.scalar() or 0
 
-    # Material request approvals (submitted/acknowledged)
-    pending_mrs = db.query(func.count(MaterialRequest.id)).filter(
-        MaterialRequest.status.in_([MRStatus.submitted, MRStatus.acknowledged]),
-    ).scalar() or 0
+    # Material request approvals
+    mr_q = db.query(func.count(MaterialRequest.id)).filter(MaterialRequest.status.in_([MRStatus.submitted, MRStatus.acknowledged]))
+    if allowed_geo_ids is not None:
+        mr_q = mr_q.join(User, MaterialRequest.user_id == User.id).filter(User.geography_id.in_(allowed_geo_ids))
+    pending_mrs = mr_q.scalar() or 0
+
+    # Master Data / Outlet Edit approvals
+    md_q = db.query(func.count(AutoFlag.id)).filter(
+        AutoFlag.entity_type == "outlet_edit_approval",
+        AutoFlag.status == FlagStatus.open
+    )
+    if allowed_geo_ids is not None:
+        md_q = md_q.join(User, AutoFlag.user_id == User.id).filter(User.geography_id.in_(allowed_geo_ids))
+    pending_master_edits = md_q.scalar() or 0
 
     queues = [
+        {
+            "name": "Outlet & Master Data Edits",
+            "icon": "🏬",
+            "count": pending_master_edits,
+            "url": "/flags?entity_type=outlet_edit_approval",
+            "description": "Master data and outlet modification approval requests",
+        },
         {
             "name": "Attendance",
             "icon": "📋",

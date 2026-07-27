@@ -20,5 +20,5 @@ class Warehouse(Base):
     # Region assignment (Geography)
     geography_id = Column(Integer, ForeignKey("geographies.id", ondelete="SET NULL"), nullable=True)
 
-    geography = relationship("Geography", foreign_keys=[geography_id])
+    geography = relationship("Geography", back_populates="warehouses", foreign_keys=[geography_id])
     products = relationship("Product", back_populates="warehouse")

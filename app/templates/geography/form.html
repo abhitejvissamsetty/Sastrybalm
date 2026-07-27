@@ -73,11 +73,17 @@
     <!-- Attached Warehouses Container (Visible for Region Level) -->
     <div id="warehouse-selection-container" class="hidden space-y-2 rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4">
       <label class="block text-xs font-bold text-indigo-300 uppercase">Attached Warehouses for this Region <span class="text-red-400 font-bold">* (Mandatory: select at least 1)</span></label>
-      <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-2">
-        {% set assigned_wh_ids = item.warehouses | map(attribute='id') | list if (item and item.level.value == 'region') else [] %}
+        {% set assigned_wh_ids = [] %}
+        {% if item %}
+          {% for wh in warehouses %}
+            {% if wh.geography_id == item.id %}
+              {% set _ = assigned_wh_ids.append(wh.id) %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
         {% for wh in warehouses %}
         <label class="flex items-center space-x-3 text-sm text-slate-300 hover:text-white cursor-pointer">
-          <input type="checkbox" name="warehouse_ids" value="{{ wh.id }}" {% if wh.id in assigned_wh_ids %}checked{% endif %}
+          <input type="checkbox" name="warehouse_ids" value="{{ wh.id }}" {% if item and (wh.id in assigned_wh_ids or wh.geography_id == item.id) %}checked{% endif %}
                  class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
           <span class="font-medium">{{ wh.name }}</span>
           <span class="text-xs font-mono text-indigo-400">({{ wh.code }})</span>

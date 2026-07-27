@@ -381,3 +381,91 @@ async def dismiss_all_alerts(
     db.commit()
     set_flash_success(request, "All alerts dismissed.")
     return RedirectResponse("/analytics/alerts", status_code=302)
+
+
+# ── Scheduled Analytics & S3 Data Reports ─────────────────────────────────────
+
+import csv
+import io
+from datetime import datetime, timedelta
+from fastapi import Form
+from app.adapters.s3_storage import upload_file_to_s3, generate_presigned_url
+
+_IN_MEMORY_SCHEDULED_REPORTS = []
+
+
+@router.get("/scheduled", response_class=HTMLResponse)
+async def scheduled_analytics_page(
+    request: Request,
+    current_user: User = Depends(_ADMIN_MANAGER),
+    db: Session = Depends(get_db),
+):
+    return templates.TemplateResponse("analytics/scheduled.html", {
+        "request": request, "current_user": current_user,
+        "reports": _IN_MEMORY_SCHEDULED_REPORTS,
+        **get_flash(request),
+    })
+
+
+@router.post("/scheduled/generate", response_class=RedirectResponse)
+async def generate_scheduled_report(
+    request: Request,
+    current_user: User = Depends(_ADMIN_MANAGER),
+    db: Session = Depends(get_db),
+    report_type: str = Form(...),
+    expiry_hours: int = Form(default=24),
+):
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if report_type == "sales_summary":
+        report_name = f"Sales_Summary_{now_str}.csv"
+        writer.writerow(["Order ID", "Date", "Outlet Name", "Status", "Total Amount"])
+        orders = db.query(Order).order_by(Order.order_date.desc()).limit(200).all()
+        for o in orders:
+            writer.writerow([o.id, str(o.order_date), o.outlet.name if o.outlet else "—", o.status.value, o.total_amount])
+
+    elif report_type == "rep_performance":
+        report_name = f"Rep_Performance_{now_str}.csv"
+        writer.writerow(["User ID", "Full Name", "Username", "Role", "Email", "Phone"])
+        users = db.query(User).filter(User.is_active == True).all()
+        for u in users:
+            writer.writerow([u.id, u.full_name, u.username, u.role.value, u.email or "", u.phone or ""])
+
+    elif report_type == "inventory_audit":
+        report_name = f"Inventory_Audit_{now_str}.csv"
+        writer.writerow(["Product ID", "Name", "SKU", "Total Stock", "Category"])
+        prods = db.query(Product).filter(Product.is_stockable == True).all()
+        for p in prods:
+            writer.writerow([p.id, p.name, p.sku or "", p.stock_qty, p.primary_category or ""])
+
+    else:
+        report_name = f"Master_Outlets_{now_str}.csv"
+        writer.writerow(["Outlet ID", "Name", "Code", "Owner", "Mobile", "Status"])
+        outlets = db.query(Outlet).limit(500).all()
+        for ot in outlets:
+            writer.writerow([ot.id, ot.name, ot.code or "", ot.owner_name or "", ot.mobile or "", ot.status.value])
+
+    csv_bytes = output.getvalue().encode("utf-8")
+    object_key = f"reports/{report_name}"
+    
+    # Upload to S3/MinIO & get time-bound presigned link
+    exp_seconds = expiry_hours * 3600
+    ok, res_url = upload_file_to_s3(csv_bytes, object_key, content_type="text/csv")
+    if ok:
+        url = generate_presigned_url(object_key, expiration_seconds=exp_seconds)
+    else:
+        url = res_url
+
+    _IN_MEMORY_SCHEDULED_REPORTS.insert(0, {
+        "name": report_name,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "expires_in": f"{expiry_hours} Hours",
+        "status": "S3 Uploaded",
+        "url": url,
+    })
+
+    set_flash_success(request, f"Scheduled CSV report '{report_name}' generated and uploaded to S3/MinIO storage.")
+    return RedirectResponse("/analytics/scheduled", status_code=302)

@@ -44,6 +44,10 @@ router = APIRouter(prefix="/inventory", tags=["inventory"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+from app.utils.geography_scope import get_user_allowed_warehouse_ids
+from datetime import datetime
+
+
 @router.get("", response_class=HTMLResponse)
 async def inventory_list(
     request: Request,
@@ -53,6 +57,8 @@ async def inventory_list(
     page: int = Query(default=1, ge=1),
 ):
     """View inventory balances and warehouse assignments for stockable products."""
+    allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
+
     query = (
         db.query(Product)
         .options(joinedload(Product.warehouse_stocks).joinedload(ProductWarehouseStock.warehouse))
@@ -66,7 +72,11 @@ async def inventory_list(
         )
     query = query.order_by(Product.name.asc())
     pagination = paginate(query, page)
-    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
+
+    wh_query = db.query(Warehouse).filter(Warehouse.is_active == True)
+    if allowed_wh_ids is not None:
+        wh_query = wh_query.filter(Warehouse.id.in_(allowed_wh_ids))
+    warehouses = wh_query.order_by(Warehouse.name).all()
 
     return templates.TemplateResponse("inventory/list.html", {
         "request": request,
@@ -84,17 +94,22 @@ async def inventory_product_warehouse_details(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    """JSON details endpoint for a product's multi-warehouse stock breakdown."""
+    """JSON details endpoint for a product's multi-warehouse stock breakdown, scoped to allowed user warehouses."""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         return JSONResponse({"error": "Product not found"}, status_code=404)
 
-    stocks = (
+    allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
+
+    stocks_query = (
         db.query(ProductWarehouseStock)
         .options(joinedload(ProductWarehouseStock.warehouse))
         .filter(ProductWarehouseStock.product_id == product_id, ProductWarehouseStock.is_active == True)
-        .all()
     )
+    if allowed_wh_ids is not None:
+        stocks_query = stocks_query.filter(ProductWarehouseStock.warehouse_id.in_(allowed_wh_ids))
+
+    stocks = stocks_query.all()
 
     items = []
     total_qty = 0
@@ -113,23 +128,24 @@ async def inventory_product_warehouse_details(
 
     # If product has legacy warehouse_id but no entry in product_warehouse_stocks
     if not items and product.warehouse:
-        items.append({
-            "id": 0,
-            "warehouse_id": product.warehouse_id,
-            "warehouse_name": product.warehouse.name,
-            "warehouse_code": product.warehouse.code,
-            "warehouse_location": product.warehouse_location or "—",
-            "stock_qty": product.stock_qty,
-            "reorder_level": product.reorder_level,
-            "status": "Low Stock" if product.stock_qty <= product.reorder_level else "Optimal Stock",
-        })
-        total_qty = product.stock_qty
+        if allowed_wh_ids is None or product.warehouse_id in allowed_wh_ids:
+            items.append({
+                "id": 0,
+                "warehouse_id": product.warehouse_id,
+                "warehouse_name": product.warehouse.name,
+                "warehouse_code": product.warehouse.code,
+                "warehouse_location": product.warehouse_location or "—",
+                "stock_qty": product.stock_qty,
+                "reorder_level": product.reorder_level,
+                "status": "Low Stock" if product.stock_qty <= product.reorder_level else "Optimal Stock",
+            })
+            total_qty = product.stock_qty
 
     return JSONResponse({
         "product_id": product.id,
         "product_name": product.name,
         "sku": product.sku or product.erp_id or "—",
-        "total_stock": product.stock_qty,
+        "total_stock": total_qty,
         "warehouses": items
     })
 
@@ -145,6 +161,11 @@ async def inventory_assign_warehouse(
     reorder_level: Optional[int] = Form(default=10),
 ):
     """Assign or update warehouse and location for a stockable product."""
+    allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
+    if allowed_wh_ids is not None and warehouse_id not in allowed_wh_ids:
+        set_flash_error(request, "Access denied. You cannot assign this warehouse.")
+        return RedirectResponse("/inventory", status_code=302)
+
     product = db.query(Product).filter(Product.id == product_id, Product.is_stockable == True).first()
     if not product:
         set_flash_error(request, "Stockable product not found.")
@@ -194,6 +215,11 @@ async def inventory_remove_warehouse(
     warehouse_id: int = Form(...),
 ):
     """Remove warehouse assignment from product."""
+    allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
+    if allowed_wh_ids is not None and warehouse_id not in allowed_wh_ids:
+        set_flash_error(request, "Access denied.")
+        return RedirectResponse("/inventory", status_code=302)
+
     pws = db.query(ProductWarehouseStock).filter(
         ProductWarehouseStock.product_id == product_id,
         ProductWarehouseStock.warehouse_id == warehouse_id
@@ -239,15 +265,15 @@ async def inventory_stock_inward(
 
     try:
         wh_id = int(warehouse_id)
+        allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
+        if allowed_wh_ids is not None and wh_id not in allowed_wh_ids:
+            set_flash_error(request, "Access denied. You can only inward stock for warehouses in your assigned geography.")
+            return RedirectResponse("/inventory", status_code=302)
+
         wh = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
         if not wh or not wh.is_active:
             set_flash_error(request, "Selected warehouse is inactive or not found.")
             return RedirectResponse("/inventory", status_code=302)
-
-        if current_user.role == UserRole.territory_manager:
-            if current_user.geography_id and wh.geography_id != current_user.geography_id:
-                set_flash_error(request, "Access denied. Territory Managers can only inward stock for warehouses in their assigned region.")
-                return RedirectResponse("/inventory", status_code=302)
 
         record_stock_movement(
             db=db,
@@ -283,15 +309,15 @@ async def inventory_stock_adjust(
 
     try:
         wh_id = int(warehouse_id)
+        allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
+        if allowed_wh_ids is not None and wh_id not in allowed_wh_ids:
+            set_flash_error(request, "Access denied. You can only adjust stock for warehouses in your assigned geography.")
+            return RedirectResponse("/inventory", status_code=302)
+
         wh = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
         if not wh or not wh.is_active:
             set_flash_error(request, "Selected warehouse is inactive or not found.")
             return RedirectResponse("/inventory", status_code=302)
-
-        if current_user.role == UserRole.territory_manager:
-            if current_user.geography_id and wh.geography_id != current_user.geography_id:
-                set_flash_error(request, "Access denied. Territory Managers can only adjust stock for warehouses in their assigned region.")
-                return RedirectResponse("/inventory", status_code=302)
 
         record_stock_movement(
             db=db,
@@ -314,22 +340,69 @@ async def inventory_movements(
     request: Request,
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
+    warehouse_id: Optional[str] = Query(default=""),
+    product_id: Optional[str] = Query(default=""),
+    movement_type: Optional[str] = Query(default=""),
+    date_from: Optional[str] = Query(default=""),
+    date_to: Optional[str] = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    """Audit trail log of all stock movements."""
+    """Audit trail log of all stock movements with filters."""
     query = (
         db.query(StockMovement)
         .options(
             joinedload(StockMovement.product),
             joinedload(StockMovement.warehouse)
         )
-        .order_by(StockMovement.created_at.desc())
     )
+
+    allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
+    if allowed_wh_ids is not None:
+        query = query.filter(StockMovement.warehouse_id.in_(allowed_wh_ids))
+
+    if warehouse_id and warehouse_id.isdigit():
+        query = query.filter(StockMovement.warehouse_id == int(warehouse_id))
+
+    if product_id and product_id.isdigit():
+        query = query.filter(StockMovement.product_id == int(product_id))
+
+    if movement_type:
+        query = query.filter(StockMovement.movement_type == movement_type.upper())
+
+    if date_from:
+        try:
+            dt_f = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(StockMovement.created_at >= dt_f)
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            dt_t = datetime.strptime(date_to, "%Y-%m-%d")
+            query = query.filter(StockMovement.created_at <= dt_t.replace(hour=23, minute=59, second=59))
+        except ValueError:
+            pass
+
+    query = query.order_by(StockMovement.created_at.desc())
     pagination = paginate(query, page)
+
+    wh_query = db.query(Warehouse).filter(Warehouse.is_active == True)
+    if allowed_wh_ids is not None:
+        wh_query = wh_query.filter(Warehouse.id.in_(allowed_wh_ids))
+    warehouses = wh_query.order_by(Warehouse.name).all()
+
+    products = db.query(Product).filter(Product.is_active == True, Product.is_stockable == True).order_by(Product.name).all()
 
     return templates.TemplateResponse("inventory/movements.html", {
         "request": request,
         "current_user": current_user,
         "pagination": pagination,
+        "warehouses": warehouses,
+        "products": products,
+        "warehouse_id": warehouse_id,
+        "product_id": product_id,
+        "movement_type": movement_type,
+        "date_from": date_from,
+        "date_to": date_to,
         **get_flash(request),
     })

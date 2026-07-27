@@ -27,6 +27,7 @@ class Geography(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     parent = relationship("Geography", remote_side=[id], backref="children")
+    warehouses = relationship("Warehouse", back_populates="geography")
 
     def level_badge(self) -> str:
         colours = {

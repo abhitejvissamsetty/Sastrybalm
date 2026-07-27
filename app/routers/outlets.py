@@ -20,6 +20,39 @@ router = APIRouter(prefix="/outlets", tags=["outlets"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+from app.utils.geography_scope import get_user_allowed_geography_ids
+from app.models.outlet_version import OutletVersion
+import json
+
+
+def _snapshot_outlet_version(db: Session, outlet: Outlet, user_id: Optional[int], summary: str) -> OutletVersion:
+    from sqlalchemy import func
+    max_ver = db.query(func.max(OutletVersion.version_number)).filter(OutletVersion.outlet_id == outlet.id).scalar() or 0
+    ver = OutletVersion(
+        outlet_id=outlet.id,
+        version_number=max_ver + 1,
+        name=outlet.name,
+        code=outlet.code,
+        owner_name=outlet.owner_name,
+        mobile=outlet.mobile,
+        address=outlet.address,
+        pincode=outlet.pincode,
+        gstin=outlet.gstin,
+        channel=outlet.channel.value if outlet.channel else None,
+        shop_type=outlet.shop_type.value if outlet.shop_type else None,
+        beat_id=outlet.beat_id,
+        territory_id=outlet.territory_id,
+        gps_lat=outlet.gps_lat,
+        gps_lng=outlet.gps_lng,
+        status=outlet.status.value if outlet.status else None,
+        changed_by_id=user_id,
+        change_summary=summary,
+    )
+    db.add(ver)
+    db.commit()
+    return ver
+
+
 @router.get("", response_class=HTMLResponse)
 async def outlet_list(
     request: Request,
@@ -31,6 +64,10 @@ async def outlet_list(
     page: int = Query(default=1, ge=1),
 ):
     query = db.query(Outlet)
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+    if allowed_geo_ids is not None:
+        query = query.filter(Outlet.territory_id.in_(allowed_geo_ids))
+
     if q:
         query = query.filter(Outlet.name.ilike(f"%{q}%") | Outlet.mobile.ilike(f"%{q}%") | Outlet.code.ilike(f"%{q}%"))
     if status and status in [s.value for s in OutletStatus]:
@@ -45,7 +82,10 @@ async def outlet_list(
             pass
     query = query.order_by(Outlet.name)
     pagination = paginate(query, page)
-    beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
+    beats_query = db.query(Beat).filter(Beat.is_active == True)
+    if allowed_geo_ids is not None:
+        beats_query = beats_query.filter(Beat.territory_id.in_(allowed_geo_ids))
+    beats = beats_query.order_by(Beat.name).all()
     return templates.TemplateResponse("outlets/list.html", {
         "request": request, "current_user": current_user,
         "pagination": pagination, "q": q, "status": status, "beat_id": beat_id,
@@ -225,6 +265,12 @@ async def outlet_update(
         set_flash_error(request, "Outlet not found.")
         return RedirectResponse("/outlets", status_code=302)
 
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+    if allowed_geo_ids is not None:
+        if item.territory_id and item.territory_id not in allowed_geo_ids:
+            set_flash_error(request, "Access denied. You can only edit outlets in your assigned geography.")
+            return RedirectResponse("/outlets", status_code=302)
+
     beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
     territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
 
@@ -237,25 +283,33 @@ async def outlet_update(
             "error": f"Code '{code.upper()}' already in use.",
         })
 
-    # Unique mobile check
-    if mobile and mobile.strip():
-        existing_mobile = db.query(Outlet).filter(Outlet.mobile == mobile.strip(), Outlet.id != outlet_id).first()
-        if existing_mobile:
-            return templates.TemplateResponse("outlets/form.html", {
-                "request": request, "current_user": current_user,
-                "item": item, "beats": beats, "territories": territories,
-                "ChannelType": ChannelType, "ShopType": ShopType,
-                "error": f"Mobile number '{mobile.strip()}' is already in use by another outlet.",
-            })
-
-    # Active outlet requires a Beat
-    if item.status == OutletStatus.active and (not beat_id or beat_id.strip() == ""):
-        return templates.TemplateResponse("outlets/form.html", {
-            "request": request, "current_user": current_user,
-            "item": item, "beats": beats, "territories": territories,
-            "ChannelType": ChannelType, "ShopType": ShopType,
-            "error": "Beat is mandatory for active outlets.",
+    # Non-admin edit creates approval request
+    if current_user.role != UserRole.admin:
+        from app.models.auto_flag import AutoFlag, FlagType, FlagSeverity, FlagStatus
+        proposed_payload = json.dumps({
+            "name": name, "code": code.upper() if code else None, "owner_name": owner_name,
+            "mobile": mobile, "address": address, "channel": channel, "shop_type": shop_type,
+            "gstin": gstin, "pincode": pincode, "beat_id": int(beat_id) if beat_id else None,
+            "territory_id": int(territory_id) if territory_id else None,
+            "gps_lat": float(gps_lat) if gps_lat else None, "gps_lng": float(gps_lng) if gps_lng else None
         })
+        flag = AutoFlag(
+            flag_type=FlagType.unusual_activity,
+            severity=FlagSeverity.medium,
+            status=FlagStatus.open,
+            user_id=current_user.id,
+            entity_type="outlet_edit_approval",
+            entity_id=item.id,
+            title=f"Pending Outlet Edit Approval: {item.name}",
+            description=f"User {current_user.full_name} submitted edit for outlet '{item.name}'. Proposed changes: {proposed_payload}",
+        )
+        db.add(flag)
+        db.commit()
+        set_flash_success(request, f"Changes to outlet '{item.name}' submitted for Admin approval.")
+        return RedirectResponse(f"/outlets/{outlet_id}", status_code=302)
+
+    # Admin direct edit — Snapshot current state first
+    _snapshot_outlet_version(db, item, current_user.id, f"Edited by Admin {current_user.full_name}")
 
     item.name = name
     item.code = code.upper() if code else None
@@ -272,8 +326,63 @@ async def outlet_update(
     item.gps_lat = float(gps_lat) if gps_lat else None
     item.gps_lng = float(gps_lng) if gps_lng else None
     db.commit()
-    set_flash_success(request, f"Outlet '{name}' updated.")
-    return RedirectResponse("/outlets", status_code=302)
+    set_flash_success(request, f"Outlet '{name}' updated and version snapshot saved.")
+    return RedirectResponse(f"/outlets/{outlet_id}", status_code=302)
+
+
+@router.get("/{outlet_id}/history", response_class=HTMLResponse)
+async def outlet_history(
+    outlet_id: int, request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
+    if not item:
+        set_flash_error(request, "Outlet not found.")
+        return RedirectResponse("/outlets", status_code=302)
+    versions = db.query(OutletVersion).filter(OutletVersion.outlet_id == outlet_id).order_by(OutletVersion.version_number.desc()).all()
+    return templates.TemplateResponse("outlets/history.html", {
+        "request": request, "current_user": current_user,
+        "item": item, "versions": versions, **get_flash(request),
+    })
+
+
+@router.post("/{outlet_id}/revert/{version_id}")
+async def outlet_revert(
+    outlet_id: int, version_id: int, request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
+    ver = db.query(OutletVersion).filter(OutletVersion.id == version_id, OutletVersion.outlet_id == outlet_id).first()
+    if not item or not ver:
+        set_flash_error(request, "Version snapshot not found.")
+        return RedirectResponse(f"/outlets/{outlet_id}", status_code=302)
+
+    # Snapshot current state before reverting
+    _snapshot_outlet_version(db, item, current_user.id, f"Reverted back to Version #{ver.version_number} by Admin {current_user.full_name}")
+
+    item.name = ver.name
+    item.code = ver.code
+    item.owner_name = ver.owner_name
+    item.mobile = ver.mobile
+    item.address = ver.address
+    item.pincode = ver.pincode
+    item.gstin = ver.gstin
+    item.channel = ChannelType(ver.channel) if ver.channel else None
+    item.shop_type = ShopType(ver.shop_type) if ver.shop_type else None
+    item.beat_id = ver.beat_id
+    item.territory_id = ver.territory_id
+    item.gps_lat = ver.gps_lat
+    item.gps_lng = ver.gps_lng
+    if ver.status:
+        try:
+            item.status = OutletStatus(ver.status)
+        except ValueError:
+            pass
+    db.commit()
+    set_flash_success(request, f"Outlet '{item.name}' successfully reverted to Version #{ver.version_number}.")
+    return RedirectResponse(f"/outlets/{outlet_id}", status_code=302)
 
 
 @router.post("/{outlet_id}/toggle")

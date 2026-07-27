@@ -18,6 +18,9 @@ router = APIRouter(prefix="/beats", tags=["beats"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+from app.utils.geography_scope import get_user_allowed_geography_ids
+
+
 @router.get("", response_class=HTMLResponse)
 async def beat_list(
     request: Request,
@@ -28,6 +31,10 @@ async def beat_list(
     page: int = Query(default=1, ge=1),
 ):
     query = db.query(Beat)
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+    if allowed_geo_ids is not None:
+        query = query.filter(Beat.territory_id.in_(allowed_geo_ids))
+
     if q:
         query = query.filter(Beat.name.ilike(f"%{q}%") | Beat.code.ilike(f"%{q}%"))
     if beat_type:
@@ -48,10 +55,19 @@ async def beat_new(
     db: Session = Depends(get_db),
 ):
     from app.models.local_distribution import LocalChannelPartner
-    territories = db.query(Geography).filter(
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+
+    terr_query = db.query(Geography).filter(
         Geography.level == GeoLevel.territory, Geography.is_active == True
-    ).order_by(Geography.name).all()
-    channel_partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
+    )
+    cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
+
+    if allowed_geo_ids is not None:
+        terr_query = terr_query.filter(Geography.id.in_(allowed_geo_ids))
+        cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_geo_ids))
+
+    territories = terr_query.order_by(Geography.name).all()
+    channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
 
     return templates.TemplateResponse("beats/form.html", {
         "request": request, "current_user": current_user,
@@ -78,9 +94,17 @@ async def beat_create(
     from app.models.local_distribution import LocalChannelPartner
     from app.models.beat_channel_partner import BeatChannelPartner
 
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+
+    terr_query = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True)
+    cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
+    if allowed_geo_ids is not None:
+        terr_query = terr_query.filter(Geography.id.in_(allowed_geo_ids))
+        cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_geo_ids))
+
     if db.query(Beat).filter(Beat.code == code.upper()).first():
-        territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
-        channel_partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
+        territories = terr_query.order_by(Geography.name).all()
+        channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
         return templates.TemplateResponse("beats/form.html", {
             "request": request, "current_user": current_user,
             "item": None, "territories": territories, "channel_partners": channel_partners,
@@ -88,11 +112,16 @@ async def beat_create(
             "error": f"Code '{code.upper()}' already exists.",
         })
     
+    assigned_terr_id = int(territory_id) if territory_id else None
+    if allowed_geo_ids is not None:
+        if assigned_terr_id and assigned_terr_id not in allowed_geo_ids:
+            assigned_terr_id = None
+
     beat = Beat(
         name=name, code=code.upper(), beat_type=parse_beat_type(beat_type),
         description=description or None, pincodes=pincodes or None,
         beat_grade=parse_beat_grade(beat_grade),
-        territory_id=int(territory_id) if territory_id else None,
+        territory_id=assigned_terr_id,
         erp_id=erp_id or None,
     )
     db.add(beat)
@@ -120,8 +149,21 @@ async def beat_edit(
     if not item or not item.is_active:
         set_flash_error(request, "Active beat not found or beat is inactive.")
         return RedirectResponse("/beats", status_code=302)
-    territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
-    channel_partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
+
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+    if allowed_geo_ids is not None:
+        if item.territory_id and item.territory_id not in allowed_geo_ids:
+            set_flash_error(request, "Access denied. Beat is not in your assigned geography.")
+            return RedirectResponse("/beats", status_code=302)
+
+    terr_query = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True)
+    cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
+    if allowed_geo_ids is not None:
+        terr_query = terr_query.filter(Geography.id.in_(allowed_geo_ids))
+        cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_geo_ids))
+
+    territories = terr_query.order_by(Geography.name).all()
+    channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
     attached_ids = [bcp.channel_partner_id for bcp in db.query(BeatChannelPartner).filter(BeatChannelPartner.beat_id == beat_id).all()]
 
     return templates.TemplateResponse("beats/form.html", {

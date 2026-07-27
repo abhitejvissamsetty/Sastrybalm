@@ -10,6 +10,7 @@ from app.models import user             # defines user_positions junction; refer
 from app.models import position         # imports user_positions; references Beat via string
 from app.models import beat             # imports position_beats; references Position, Outlet via string
 from app.models import outlet           # references Beat, Geography
+from app.models import outlet_version   # snapshots of outlet edits
 from app.models import order            # references Outlet, User, Beat, CompanyProfile, Product
 from app.models import payment_submission
 from app.models import payment          # references Order, Outlet, User, PaymentSubmission

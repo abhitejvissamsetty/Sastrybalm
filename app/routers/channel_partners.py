@@ -50,12 +50,12 @@ import json
 from app.models.geography import Geography, GeoLevel
 
 
+from app.utils.geography_scope import get_user_allowed_geography_ids
+
+
 def _get_tm_allowed_geo_ids(db: Session, user: User) -> list[int]:
-    if not user or user.role != UserRole.territory_manager or not user.geography_id:
-        return []
-    region_id = user.geography_id
-    territory_ids = [t.id for t in db.query(Geography).filter(Geography.parent_id == region_id, Geography.is_active == True).all()]
-    return [region_id] + territory_ids
+    res = get_user_allowed_geography_ids(user, db)
+    return res if res is not None else []
 
 
 def _cp_form_context(db: Session, user: Optional[User] = None):

@@ -24,6 +24,8 @@ def _get_regions(db: Session):
     return db.query(Geography).filter(Geography.level == GeoLevel.region, Geography.is_active == True).order_by(Geography.name).all()
 
 
+from app.utils.geography_scope import get_user_allowed_warehouse_ids
+
 @router.get("", response_class=HTMLResponse)
 async def warehouse_list(
     request: Request,
@@ -32,8 +34,12 @@ async def warehouse_list(
     q: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    """List all warehouses."""
+    """List warehouses scoped to user's assigned geography."""
     query = db.query(Warehouse)
+    allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
+    if allowed_wh_ids is not None:
+        query = query.filter(Warehouse.id.in_(allowed_wh_ids))
+
     if q:
         query = query.filter(Warehouse.name.ilike(f"%{q}%") | Warehouse.code.ilike(f"%{q}%") | Warehouse.pincode.ilike(f"%{q}%"))
     query = query.order_by(Warehouse.name.asc())

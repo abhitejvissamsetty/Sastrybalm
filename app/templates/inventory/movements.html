@@ -18,6 +18,50 @@
         &larr; Back to Catalogue
       </a>
     </div>
+  <!-- Filter Bar -->
+  <div class="glass rounded-2xl p-6 border border-white/5 mb-6">
+    <form method="get" class="grid grid-cols-1 gap-4 sm:grid-cols-5 items-end">
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Warehouse</label>
+        <select name="warehouse_id" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Warehouses</option>
+          {% for wh in warehouses %}
+          <option value="{{ wh.id }}" {% if warehouse_id and warehouse_id|int == wh.id %}selected{% endif %}>{{ wh.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Product</label>
+        <select name="product_id" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Products</option>
+          {% for p in products %}
+          <option value="{{ p.id }}" {% if product_id and product_id|int == p.id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Movement Type</label>
+        <select name="movement_type" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Types</option>
+          <option value="INWARD" {% if movement_type == 'INWARD' %}selected{% endif %}>Inward</option>
+          <option value="OUTWARD" {% if movement_type == 'OUTWARD' %}selected{% endif %}>Outward</option>
+          <option value="ADJUSTMENT" {% if movement_type == 'ADJUSTMENT' %}selected{% endif %}>Adjustment</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">From Date</label>
+        <input type="date" name="date_from" value="{{ date_from or '' }}" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div>
+        <button type="submit" class="w-full rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors">
+          Filter Audit Logs
+        </button>
+      </div>
+    </form>
   </div>
 
   <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">

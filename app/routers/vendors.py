@@ -22,6 +22,8 @@ templates = Jinja2Templates(directory="app/templates")
 _ADMIN = require_web_roles(UserRole.admin, UserRole.territory_manager)
 
 
+from app.utils.geography_scope import get_user_allowed_geography_ids
+
 @router.get("", response_class=HTMLResponse)
 async def vendor_list(
     request: Request,
@@ -32,8 +34,9 @@ async def vendor_list(
     page: int = Query(default=1, ge=1),
 ):
     query = db.query(Vendor)
-    if current_user.role == UserRole.territory_manager and current_user.geography_id:
-        query = query.filter(Vendor.geography_id == current_user.geography_id)
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+    if allowed_geo_ids is not None:
+        query = query.filter(Vendor.geography_id.in_(allowed_geo_ids))
     if q:
         query = query.filter(Vendor.name.ilike(f"%{q}%") | Vendor.mobile.ilike(f"%{q}%"))
     if status and status in [s.value for s in VendorStatus]:
@@ -51,13 +54,14 @@ from app.models.geography import Geography, GeoLevel
 from app.models.product import Product, ProductCategory
 
 
-def _vendor_form_context(db: Session) -> dict:
-    geographies = (
-        db.query(Geography)
-        .filter(Geography.is_active == True, Geography.level == GeoLevel.region)
-        .order_by(Geography.name)
-        .all()
-    )
+def _vendor_form_context(db: Session, user: Optional[User] = None) -> dict:
+    geo_query = db.query(Geography).filter(Geography.is_active == True, Geography.level == GeoLevel.region)
+    if user:
+        allowed_geo_ids = get_user_allowed_geography_ids(user, db)
+        if allowed_geo_ids is not None:
+            geo_query = geo_query.filter(Geography.id.in_(allowed_geo_ids))
+
+    geographies = geo_query.order_by(Geography.name).all()
     products = db.query(Product).filter(
         Product.is_active == True,
         Product.category_type == ProductCategory.marketing_procurement
@@ -76,7 +80,7 @@ async def vendor_new(
 ):
     return templates.TemplateResponse("vendors/form.html", {
         "request": request, "current_user": current_user,
-        "item": None, "error": None, **_vendor_form_context(db),
+        "item": None, "error": None, **_vendor_form_context(db, current_user),
     })
 
 
@@ -99,12 +103,14 @@ async def vendor_create(
     if mobile and db.query(Vendor).filter(Vendor.mobile == mobile).first():
         return templates.TemplateResponse("vendors/form.html", {
             "request": request, "current_user": current_user,
-            "item": None, "error": f"Mobile '{mobile}' already registered.", **_vendor_form_context(db),
+            "item": None, "error": f"Mobile '{mobile}' already registered.", **_vendor_form_context(db, current_user),
         })
 
     assigned_geo_id = int(geography_id) if geography_id else None
-    if current_user.role == UserRole.territory_manager and current_user.geography_id:
-        assigned_geo_id = current_user.geography_id
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+    if allowed_geo_ids is not None:
+        if not assigned_geo_id or assigned_geo_id not in allowed_geo_ids:
+            assigned_geo_id = allowed_geo_ids[0] if allowed_geo_ids else None
 
     v = Vendor(
         name=name,
@@ -137,13 +143,14 @@ async def vendor_edit(
     if not item:
         set_flash_error(request, "Vendor not found.")
         return RedirectResponse("/vendors", status_code=302)
-    if current_user.role == UserRole.territory_manager and current_user.geography_id:
-        if item.geography_id and item.geography_id != current_user.geography_id:
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+    if allowed_geo_ids is not None:
+        if item.geography_id and item.geography_id not in allowed_geo_ids:
             set_flash_error(request, "Access denied. Territory Managers can only edit vendors assigned to their region.")
             return RedirectResponse("/vendors", status_code=302)
     return templates.TemplateResponse("vendors/form.html", {
         "request": request, "current_user": current_user,
-        "item": item, "error": None, **_vendor_form_context(db),
+        "item": item, "error": None, **_vendor_form_context(db, current_user),
     })
 
 
@@ -167,14 +174,16 @@ async def vendor_update(
     if not item:
         set_flash_error(request, "Vendor not found.")
         return RedirectResponse("/vendors", status_code=302)
-    if current_user.role == UserRole.territory_manager and current_user.geography_id:
-        if item.geography_id and item.geography_id != current_user.geography_id:
+    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+    if allowed_geo_ids is not None:
+        if item.geography_id and item.geography_id not in allowed_geo_ids:
             set_flash_error(request, "Access denied. Territory Managers can only edit vendors assigned to their region.")
             return RedirectResponse("/vendors", status_code=302)
 
     assigned_geo_id = int(geography_id) if geography_id else None
-    if current_user.role == UserRole.territory_manager and current_user.geography_id:
-        assigned_geo_id = current_user.geography_id
+    if allowed_geo_ids is not None:
+        if not assigned_geo_id or assigned_geo_id not in allowed_geo_ids:
+            assigned_geo_id = item.geography_id if item.geography_id in allowed_geo_ids else (allowed_geo_ids[0] if allowed_geo_ids else None)
 
     item.name = name
     item.contact_person = contact_person or None
@@ -183,9 +192,6 @@ async def vendor_update(
     item.category = category or None
     item.cmms_supplier_ref = cmms_supplier_ref or None
     item.geography_id = assigned_geo_id
-    item.address = address or None
-    if new_password:
-        item.hashed_password = hash_password(new_password)
     item.address = address or None
     if new_password:
         item.hashed_password = hash_password(new_password)
