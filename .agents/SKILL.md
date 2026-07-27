@@ -318,5 +318,9 @@ docker compose up -d
   - **`vendor_admin` / `vendor_technician`**: `["orders", "inventory", "expenses"]`
   - **`qc_manager`**: `["orders", "inventory", "material_requests", "approvals"]`
 
-
-
+### E. Field Rep Web Dashboard Login Restriction
+- **Rule**: Users with `system_role == UserRole.field_rep` are **strictly prohibited** from logging into the web dashboard UI. They are mobile-app-only users.
+- **Enforcement Points (`app/routers/auth.py`)**:
+  - **Password Login (`POST /login`)**: After successful authentication, checks `user.system_role`. If `field_rep`, redirects back to `/login` with flash error: *"Field Representatives are not permitted to access the web dashboard. Please use the mobile app."*
+  - **OTP Login (`POST /auth/verify-otp`)**: After successful OTP verification, checks `user.system_role`. If `field_rep`, renders login page with the same error message.
+- **Rationale**: Field Reps (L1 users) operate exclusively through the mobile application for field operations (visits, orders, attendance, GPS). The web dashboard is reserved for Territory Managers and above.

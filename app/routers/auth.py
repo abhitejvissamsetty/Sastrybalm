@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_web_user, get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.services.auth import (authenticate_user, generate_and_send_user_otp,
                                verify_user_otp)
 
@@ -52,6 +52,12 @@ async def login(
     if not user:
         request.session["_flash_error"] = "Invalid admin username or password."
         return RedirectResponse("/login", status_code=302)
+
+    # Block field reps from web dashboard — mobile app only
+    if user.system_role == UserRole.field_rep:
+        request.session["_flash_error"] = "Field Representatives are not permitted to access the web dashboard. Please use the mobile app."
+        return RedirectResponse("/login", status_code=302)
+
     request.session["user_id"] = user.id
     return RedirectResponse("/dashboard", status_code=302)
 
@@ -96,6 +102,14 @@ async def verify_otp(
             "error": "Invalid or expired OTP code. Please try again.",
             "otp_step": True,
             "email": email,
+        })
+
+    # Block field reps from web dashboard — mobile app only
+    if user.system_role == UserRole.field_rep:
+        return templates.TemplateResponse("auth/login.html", {
+            "request": request,
+            "error": "Field Representatives are not permitted to access the web dashboard. Please use the mobile app.",
+            "otp_step": False,
         })
 
     request.session["user_id"] = user.id
