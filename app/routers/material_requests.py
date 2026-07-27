@@ -20,7 +20,7 @@ from app.utils.pagination import paginate
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/material-requests", tags=["material_requests"])
+router = APIRouter(prefix="/operations/material-requests", tags=["material_requests"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -114,7 +114,7 @@ async def mr_create(
     db.commit()
 
     set_flash_success(request, f"Material request {mr.request_number} created.")
-    return RedirectResponse("/material-requests", status_code=302)
+    return RedirectResponse("/operations/material-requests", status_code=302)
 
 
 def _can_manage_vendor_mapping(user: User) -> bool:
@@ -137,7 +137,7 @@ async def mr_detail(
     item = q.first()
     if not item:
         set_flash_error(request, "Material request not found.")
-        return RedirectResponse("/material-requests", status_code=302)
+        return RedirectResponse("/operations/material-requests", status_code=302)
 
     quotations = db.query(VendorQuotation).filter(VendorQuotation.material_request_id == mr_id).all()
     available_vendors = db.query(User).filter(
@@ -167,18 +167,18 @@ async def mr_assign_vendor(
     mr = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
     if not mr:
         set_flash_error(request, "Material request not found.")
-        return RedirectResponse("/material-requests", status_code=302)
+        return RedirectResponse("/operations/material-requests", status_code=302)
 
     # Authority Check: TM must have Regional or Zonal management scope
     if not _can_manage_vendor_mapping(current_user):
         set_flash_error(request, "Vendor mapping requires Regional or Zonal management scope.")
-        return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+        return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
 
     # Check if Work Order is already completed / QC approved
     for wo in mr.work_orders:
         if wo.qc_status == QCStatus.passed or wo.status == WorkOrderStatus.concluded:
             set_flash_error(request, "Cannot reassign vendor after QC Manager approval / Work Order completion.")
-            return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+            return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
 
     v_id_int = int(vendor_id) if vendor_id and str(vendor_id).isdigit() else None
     vendor = db.query(User).filter(User.id == v_id_int).first() if v_id_int else None
@@ -210,7 +210,7 @@ async def mr_assign_vendor(
         trigger_vendor_material_request_notification(db, mr, is_reassignment=is_reassignment)
 
     set_flash_success(request, f"Vendor '{v_name}' assigned to Material Request {mr.mr_number}.")
-    return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+    return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
 
 
 @router.post("/{mr_id}/status")
@@ -223,7 +223,7 @@ async def mr_update_status(
     item = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
     if not item:
         set_flash_error(request, "Material request not found.")
-        return RedirectResponse("/material-requests", status_code=302)
+        return RedirectResponse("/operations/material-requests", status_code=302)
 
     old_st = item.status.value if item.status else None
     if new_status in ["Approved", "Rejected", "Held", "approved", "rejected", "held"]:
@@ -254,7 +254,7 @@ async def mr_update_status(
     else:
         set_flash_error(request, f"Invalid status '{new_status}'.")
 
-    return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+    return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
 
 
 @router.post("/{mr_id}/quote")
@@ -271,7 +271,7 @@ async def mr_submit_quote(
     mr = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
     if not mr:
         set_flash_error(request, "Material Request not found.")
-        return RedirectResponse("/material-requests", status_code=302)
+        return RedirectResponse("/operations/material-requests", status_code=302)
 
     invoice_photo_url = None
     if invoice_photo and invoice_photo.filename:
@@ -312,7 +312,7 @@ async def mr_submit_quote(
     )
 
     set_flash_success(request, "Quotation submitted successfully.")
-    return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+    return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
 
 
 @router.post("/{mr_id}/quote/{quote_id}/review")
@@ -326,7 +326,7 @@ async def quote_review(
     quote = db.query(VendorQuotation).filter(VendorQuotation.id == quote_id).first()
     if not quote:
         set_flash_error(request, "Quotation not found.")
-        return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+        return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
 
     mr = quote.material_request
     from app.services.channel_partner_notification import record_material_request_history_log
@@ -374,7 +374,7 @@ async def quote_review(
         db.commit()
         set_flash_success(request, "Quotation put on hold.")
 
-    return RedirectResponse(f"/material-requests/{mr_id}", status_code=302)
+    return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
 
 
 from fastapi import File, UploadFile
@@ -395,7 +395,7 @@ async def work_order_qc(
     wo = db.query(WorkOrder).filter(WorkOrder.id == wo_id).first()
     if not wo:
         set_flash_error(request, "Work order not found.")
-        return RedirectResponse("/material-requests", status_code=302)
+        return RedirectResponse("/operations/material-requests", status_code=302)
 
     photo_path = None
     if qc_photo and qc_photo.filename:

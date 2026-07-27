@@ -17,7 +17,7 @@ from app.utils.pagination import paginate
 ALLOWED_RECEIPT_EXTS = {".jpg", ".jpeg", ".png", ".pdf"}
 MAX_RECEIPT_SIZE = 5 * 1024 * 1024  # 5 MB
 
-router = APIRouter(prefix="/expenses", tags=["expenses"])
+router = APIRouter(prefix="/operations/expenses", tags=["expenses"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -120,7 +120,7 @@ async def expense_create(
     db.add(e)
     db.commit()
     set_flash_success(request, "Expense submitted.")
-    return RedirectResponse("/expenses", status_code=302)
+    return RedirectResponse("/operations/expenses", status_code=302)
 
 
 @router.post("/{expense_id}/upload-receipt")
@@ -133,29 +133,29 @@ async def expense_upload_receipt(
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not expense:
         set_flash_error(request, "Expense not found.")
-        return RedirectResponse("/expenses", status_code=302)
+        return RedirectResponse("/operations/expenses", status_code=302)
 
     # Ownership check for field reps
     if current_user.role == UserRole.field_rep and expense.user_id != current_user.id:
         set_flash_error(request, "You can only upload receipts for your own expenses.")
-        return RedirectResponse("/expenses", status_code=302)
+        return RedirectResponse("/operations/expenses", status_code=302)
 
     form = await request.form()
     receipt_file = form.get("receipt")
 
     if not receipt_file or not hasattr(receipt_file, "filename") or not receipt_file.filename:
         set_flash_error(request, "No file selected.")
-        return RedirectResponse(f"/expenses", status_code=302)
+        return RedirectResponse(f"/operations/expenses", status_code=302)
 
     ext = os.path.splitext(receipt_file.filename)[1].lower()
     if ext not in ALLOWED_RECEIPT_EXTS:
         set_flash_error(request, f"File type not allowed. Use: {', '.join(ALLOWED_RECEIPT_EXTS)}")
-        return RedirectResponse("/expenses", status_code=302)
+        return RedirectResponse("/operations/expenses", status_code=302)
 
     contents = await receipt_file.read()
     if len(contents) > MAX_RECEIPT_SIZE:
         set_flash_error(request, "File too large. Maximum 5MB.")
-        return RedirectResponse("/expenses", status_code=302)
+        return RedirectResponse("/operations/expenses", status_code=302)
 
     upload_dir = os.path.join("app", "static", "uploads", "receipts")
     os.makedirs(upload_dir, exist_ok=True)
@@ -167,7 +167,7 @@ async def expense_upload_receipt(
     expense.receipt_url = f"/static/uploads/receipts/{filename}"
     db.commit()
     set_flash_success(request, f"Receipt uploaded for expense #{expense_id}.")
-    return RedirectResponse("/expenses", status_code=302)
+    return RedirectResponse("/operations/expenses", status_code=302)
 
 
 @router.post("/{expense_id}/approve")
@@ -183,7 +183,7 @@ async def expense_approve(
         item.approved_at = datetime.now()
         db.commit()
         set_flash_success(request, f"Expense #{expense_id} approved.")
-    return RedirectResponse("/expenses", status_code=302)
+    return RedirectResponse("/operations/expenses", status_code=302)
 
 
 @router.post("/{expense_id}/reject")

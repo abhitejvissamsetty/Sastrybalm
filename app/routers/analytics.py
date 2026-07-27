@@ -321,6 +321,10 @@ async def marketing_data(
 
 # ── Alerts ─────────────────────────────────────────────────────────────────────
 
+action_center_alerts_router = APIRouter(prefix="/action-center/alerts", tags=["alerts"])
+
+
+@action_center_alerts_router.get("/unread-count")
 @router.get("/alerts/unread-count")
 async def alerts_unread_count(
     current_user: User = Depends(_ADMIN_MANAGER),
@@ -330,6 +334,7 @@ async def alerts_unread_count(
     return JSONResponse({"count": count})
 
 
+@action_center_alerts_router.get("", response_class=HTMLResponse)
 @router.get("/alerts", response_class=HTMLResponse)
 async def alerts_page(
     request: Request,
@@ -358,6 +363,7 @@ async def alerts_page(
     })
 
 
+@action_center_alerts_router.post("/{alert_id}/dismiss", response_class=RedirectResponse)
 @router.post("/alerts/{alert_id}/dismiss", response_class=RedirectResponse)
 async def dismiss_alert(
     alert_id: int, request: Request,
@@ -368,9 +374,10 @@ async def dismiss_alert(
     if alert:
         alert.is_read = True
         db.commit()
-    return RedirectResponse("/analytics/alerts", status_code=302)
+    return RedirectResponse("/action-center/alerts", status_code=302)
 
 
+@action_center_alerts_router.post("/dismiss-all", response_class=RedirectResponse)
 @router.post("/alerts/dismiss-all", response_class=RedirectResponse)
 async def dismiss_all_alerts(
     request: Request,
@@ -380,7 +387,7 @@ async def dismiss_all_alerts(
     db.query(Alert).filter(Alert.is_read == False).update({"is_read": True})
     db.commit()
     set_flash_success(request, "All alerts dismissed.")
-    return RedirectResponse("/analytics/alerts", status_code=302)
+    return RedirectResponse("/action-center/alerts", status_code=302)
 
 
 # ── Scheduled Analytics & S3 Data Reports ─────────────────────────────────────

@@ -23,7 +23,7 @@ from app.utils.ref_generator import order_number
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/orders", tags=["orders"])
+router = APIRouter(prefix="/operations/orders", tags=["orders"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -198,7 +198,7 @@ async def order_create(
     )
 
     set_flash_success(request, f"Order {ord_num} created successfully.")
-    return RedirectResponse(f"/orders/{o.id}", status_code=302)
+    return RedirectResponse(f"/operations/orders/{o.id}", status_code=302)
 
 
 @router.get("/{order_id}", response_class=HTMLResponse)
@@ -213,7 +213,7 @@ async def order_detail(
     item = q.first()
     if not item:
         set_flash_error(request, "Order not found.")
-        return RedirectResponse("/orders", status_code=302)
+        return RedirectResponse("/operations/orders", status_code=302)
 
     # Ensure channel partner is auto-allocated if missing
     if not item.channel_partner_id:
@@ -260,13 +260,13 @@ async def order_record_payment(
     item = db.query(Order).filter(Order.id == order_id).first()
     if not item:
         set_flash_error(request, "Order not found.")
-        return RedirectResponse("/orders", status_code=302)
+        return RedirectResponse("/operations/orders", status_code=302)
 
     try:
         amt_val = Decimal(amount)
     except Exception:
         set_flash_error(request, "Invalid payment amount.")
-        return RedirectResponse(f"/orders/{order_id}", status_code=302)
+        return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
 
     # Denomination validation for cash
     denom_json = None
@@ -274,7 +274,7 @@ async def order_record_payment(
         calculated_total = (count_500 * 500) + (count_200 * 200) + (count_100 * 100) + (count_50 * 50) + (count_20 * 20) + (count_10 * 10)
         if Decimal(calculated_total) != amt_val:
             set_flash_error(request, f"Cash denomination total (₹{calculated_total}) does not match payment amount (₹{amt_val}).")
-            return RedirectResponse(f"/orders/{order_id}", status_code=302)
+            return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
         denom_json = json.dumps({
             "500": count_500, "200": count_200, "100": count_100,
             "50": count_50, "20": count_20, "10": count_10
@@ -298,7 +298,7 @@ async def order_record_payment(
     db.commit()
 
     set_flash_success(request, f"Payment of ₹{amt_val} recorded for order {item.order_number}.")
-    return RedirectResponse(f"/orders/{order_id}", status_code=302)
+    return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
 
 
 @router.post("/{order_id}/status")
@@ -311,7 +311,7 @@ async def order_update_status(
     item = db.query(Order).filter(Order.id == order_id).first()
     if not item:
         set_flash_error(request, "Order not found.")
-        return RedirectResponse("/orders", status_code=302)
+        return RedirectResponse("/operations/orders", status_code=302)
     try:
         old_status_val = item.status.value if item.status else None
         item.status = OrderStatus(new_status)
@@ -345,7 +345,7 @@ async def order_update_status(
         set_flash_success(request, f"Order {item.order_number} status → {new_status}.")
     except ValueError:
         set_flash_error(request, f"Invalid status '{new_status}'.")
-    return RedirectResponse(f"/orders/{order_id}", status_code=302)
+    return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
 
 
 @router.post("/{order_id}/allocate-channel-partner")
@@ -359,7 +359,7 @@ async def order_allocate_channel_partner(
     item = db.query(Order).filter(Order.id == order_id).first()
     if not item:
         set_flash_error(request, "Order not found.")
-        return RedirectResponse("/orders", status_code=302)
+        return RedirectResponse("/operations/orders", status_code=302)
 
     cp_id_int = int(channel_partner_id) if channel_partner_id and str(channel_partner_id).isdigit() else None
     from app.models.local_distribution import LocalChannelPartner
@@ -388,7 +388,7 @@ async def order_allocate_channel_partner(
         trigger_instant_order_notification(db, item)
 
     set_flash_success(request, f"Fulfillment allocated to Channel Partner '{cp_name}'.")
-    return RedirectResponse(f"/orders/{order_id}", status_code=302)
+    return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
 
 
 @router.post("/{order_id}/sync-connect")
@@ -401,22 +401,22 @@ async def order_sync_connect(
     item = db.query(Order).filter(Order.id == order_id).first()
     if not item:
         set_flash_error(request, "Order not found.")
-        return RedirectResponse("/orders", status_code=302)
+        return RedirectResponse("/operations/orders", status_code=302)
 
     if item.flow_type != FlowType.connect:
         set_flash_error(request, "This order does not use the CONNECT flow.")
-        return RedirectResponse(f"/orders/{order_id}", status_code=302)
+        return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
 
     if item.status not in (OrderStatus.submitted, OrderStatus.confirmed):
         set_flash_error(request, "Order must be submitted or confirmed to sync to CONNECT.")
-        return RedirectResponse(f"/orders/{order_id}", status_code=302)
+        return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
 
     item.sync_status = SyncStatus.pending
     item.sync_error = None
     db.commit()
 
     await _sync_order_to_connect(item, db)
-    return RedirectResponse(f"/orders/{order_id}", status_code=302)
+    return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
 
 
 async def _sync_order_to_connect(order: Order, db: Session) -> None:

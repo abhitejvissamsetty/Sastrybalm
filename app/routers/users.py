@@ -15,7 +15,7 @@ from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 from app.utils.security import hash_password
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/master-data/users", tags=["users"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -324,7 +324,7 @@ async def user_create(
             
     db.commit()
     set_flash_success(request, f"User '{full_name}' created.")
-    return RedirectResponse("/users", status_code=302)
+    return RedirectResponse("/master-data/users", status_code=302)
 
 
 @router.get("/{user_id}/edit", response_class=HTMLResponse)
@@ -336,7 +336,7 @@ async def user_edit(
     item = db.query(User).filter(User.id == user_id).first()
     if not item:
         set_flash_error(request, "User not found.")
-        return RedirectResponse("/users", status_code=302)
+        return RedirectResponse("/master-data/users", status_code=302)
     return templates.TemplateResponse("users/form.html", {
         "request": request, "current_user": current_user,
         "item": item, "error": None, **_form_context(db, current_user, editing_user=item),
@@ -366,7 +366,7 @@ async def user_update(
     item = db.query(User).filter(User.id == user_id).first()
     if not item:
         set_flash_error(request, "User not found.")
-        return RedirectResponse("/users", status_code=302)
+        return RedirectResponse("/master-data/users", status_code=302)
         
     import re
     err = None
@@ -470,7 +470,7 @@ async def user_update(
 
     db.commit()
     set_flash_success(request, f"User '{full_name}' updated.")
-    return RedirectResponse("/users", status_code=302)
+    return RedirectResponse("/master-data/users", status_code=302)
 
 
 @router.post("/{user_id}/delete")
@@ -481,13 +481,13 @@ async def user_deactivate(
 ):
     if user_id == current_user.id:
         set_flash_error(request, "You cannot deactivate your own account.")
-        return RedirectResponse("/users", status_code=302)
+        return RedirectResponse("/master-data/users", status_code=302)
     item = db.query(User).filter(User.id == user_id).first()
     if item:
         item.is_active = False
         db.commit()
         set_flash_success(request, f"'{item.full_name}' deactivated.")
-    return RedirectResponse("/users", status_code=302)
+    return RedirectResponse("/master-data/users", status_code=302)
 
 
 @router.post("/{user_id}/activate")

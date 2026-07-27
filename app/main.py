@@ -116,9 +116,62 @@ app.include_router(asset_capitalizations.router)
 app.include_router(vendors.router)
 app.include_router(attendance.router)
 app.include_router(approvals.router)
-app.include_router(flags.router)
+app.include_router(analytics.action_center_alerts_router)
 
-# API routers
+# Legacy URL compatibility redirects
+@app.get("/attendance", include_in_schema=False)
+async def legacy_attendance(): return RedirectResponse("/tracking/attendance", status_code=307)
+
+@app.get("/orders", include_in_schema=False)
+async def legacy_orders(): return RedirectResponse("/operations/orders", status_code=307)
+
+@app.get("/expenses", include_in_schema=False)
+async def legacy_expenses(): return RedirectResponse("/operations/expenses", status_code=307)
+
+@app.get("/timesheets", include_in_schema=False)
+async def legacy_timesheets(): return RedirectResponse("/operations/timesheets", status_code=307)
+
+@app.get("/material-requests", include_in_schema=False)
+async def legacy_mrs(): return RedirectResponse("/operations/material-requests", status_code=307)
+
+@app.get("/asset-capitalizations", include_in_schema=False)
+async def legacy_ac(): return RedirectResponse("/operations/marketing-assets", status_code=307)
+
+@app.get("/approvals", include_in_schema=False)
+async def legacy_approvals(): return RedirectResponse("/action-center/approvals", status_code=307)
+
+@app.get("/flags", include_in_schema=False)
+async def legacy_flags(): return RedirectResponse("/action-center/flags", status_code=307)
+
+@app.get("/products", include_in_schema=False)
+async def legacy_products(): return RedirectResponse("/catalogue/products", status_code=307)
+
+@app.get("/inventory", include_in_schema=False)
+async def legacy_inventory(): return RedirectResponse("/catalogue/inventory", status_code=307)
+
+@app.get("/warehouses", include_in_schema=False)
+async def legacy_warehouses(): return RedirectResponse("/catalogue/warehouses", status_code=307)
+
+@app.get("/geography", include_in_schema=False)
+async def legacy_geography(): return RedirectResponse("/master-data/geography", status_code=307)
+
+@app.get("/users", include_in_schema=False)
+async def legacy_users(): return RedirectResponse("/master-data/users", status_code=307)
+
+@app.get("/positions", include_in_schema=False)
+async def legacy_positions(): return RedirectResponse("/master-data/positions", status_code=307)
+
+@app.get("/beats", include_in_schema=False)
+async def legacy_beats(): return RedirectResponse("/master-data/beats", status_code=307)
+
+@app.get("/outlets", include_in_schema=False)
+async def legacy_outlets(): return RedirectResponse("/master-data/outlets", status_code=307)
+
+@app.get("/channel-partners", include_in_schema=False)
+async def legacy_cps(): return RedirectResponse("/master-data/channel-partners", status_code=307)
+
+@app.get("/vendors", include_in_schema=False)
+async def legacy_vendors(): return RedirectResponse("/master-data/vendors", status_code=307)
 app.include_router(api_auth.router)
 app.include_router(api_master.router)
 app.include_router(api_operations.router)

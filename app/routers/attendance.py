@@ -21,7 +21,7 @@ from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 
-router = APIRouter(prefix="/attendance", tags=["attendance"])
+router = APIRouter(prefix="/tracking/attendance", tags=["attendance"])
 templates = Jinja2Templates(directory="app/templates")
 
 _ADMIN_MANAGER = require_web_roles(UserRole.admin, UserRole.territory_manager)
@@ -62,7 +62,7 @@ async def attendance_detail(
     att = db.query(Attendance).filter(Attendance.id == att_id).first()
     if not att:
         set_flash_error(request, "Attendance record not found.")
-        return RedirectResponse("/attendance", status_code=302)
+        return RedirectResponse("/tracking/attendance", status_code=302)
 
     user = att.user
     att_date = att.date
@@ -178,7 +178,7 @@ async def attendance_approve(
         att.approved_at = datetime.now()
         db.commit()
         set_flash_success(request, f"Attendance approved as {att.type_display}.")
-    return RedirectResponse(f"/attendance/{att_id}", status_code=302)
+    return RedirectResponse(f"/tracking/attendance/{att_id}", status_code=302)
 
 
 @router.post("/{att_id}/reject")
@@ -194,7 +194,7 @@ async def attendance_reject(
         att.rejection_reason = reason or None
         db.commit()
         set_flash_error(request, "Attendance rejected.")
-    return RedirectResponse(f"/attendance/{att_id}", status_code=302)
+    return RedirectResponse(f"/tracking/attendance/{att_id}", status_code=302)
 
 
 @router.post("/{att_id}/reset-checkout")
@@ -206,7 +206,7 @@ async def attendance_reset_checkout(
     att = db.query(Attendance).filter(Attendance.id == att_id).first()
     if not att:
         set_flash_error(request, "Attendance record not found.")
-        return RedirectResponse("/attendance", status_code=302)
+        return RedirectResponse("/tracking/attendance", status_code=302)
 
     from app.models.timesheet import TimesheetStatus
     att.checkout_time = None
@@ -224,7 +224,7 @@ async def attendance_reset_checkout(
 
     db.commit()
     set_flash_success(request, f"Checkout reset successfully for {att.user.full_name}. They can now login / checkin again today.")
-    return RedirectResponse(f"/attendance/{att_id}", status_code=302)
+    return RedirectResponse(f"/tracking/attendance/{att_id}", status_code=302)
 
 
 
@@ -241,7 +241,7 @@ async def timesheet_approve(
         ts.approved_at = datetime.now()
         db.commit()
         set_flash_success(request, "Timesheet approved.")
-    return RedirectResponse(request.headers.get("referer", "/attendance"), status_code=302)
+    return RedirectResponse(request.headers.get("referer", "/tracking/attendance"), status_code=302)
 
 
 @router.post("/timesheets/{ts_id}/reject")
@@ -257,4 +257,4 @@ async def timesheet_reject(
         ts.rejection_reason = reason or None
         db.commit()
         set_flash_error(request, "Timesheet rejected.")
-    return RedirectResponse(request.headers.get("referer", "/attendance"), status_code=302)
+    return RedirectResponse(request.headers.get("referer", "/tracking/attendance"), status_code=302)

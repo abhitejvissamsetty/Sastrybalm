@@ -11,7 +11,7 @@ from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 
-router = APIRouter(prefix="/geography", tags=["geography"])
+router = APIRouter(prefix="/master-data/geography", tags=["geography"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -151,10 +151,10 @@ async def geo_update(
     item = db.query(Geography).filter(Geography.id == geo_id).first()
     if not item:
         set_flash_error(request, "Geography not found.")
-        return RedirectResponse("/geography", status_code=302)
+        return RedirectResponse("/master-data/geography", status_code=302)
     if not item.is_active:
         set_flash_error(request, "Cannot edit a deactivated geography.")
-        return RedirectResponse("/geography", status_code=302)
+        return RedirectResponse("/master-data/geography", status_code=302)
     parent_id_int = int(parent_id) if parent_id else None
     err = _validate_hierarchy(db, GeoLevel(level), parent_id_int)
 
@@ -212,7 +212,7 @@ async def geo_update(
 
     db.commit()
     set_flash_success(request, f"Geography '{name}' updated.")
-    return RedirectResponse("/geography", status_code=302)
+    return RedirectResponse("/master-data/geography", status_code=302)
 
 
 @router.post("/{geo_id}/delete")
@@ -227,14 +227,14 @@ async def geo_delete(
         active_children = db.query(Geography).filter(Geography.parent_id == item.id, Geography.is_active == True).count()
         if active_children > 0:
             set_flash_error(request, f"Cannot deactivate '{item.name}' because it has active child geographies.")
-            return RedirectResponse("/geography", status_code=302)
+            return RedirectResponse("/master-data/geography", status_code=302)
         
         # Check active beats linked to this territory
         from app.models.beat import Beat
         active_beats = db.query(Beat).filter(Beat.territory_id == item.id, Beat.is_active == True).count()
         if active_beats > 0:
             set_flash_error(request, f"Cannot deactivate '{item.name}' because it is attached to active beats.")
-            return RedirectResponse("/geography", status_code=302)
+            return RedirectResponse("/master-data/geography", status_code=302)
 
         # Check inventory stock in attached warehouses for Region
         if item.level == GeoLevel.region:
@@ -249,12 +249,12 @@ async def geo_delete(
                 ).scalar() or 0
                 if wh_stock > 0:
                     set_flash_error(request, f"Cannot deactivate Region '{item.name}' because attached warehouses have active inventory stock ({wh_stock} units). Clear or adjust inventory stock before deactivation.")
-                    return RedirectResponse("/geography", status_code=302)
+                    return RedirectResponse("/master-data/geography", status_code=302)
             
         item.is_active = False
         db.commit()
         set_flash_success(request, f"'{item.name}' deactivated.")
-    return RedirectResponse("/geography", status_code=302)
+    return RedirectResponse("/master-data/geography", status_code=302)
 
 
 @router.post("/{geo_id}/activate")
@@ -270,12 +270,12 @@ async def geo_activate(
             parent = db.query(Geography).filter(Geography.id == item.parent_id).first()
             if parent and not parent.is_active:
                 set_flash_error(request, f"Cannot activate '{item.name}' because its parent geography '{parent.name}' is deactivated.")
-                return RedirectResponse("/geography", status_code=302)
+                return RedirectResponse("/master-data/geography", status_code=302)
                 
         item.is_active = True
         db.commit()
         set_flash_success(request, f"'{item.name}' activated.")
-    return RedirectResponse("/geography", status_code=302)
+    return RedirectResponse("/master-data/geography", status_code=302)
 
 
 def _validate_hierarchy(db, level: GeoLevel, parent_id: Optional[int]) -> Optional[str]:

@@ -14,7 +14,7 @@ from app.utils.pagination import paginate
 
 from app.utils.beat_types import get_all_beat_types
 
-router = APIRouter(prefix="/beats", tags=["beats"])
+router = APIRouter(prefix="/master-data/beats", tags=["beats"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -133,7 +133,7 @@ async def beat_create(
 
     db.commit()
     set_flash_success(request, f"Beat '{name}' created.")
-    return RedirectResponse("/beats", status_code=302)
+    return RedirectResponse("/master-data/beats", status_code=302)
 
 
 @router.get("/{beat_id}/edit", response_class=HTMLResponse)
@@ -148,13 +148,13 @@ async def beat_edit(
     item = db.query(Beat).filter(Beat.id == beat_id).first()
     if not item or not item.is_active:
         set_flash_error(request, "Active beat not found or beat is inactive.")
-        return RedirectResponse("/beats", status_code=302)
+        return RedirectResponse("/master-data/beats", status_code=302)
 
     allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
     if allowed_geo_ids is not None:
         if item.territory_id and item.territory_id not in allowed_geo_ids:
             set_flash_error(request, "Access denied. Beat is not in your assigned geography.")
-            return RedirectResponse("/beats", status_code=302)
+            return RedirectResponse("/master-data/beats", status_code=302)
 
     terr_query = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True)
     cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
@@ -194,7 +194,7 @@ async def beat_update(
     item = db.query(Beat).filter(Beat.id == beat_id).first()
     if not item or not item.is_active:
         set_flash_error(request, "Active beat not found or beat is inactive.")
-        return RedirectResponse("/beats", status_code=302)
+        return RedirectResponse("/master-data/beats", status_code=302)
     if db.query(Beat).filter(Beat.code == code.upper(), Beat.id != beat_id).first():
         cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
         if allowed_geo_ids is not None:
@@ -223,7 +223,7 @@ async def beat_update(
 
     db.commit()
     set_flash_success(request, f"Beat '{name}' updated.")
-    return RedirectResponse("/beats", status_code=302)
+    return RedirectResponse("/master-data/beats", status_code=302)
 
 
 @router.post("/{beat_id}/activate")
@@ -237,7 +237,7 @@ async def beat_activate(
         item.is_active = True
         db.commit()
         set_flash_success(request, f"'{item.name}' activated.")
-    return RedirectResponse("/beats", status_code=302)
+    return RedirectResponse("/master-data/beats", status_code=302)
 
 
 @router.post("/{beat_id}/delete")
@@ -250,10 +250,10 @@ async def beat_delete(
     if item:
         if item.active_outlet_count > 0:
             set_flash_error(request, f"Cannot deactivate '{item.name}' because it has active outlets.")
-            return RedirectResponse("/beats", status_code=302)
+            return RedirectResponse("/master-data/beats", status_code=302)
         if any(p.is_active for p in item.positions):
             set_flash_error(request, f"Cannot deactivate '{item.name}' because it is attached to active positions.")
-            return RedirectResponse("/beats", status_code=302)
+            return RedirectResponse("/master-data/beats", status_code=302)
             
         item.is_active = False
         db.commit()

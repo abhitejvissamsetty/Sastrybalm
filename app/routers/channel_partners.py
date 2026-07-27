@@ -15,7 +15,7 @@ from app.utils.pagination import paginate
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/channel-partners", tags=["channel-partners"])
+router = APIRouter(prefix="/master-data/channel-partners", tags=["channel-partners"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -164,7 +164,7 @@ async def channel_partner_create(
     db.add(partner)
     db.commit()
     set_flash_success(request, f"Channel Partner '{name}' created.")
-    return RedirectResponse("/channel-partners", status_code=302)
+    return RedirectResponse("/master-data/channel-partners", status_code=302)
 
 
 @router.get("/{cp_id}/edit", response_class=HTMLResponse)
@@ -177,13 +177,13 @@ async def channel_partner_edit(
     item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
     if not item:
         set_flash_error(request, "Channel Partner not found.")
-        return RedirectResponse("/channel-partners", status_code=302)
+        return RedirectResponse("/master-data/channel-partners", status_code=302)
 
     if current_user.role == UserRole.territory_manager:
         allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
         if item.geography_id not in allowed_ids:
             set_flash_error(request, "You are not authorized to edit Channel Partners outside your region.")
-            return RedirectResponse("/channel-partners", status_code=302)
+            return RedirectResponse("/master-data/channel-partners", status_code=302)
 
     return templates.TemplateResponse("channel_partners/form.html", {
         "request": request,
@@ -216,13 +216,13 @@ async def channel_partner_update(
     item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
     if not item:
         set_flash_error(request, "Channel Partner not found.")
-        return RedirectResponse("/channel-partners", status_code=302)
+        return RedirectResponse("/master-data/channel-partners", status_code=302)
 
     if current_user.role == UserRole.territory_manager:
         allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
         if item.geography_id not in allowed_ids:
             set_flash_error(request, "You are not authorized to edit Channel Partners outside your region.")
-            return RedirectResponse("/channel-partners", status_code=302)
+            return RedirectResponse("/master-data/channel-partners", status_code=302)
 
     form_data = await request.form()
     raw_channels = form_data.getlist("sales_channels") or sales_channels
@@ -273,7 +273,7 @@ async def channel_partner_update(
 
     db.commit()
     set_flash_success(request, f"Channel Partner '{name}' updated.")
-    return RedirectResponse("/channel-partners", status_code=302)
+    return RedirectResponse("/master-data/channel-partners", status_code=302)
 
 
 @router.post("/{cp_id}/deactivate")
@@ -286,18 +286,18 @@ async def channel_partner_deactivate(
     item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
     if not item:
         set_flash_error(request, "Channel Partner not found.")
-        return RedirectResponse("/channel-partners", status_code=302)
+        return RedirectResponse("/master-data/channel-partners", status_code=302)
 
     if current_user.role == UserRole.territory_manager:
         allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
         if item.geography_id not in allowed_ids:
             set_flash_error(request, "You are not authorized to deactivate Channel Partners outside your region.")
-            return RedirectResponse("/channel-partners", status_code=302)
+            return RedirectResponse("/master-data/channel-partners", status_code=302)
 
     item.is_active = False
     db.commit()
     set_flash_success(request, f"Channel Partner '{item.name}' deactivated.")
-    return RedirectResponse("/channel-partners", status_code=302)
+    return RedirectResponse("/master-data/channel-partners", status_code=302)
 
 
 @router.post("/{cp_id}/activate")
@@ -310,18 +310,18 @@ async def channel_partner_activate(
     item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
     if not item:
         set_flash_error(request, "Channel Partner not found.")
-        return RedirectResponse("/channel-partners", status_code=302)
+        return RedirectResponse("/master-data/channel-partners", status_code=302)
 
     if current_user.role == UserRole.territory_manager:
         allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
         if item.geography_id not in allowed_ids:
             set_flash_error(request, "You are not authorized to activate Channel Partners outside your region.")
-            return RedirectResponse("/channel-partners", status_code=302)
+            return RedirectResponse("/master-data/channel-partners", status_code=302)
 
     item.is_active = True
     db.commit()
     set_flash_success(request, f"Channel Partner '{item.name}' activated.")
-    return RedirectResponse("/channel-partners", status_code=302)
+    return RedirectResponse("/master-data/channel-partners", status_code=302)
 
 
 from fastapi.responses import Response
@@ -338,13 +338,13 @@ async def export_channel_partner_daily_orders_csv(
     item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
     if not item:
         set_flash_error(request, "Channel Partner not found.")
-        return RedirectResponse("/channel-partners", status_code=302)
+        return RedirectResponse("/master-data/channel-partners", status_code=302)
 
     if current_user.role == UserRole.territory_manager:
         allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
         if item.geography_id not in allowed_ids:
             set_flash_error(request, "You are not authorized to export data for Channel Partners outside your region.")
-            return RedirectResponse("/channel-partners", status_code=302)
+            return RedirectResponse("/master-data/channel-partners", status_code=302)
 
     csv_data = generate_channel_partner_daily_orders_csv(db, item)
     filename = f"channel_partner_{item.code or item.id}_daily_orders.csv"

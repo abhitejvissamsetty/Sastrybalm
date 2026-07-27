@@ -318,9 +318,28 @@ docker compose up -d
   - **`vendor_admin` / `vendor_technician`**: `["orders", "inventory", "expenses"]`
   - **`qc_manager`**: `["orders", "inventory", "material_requests", "approvals"]`
 
-### E. Field Rep Web Dashboard Login Restriction
-- **Rule**: Users with `system_role == UserRole.field_rep` are **strictly prohibited** from logging into the web dashboard UI. They are mobile-app-only users.
-- **Enforcement Points (`app/routers/auth.py`)**:
-  - **Password Login (`POST /login`)**: After successful authentication, checks `user.system_role`. If `field_rep`, redirects back to `/login` with flash error: *"Field Representatives are not permitted to access the web dashboard. Please use the mobile app."*
-  - **OTP Login (`POST /auth/verify-otp`)**: After successful OTP verification, checks `user.system_role`. If `field_rep`, renders login page with the same error message.
-- **Rationale**: Field Reps (L1 users) operate exclusively through the mobile application for field operations (visits, orders, attendance, GPS). The web dashboard is reserved for Territory Managers and above.
+### F. Permission Matrix to Sidebar Navigation Enforcement
+- **Dynamic Navigation Scoping (`app/templates/shared/sidebar.html`)**: The sidebar template extracts the user's enabled modules via `mods = current_user.active_modules()`.
+- **Module to Menu Item Mapping**:
+  - `attendance` $\rightarrow$ Attendance
+  - `visits` $\rightarrow$ Visit Records (with role check)
+  - `gps_map` $\rightarrow$ GPS Map View (with role check)
+  - `orders` $\rightarrow$ Orders
+  - `expenses` $\rightarrow$ Expenses
+  - `timesheets` $\rightarrow$ Timesheets
+  - `inventory` $\rightarrow$ Material Requests & Marketing Assets (for non-admin users) / Inventory (Catalogue)
+  - `approvals` $\rightarrow$ Approval Hub, Alerts & Notifications, Auto-Flags
+  - `analytics` $\rightarrow$ Sales Analytics, Rep Performance, Marketing, Scheduled Reports
+- **Admin Bypass**: `system_role == admin` bypasses individual module toggles to preserve complete system configuration & management oversight.
+- **Eager Loading (`app/dependencies.py`)**: `get_current_web_user` uses `options(joinedload(User.module_access))` to ensure clean template rendering without lazy loading overhead.
+
+### G. Structured Section URL Slugs Architecture
+All Web UI routes are structured with section prefixes corresponding to their sidebar tab hierarchy:
+- **Field Tracking (`/tracking/...`)**: `/tracking/attendance`, `/tracking/visits`, `/tracking/map`
+- **Operations (`/operations/...`)**: `/operations/orders`, `/operations/expenses`, `/operations/timesheets`, `/operations/material-requests`, `/operations/marketing-assets`
+- **Action Center (`/action-center/...`)**: `/action-center/approvals`, `/action-center/alerts`, `/action-center/flags`
+- **Analytics (`/analytics/...`)**: `/analytics/sales`, `/analytics/reps`, `/analytics/marketing`, `/analytics/scheduled`
+- **Catalogue (`/catalogue/...`)**: `/catalogue/products`, `/catalogue/inventory`, `/catalogue/warehouses`
+- **Master Data (`/master-data/...`)**: `/master-data/geography`, `/master-data/users`, `/master-data/positions`, `/master-data/beats`, `/master-data/outlets`, `/master-data/channel-partners`, `/master-data/vendors`
+- **Configuration (`/settings/...`)**: `/settings/...`
+- **Legacy Path Redirects**: Backward-compatibility 307 redirects are mounted in `app/main.py` for legacy top-level routes (e.g. `/orders` $\rightarrow$ `/operations/orders`).

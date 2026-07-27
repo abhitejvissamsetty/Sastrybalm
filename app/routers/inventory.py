@@ -16,7 +16,7 @@ from app.utils.pagination import paginate
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
+router = APIRouter(prefix="/catalogue/inventory", tags=["inventory"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -194,17 +194,17 @@ async def inventory_assign_warehouse(
     allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
     if allowed_wh_ids is not None and warehouse_id not in allowed_wh_ids:
         set_flash_error(request, "Access denied. You cannot assign this warehouse.")
-        return RedirectResponse("/inventory", status_code=302)
+        return RedirectResponse("/catalogue/inventory", status_code=302)
 
     product = db.query(Product).filter(Product.id == product_id, Product.is_stockable == True).first()
     if not product:
         set_flash_error(request, "Stockable product not found.")
-        return RedirectResponse("/inventory", status_code=302)
+        return RedirectResponse("/catalogue/inventory", status_code=302)
 
     wh = db.query(Warehouse).filter(Warehouse.id == warehouse_id, Warehouse.is_active == True).first()
     if not wh:
         set_flash_error(request, "Selected warehouse not found or inactive.")
-        return RedirectResponse("/inventory", status_code=302)
+        return RedirectResponse("/catalogue/inventory", status_code=302)
 
     pws = db.query(ProductWarehouseStock).filter(
         ProductWarehouseStock.product_id == product_id,
@@ -233,7 +233,7 @@ async def inventory_assign_warehouse(
 
     db.commit()
     set_flash_success(request, f"Attached warehouse '{wh.name}' to product '{product.name}'.")
-    return RedirectResponse("/inventory", status_code=302)
+    return RedirectResponse("/catalogue/inventory", status_code=302)
 
 
 @router.post("/remove-warehouse")
@@ -248,7 +248,7 @@ async def inventory_remove_warehouse(
     allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
     if allowed_wh_ids is not None and warehouse_id not in allowed_wh_ids:
         set_flash_error(request, "Access denied.")
-        return RedirectResponse("/inventory", status_code=302)
+        return RedirectResponse("/catalogue/inventory", status_code=302)
 
     pws = db.query(ProductWarehouseStock).filter(
         ProductWarehouseStock.product_id == product_id,
@@ -258,7 +258,7 @@ async def inventory_remove_warehouse(
     if pws:
         if pws.stock_qty > 0:
             set_flash_error(request, f"Cannot remove warehouse. Stock is present ({pws.stock_qty} units). Clear stock first.")
-            return RedirectResponse("/inventory", status_code=302)
+            return RedirectResponse("/catalogue/inventory", status_code=302)
         
         db.delete(pws)
         db.commit()
@@ -274,7 +274,7 @@ async def inventory_remove_warehouse(
             db.commit()
 
         set_flash_success(request, "Warehouse unassigned from product successfully.")
-    return RedirectResponse("/inventory", status_code=302)
+    return RedirectResponse("/catalogue/inventory", status_code=302)
 
 
 @router.post("/stock-inward")
@@ -291,19 +291,19 @@ async def inventory_stock_inward(
     """Add incoming stock to a specific warehouse."""
     if not warehouse_id:
         set_flash_error(request, "Please select a warehouse for stock inward.")
-        return RedirectResponse("/inventory", status_code=302)
+        return RedirectResponse("/catalogue/inventory", status_code=302)
 
     try:
         wh_id = int(warehouse_id)
         allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
         if allowed_wh_ids is not None and wh_id not in allowed_wh_ids:
             set_flash_error(request, "Access denied. You can only inward stock for warehouses in your assigned geography.")
-            return RedirectResponse("/inventory", status_code=302)
+            return RedirectResponse("/catalogue/inventory", status_code=302)
 
         wh = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
         if not wh or not wh.is_active:
             set_flash_error(request, "Selected warehouse is inactive or not found.")
-            return RedirectResponse("/inventory", status_code=302)
+            return RedirectResponse("/catalogue/inventory", status_code=302)
 
         record_stock_movement(
             db=db,
@@ -319,7 +319,7 @@ async def inventory_stock_inward(
     except Exception as exc:
         set_flash_error(request, f"Failed to record stock inward: {exc}")
 
-    return RedirectResponse("/inventory", status_code=302)
+    return RedirectResponse("/catalogue/inventory", status_code=302)
 
 
 @router.post("/adjust")
@@ -335,19 +335,19 @@ async def inventory_stock_adjust(
     """Adjust stock quantity for a specific warehouse."""
     if not warehouse_id:
         set_flash_error(request, "Please select a warehouse for stock adjustment.")
-        return RedirectResponse("/inventory", status_code=302)
+        return RedirectResponse("/catalogue/inventory", status_code=302)
 
     try:
         wh_id = int(warehouse_id)
         allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
         if allowed_wh_ids is not None and wh_id not in allowed_wh_ids:
             set_flash_error(request, "Access denied. You can only adjust stock for warehouses in your assigned geography.")
-            return RedirectResponse("/inventory", status_code=302)
+            return RedirectResponse("/catalogue/inventory", status_code=302)
 
         wh = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
         if not wh or not wh.is_active:
             set_flash_error(request, "Selected warehouse is inactive or not found.")
-            return RedirectResponse("/inventory", status_code=302)
+            return RedirectResponse("/catalogue/inventory", status_code=302)
 
         record_stock_movement(
             db=db,
@@ -362,7 +362,7 @@ async def inventory_stock_adjust(
     except Exception as exc:
         set_flash_error(request, f"Failed to adjust stock: {exc}")
 
-    return RedirectResponse("/inventory", status_code=302)
+    return RedirectResponse("/catalogue/inventory", status_code=302)
 
 
 @router.get("/movements", response_class=HTMLResponse)

@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import SessionLocal
 from app.models.user import User, UserRole
@@ -25,7 +25,7 @@ def get_current_web_user(request: Request, db: Session = Depends(get_db)) -> Opt
     user_id = request.session.get("user_id")
     if not user_id:
         return None
-    return db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    return db.query(User).options(joinedload(User.module_access)).filter(User.id == user_id, User.is_active == True).first()
 
 
 def require_web_auth(user: Optional[User] = Depends(get_current_web_user)) -> User:

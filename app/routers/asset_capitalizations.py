@@ -22,7 +22,7 @@ from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.geography_scope import get_user_allowed_warehouse_ids
 from app.utils.pagination import paginate
 
-router = APIRouter(prefix="/asset-capitalizations", tags=["asset-capitalizations"])
+router = APIRouter(prefix="/operations/marketing-assets", tags=["asset-capitalizations"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -129,7 +129,7 @@ async def ac_create(
     await _sync_ac_to_cmms(ac, db)
 
     set_flash_success(request, f"Asset capitalization {ac_num} created.")
-    return RedirectResponse("/asset-capitalizations", status_code=302)
+    return RedirectResponse("/operations/marketing-assets", status_code=302)
 
 
 @router.get("/{ac_id}", response_class=HTMLResponse)
@@ -141,7 +141,7 @@ async def ac_detail(
     item = db.query(AssetCapitalization).filter(AssetCapitalization.id == ac_id).first()
     if not item:
         set_flash_error(request, "Asset capitalization not found.")
-        return RedirectResponse("/asset-capitalizations", status_code=302)
+        return RedirectResponse("/operations/marketing-assets", status_code=302)
     return templates.TemplateResponse("asset_capitalizations/detail.html", {
         "request": request, "current_user": current_user,
         "item": item, "ACStatus": ACStatus, "ACSyncStatus": ACSyncStatus,
@@ -158,12 +158,12 @@ async def ac_sync_cmms(
     item = db.query(AssetCapitalization).filter(AssetCapitalization.id == ac_id).first()
     if not item:
         set_flash_error(request, "Not found.")
-        return RedirectResponse("/asset-capitalizations", status_code=302)
+        return RedirectResponse("/operations/marketing-assets", status_code=302)
     item.sync_status = ACSyncStatus.pending
     item.sync_error = None
     db.commit()
     await _sync_ac_to_cmms(item, db)
-    return RedirectResponse(f"/asset-capitalizations/{ac_id}", status_code=302)
+    return RedirectResponse(f"/operations/marketing-assets/{ac_id}", status_code=302)
 
 
 async def _sync_ac_to_cmms(ac: AssetCapitalization, db: Session):

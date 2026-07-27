@@ -190,21 +190,33 @@
           <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-x-2">
             <span class="h-2 w-2 rounded-full bg-indigo-500"></span> Operations
           </h3>
-          <div class="space-y-2.5 text-xs text-slate-300">
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Orders &amp; Billing</span>
+          <div class="space-y-2 text-xs text-slate-300">
+            <label class="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors">
+              <div>
+                <span class="font-medium block text-slate-200">Orders &amp; Billing</span>
+                <span class="text-[11px] text-slate-400">Disables/Enables Orders menu</span>
+              </div>
               <input type="checkbox" name="modules" value="orders" {% if 'orders' in active_mods or 'invoicing' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
             </label>
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Inventory &amp; Stock Catalogue</span>
+            <label class="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors">
+              <div>
+                <span class="font-medium block text-slate-200">Inventory &amp; Stock Catalogue</span>
+                <span class="text-[11px] text-slate-400">Disables/Enables Inventory, Warehouses, Material Requests &amp; Marketing Assets</span>
+              </div>
               <input type="checkbox" name="modules" value="inventory" {% if 'inventory' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
             </label>
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Expenses Management</span>
+            <label class="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors">
+              <div>
+                <span class="font-medium block text-slate-200">Expenses Management</span>
+                <span class="text-[11px] text-slate-400">Disables/Enables Expenses menu</span>
+              </div>
               <input type="checkbox" name="modules" value="expenses" {% if 'expenses' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
             </label>
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Timesheets Management</span>
+            <label class="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors">
+              <div>
+                <span class="font-medium block text-slate-200">Timesheets Management</span>
+                <span class="text-[11px] text-slate-400">Disables/Enables Timesheets menu</span>
+              </div>
               <input type="checkbox" name="modules" value="timesheets" {% if 'timesheets' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
             </label>
           </div>
@@ -215,17 +227,26 @@
           <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-x-2">
             <span class="h-2 w-2 rounded-full bg-emerald-500"></span> Field Operations
           </h3>
-          <div class="space-y-2.5 text-xs text-slate-300">
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Attendance Check-ins</span>
+          <div class="space-y-2 text-xs text-slate-300">
+            <label class="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors">
+              <div>
+                <span class="font-medium block text-slate-200">Attendance Check-ins</span>
+                <span class="text-[11px] text-slate-400">Disables/Enables Attendance tracking menu</span>
+              </div>
               <input type="checkbox" name="modules" value="attendance" {% if 'attendance' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
             </label>
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Store Visit Records</span>
+            <label class="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors">
+              <div>
+                <span class="font-medium block text-slate-200">Store Visit Records</span>
+                <span class="text-[11px] text-slate-400">Disables/Enables Store Visit Records menu</span>
+              </div>
               <input type="checkbox" name="modules" value="visits" {% if 'visits' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
             </label>
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Live GPS Map View</span>
+            <label class="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors">
+              <div>
+                <span class="font-medium block text-slate-200">Live GPS Map View</span>
+                <span class="text-[11px] text-slate-400">Disables/Enables Live GPS Map View menu</span>
+              </div>
               <input type="checkbox" name="modules" value="gps_map" {% if 'gps_map' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
             </label>
           </div>
@@ -236,34 +257,24 @@
           <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-x-2">
             <span class="h-2 w-2 rounded-full bg-amber-500"></span> Analytics &amp; Approvals
           </h3>
-          <div class="space-y-2.5 text-xs text-slate-300">
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Sales &amp; Performance Analytics</span>
+          <div class="space-y-2 text-xs text-slate-300">
+            <label class="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors">
+              <div>
+                <span class="font-medium block text-slate-200">Sales &amp; Performance Analytics</span>
+                <span class="text-[11px] text-slate-400">Disables/Enables Sales Analytics, Rep Performance, Marketing &amp; Scheduled Reports</span>
+              </div>
               <input type="checkbox" name="modules" value="analytics" {% if 'analytics' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
             </label>
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Manager Approvals Hub</span>
+            <label class="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-900 cursor-pointer transition-colors">
+              <div>
+                <span class="font-medium block text-slate-200">Manager Approvals Hub</span>
+                <span class="text-[11px] text-slate-400">Disables/Enables Approval Hub, Alerts &amp; Notifications, and Auto-Flags</span>
+              </div>
               <input type="checkbox" name="modules" value="approvals" {% if 'approvals' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
             </label>
           </div>
         </div>
 
-        <!-- Category: Settings & System -->
-        <div class="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-3">
-          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-x-2">
-            <span class="h-2 w-2 rounded-full bg-cyan-500"></span> Master Data &amp; System Settings
-          </h3>
-          <div class="space-y-2.5 text-xs text-slate-300">
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Warehouses &amp; Channel Partners</span>
-              <input type="checkbox" name="modules" value="settings" {% if 'settings' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
-            </label>
-            <label class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900 cursor-pointer">
-              <span>Data Backup &amp; Recovery</span>
-              <input type="checkbox" name="modules" value="backup" {% if 'backup' in active_mods %}checked{% endif %} class="permission-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
-            </label>
-          </div>
-        </div>
 
       </div>
     </div>

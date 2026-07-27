@@ -16,7 +16,7 @@ from app.utils.pagination import paginate
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/warehouses", tags=["warehouses"])
+router = APIRouter(prefix="/catalogue/warehouses", tags=["warehouses"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -99,7 +99,7 @@ async def warehouse_create(
     db.add(wh)
     db.commit()
     set_flash_success(request, f"Warehouse '{name}' created.")
-    return RedirectResponse("/warehouses", status_code=302)
+    return RedirectResponse("/catalogue/warehouses", status_code=302)
 
 
 @router.get("/{wh_id}/edit", response_class=HTMLResponse)
@@ -112,7 +112,7 @@ async def warehouse_edit(
     item = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
     if not item:
         set_flash_error(request, "Warehouse not found.")
-        return RedirectResponse("/warehouses", status_code=302)
+        return RedirectResponse("/catalogue/warehouses", status_code=302)
 
     return templates.TemplateResponse("warehouses/form.html", {
         "request": request,
@@ -158,7 +158,7 @@ async def warehouse_update(
     item = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
     if not item:
         set_flash_error(request, "Warehouse not found.")
-        return RedirectResponse("/warehouses", status_code=302)
+        return RedirectResponse("/catalogue/warehouses", status_code=302)
 
     if db.query(Warehouse).filter(Warehouse.code == code.upper(), Warehouse.id != wh_id).first():
         return templates.TemplateResponse("warehouses/form.html", {
@@ -191,7 +191,7 @@ async def warehouse_update(
 
     db.commit()
     set_flash_success(request, f"Warehouse '{name}' updated.")
-    return RedirectResponse("/warehouses", status_code=302)
+    return RedirectResponse("/catalogue/warehouses", status_code=302)
 
 
 @router.post("/{wh_id}/delete")
@@ -206,12 +206,12 @@ async def warehouse_deactivate(
         total_stock = _check_warehouse_stock(db, wh_id)
         if total_stock > 0:
             set_flash_error(request, f"Cannot deactivate warehouse '{item.name}' because inventory stock ({total_stock} units) is present. Clear or adjust stock to 0 before deactivation.")
-            return RedirectResponse("/warehouses", status_code=302)
+            return RedirectResponse("/catalogue/warehouses", status_code=302)
 
         item.is_active = False
         db.commit()
         set_flash_success(request, f"Warehouse '{item.name}' deactivated successfully.")
-    return RedirectResponse("/warehouses", status_code=302)
+    return RedirectResponse("/catalogue/warehouses", status_code=302)
 
 
 @router.post("/{wh_id}/activate")

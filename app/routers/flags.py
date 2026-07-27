@@ -15,7 +15,7 @@ from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 
-router = APIRouter(prefix="/flags", tags=["auto-flags"])
+router = APIRouter(prefix="/action-center/flags", tags=["auto-flags"])
 templates = Jinja2Templates(directory="app/templates")
 
 _ADMIN_MANAGER = require_web_roles(UserRole.admin, UserRole.territory_manager)
@@ -75,7 +75,7 @@ async def flag_review(
     db.commit()
 
     set_flash_success(request, f"Flag rated {flag.admin_rating}/5 and marked {flag.status.value}.")
-    return RedirectResponse("/flags", status_code=302)
+    return RedirectResponse("/action-center/flags", status_code=302)
 
 
 @router.post("/{flag_id}/escalate")

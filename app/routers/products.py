@@ -17,7 +17,7 @@ from app.utils.csv_import import parse_csv_bytes
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 
-router = APIRouter(prefix="/products", tags=["products"])
+router = APIRouter(prefix="/catalogue/products", tags=["products"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -113,7 +113,7 @@ async def product_create(
     db.add(product)
     db.commit()
     set_flash_success(request, f"Product '{name}' created.")
-    return RedirectResponse("/products", status_code=302)
+    return RedirectResponse("/catalogue/products", status_code=302)
 
 
 @router.get("/{product_id}/edit", response_class=HTMLResponse)
@@ -125,7 +125,7 @@ async def product_edit(
     item = db.query(Product).filter(Product.id == product_id).first()
     if not item:
         set_flash_error(request, "Product not found.")
-        return RedirectResponse("/products", status_code=302)
+        return RedirectResponse("/catalogue/products", status_code=302)
     warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
     return templates.TemplateResponse("products/form.html", {
         "request": request, "current_user": current_user, "item": item, "warehouses": warehouses, "ProductCategory": ProductCategory, "error": None,
@@ -157,7 +157,7 @@ async def product_update(
     item = db.query(Product).filter(Product.id == product_id).first()
     if not item:
         set_flash_error(request, "Product not found.")
-        return RedirectResponse("/products", status_code=302)
+        return RedirectResponse("/catalogue/products", status_code=302)
 
     try:
         mrp_val = Decimal(mrp) if mrp else Decimal("0")
@@ -189,7 +189,7 @@ async def product_update(
 
     db.commit()
     set_flash_success(request, f"Product '{name}' updated.")
-    return RedirectResponse("/products", status_code=302)
+    return RedirectResponse("/catalogue/products", status_code=302)
 
 
 @router.post("/{product_id}/delete")
@@ -213,12 +213,12 @@ async def product_delete(
             
         if total_stock > 0:
             set_flash_error(request, f"Cannot deactivate product '{item.name}' because stock ({total_stock} units) is present. Clear or adjust stock to 0 before deactivation.")
-            return RedirectResponse("/products", status_code=302)
+            return RedirectResponse("/catalogue/products", status_code=302)
 
         item.is_active = False
         db.commit()
         set_flash_success(request, f"Product '{item.name}' deactivated successfully.")
-    return RedirectResponse("/products", status_code=302)
+    return RedirectResponse("/catalogue/products", status_code=302)
 
 
 @router.get("/{product_id}/attach-warehouses", response_class=HTMLResponse)
@@ -300,7 +300,7 @@ async def product_attach_warehouses_post(
                     request,
                     f"Cannot remove warehouse '{wh_name}'. Stock is present ({pws.stock_qty} units). Please clear inventory stock first."
                 )
-                return RedirectResponse(f"/products/{product_id}/attach-warehouses", status_code=302)
+                return RedirectResponse(f"/catalogue/products/{product_id}/attach-warehouses", status_code=302)
             db.delete(pws)
 
     db.commit()

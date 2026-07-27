@@ -12,7 +12,7 @@ from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 
-router = APIRouter(prefix="/positions", tags=["positions"])
+router = APIRouter(prefix="/master-data/positions", tags=["positions"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -169,7 +169,7 @@ async def position_create(
     db.add(pos)
     db.commit()
     set_flash_success(request, f"Position '{name}' created.")
-    return RedirectResponse("/positions", status_code=302)
+    return RedirectResponse("/master-data/positions", status_code=302)
 
 
 @router.get("/{pos_id}/edit", response_class=HTMLResponse)
@@ -181,10 +181,10 @@ async def position_edit(
     item = db.query(Position).filter(Position.id == pos_id).first()
     if not item:
         set_flash_error(request, "Position not found.")
-        return RedirectResponse("/positions", status_code=302)
+        return RedirectResponse("/master-data/positions", status_code=302)
     if current_user.role == UserRole.territory_manager and item.level != PositionLevel.L1:
         set_flash_error(request, "Territory Managers are authorized to edit L1 Positions only.")
-        return RedirectResponse("/positions", status_code=302)
+        return RedirectResponse("/master-data/positions", status_code=302)
     managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1, Position.id != pos_id).order_by(Position.name).all()
     beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
     users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
@@ -213,7 +213,7 @@ async def position_update(
     item = db.query(Position).filter(Position.id == pos_id).first()
     if not item:
         set_flash_error(request, "Position not found.")
-        return RedirectResponse("/positions", status_code=302)
+        return RedirectResponse("/master-data/positions", status_code=302)
 
     def _form_context(err_msg: str):
         managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1, Position.id != pos_id).order_by(Position.name).all()
@@ -263,7 +263,7 @@ async def position_update(
         
     db.commit()
     set_flash_success(request, f"Position '{name}' updated.")
-    return RedirectResponse("/positions", status_code=302)
+    return RedirectResponse("/master-data/positions", status_code=302)
 
 
 @router.post("/{pos_id}/activate")
@@ -277,7 +277,7 @@ async def position_activate(
         item.is_active = True
         db.commit()
         set_flash_success(request, f"'{item.name}' activated.")
-    return RedirectResponse("/positions", status_code=302)
+    return RedirectResponse("/master-data/positions", status_code=302)
 
 
 def _has_active_subordinates(position: "Position") -> bool:
@@ -300,18 +300,18 @@ async def position_delete(
     if item:
         if not item.is_vacant:
             set_flash_error(request, f"Cannot deactivate '{item.name}' because it has active assigned users.")
-            return RedirectResponse("/positions", status_code=302)
+            return RedirectResponse("/master-data/positions", status_code=302)
         if _has_active_subordinates(item):
             set_flash_error(request, f"Cannot deactivate '{item.name}' because it has active subordinate positions.")
-            return RedirectResponse("/positions", status_code=302)
+            return RedirectResponse("/master-data/positions", status_code=302)
         if item.beats:
             set_flash_error(request, f"Cannot deactivate '{item.name}' because it has dependent beats assigned.")
-            return RedirectResponse("/positions", status_code=302)
+            return RedirectResponse("/master-data/positions", status_code=302)
 
         item.is_active = False
         db.commit()
         set_flash_success(request, f"'{item.name}' deactivated successfully.")
-    return RedirectResponse("/positions", status_code=302)
+    return RedirectResponse("/master-data/positions", status_code=302)
 
 
 @router.get("/{pos_id}/attach-beats", response_class=HTMLResponse)
@@ -323,10 +323,10 @@ async def position_attach_beats_get(
     item = db.query(Position).filter(Position.id == pos_id).first()
     if not item or not item.is_active:
         set_flash_error(request, "Active position not found.")
-        return RedirectResponse("/positions", status_code=302)
+        return RedirectResponse("/master-data/positions", status_code=302)
     if item.level != PositionLevel.L1:
         set_flash_error(request, "Beats can only be attached to L1 positions.")
-        return RedirectResponse("/positions", status_code=302)
+        return RedirectResponse("/master-data/positions", status_code=302)
         
     from sqlalchemy import select
     from app.models.position import position_beats
@@ -377,10 +377,10 @@ async def position_attach_beats_post(
     item = db.query(Position).filter(Position.id == pos_id).first()
     if not item or not item.is_active:
         set_flash_error(request, "Active position not found.")
-        return RedirectResponse("/positions", status_code=302)
+        return RedirectResponse("/master-data/positions", status_code=302)
     if item.level != PositionLevel.L1:
         set_flash_error(request, "Beats can only be attached to L1 positions.")
-        return RedirectResponse("/positions", status_code=302)
+        return RedirectResponse("/master-data/positions", status_code=302)
         
     item.beats.clear()
     if beat_ids:

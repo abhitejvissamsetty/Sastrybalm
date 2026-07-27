@@ -16,7 +16,7 @@ from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 from app.utils.security import hash_password
 
-router = APIRouter(prefix="/vendors", tags=["vendors"])
+router = APIRouter(prefix="/master-data/vendors", tags=["vendors"])
 templates = Jinja2Templates(directory="app/templates")
 
 _ADMIN = require_web_roles(UserRole.admin, UserRole.territory_manager)
@@ -130,7 +130,7 @@ async def vendor_create(
     db.add(v)
     db.commit()
     set_flash_success(request, f"Vendor '{name}' created.")
-    return RedirectResponse("/vendors", status_code=302)
+    return RedirectResponse("/master-data/vendors", status_code=302)
 
 
 @router.get("/{vendor_id}/edit", response_class=HTMLResponse)
@@ -142,12 +142,12 @@ async def vendor_edit(
     item = db.query(Vendor).filter(Vendor.id == vendor_id).first()
     if not item:
         set_flash_error(request, "Vendor not found.")
-        return RedirectResponse("/vendors", status_code=302)
+        return RedirectResponse("/master-data/vendors", status_code=302)
     allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
     if allowed_geo_ids is not None:
         if item.geography_id and item.geography_id not in allowed_geo_ids:
             set_flash_error(request, "Access denied. Territory Managers can only edit vendors assigned to their region.")
-            return RedirectResponse("/vendors", status_code=302)
+            return RedirectResponse("/master-data/vendors", status_code=302)
     return templates.TemplateResponse("vendors/form.html", {
         "request": request, "current_user": current_user,
         "item": item, "error": None, **_vendor_form_context(db, current_user),
@@ -173,12 +173,12 @@ async def vendor_update(
     item = db.query(Vendor).filter(Vendor.id == vendor_id).first()
     if not item:
         set_flash_error(request, "Vendor not found.")
-        return RedirectResponse("/vendors", status_code=302)
+        return RedirectResponse("/master-data/vendors", status_code=302)
     allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
     if allowed_geo_ids is not None:
         if item.geography_id and item.geography_id not in allowed_geo_ids:
             set_flash_error(request, "Access denied. Territory Managers can only edit vendors assigned to their region.")
-            return RedirectResponse("/vendors", status_code=302)
+            return RedirectResponse("/master-data/vendors", status_code=302)
 
     assigned_geo_id = int(geography_id) if geography_id else None
     if allowed_geo_ids is not None:
@@ -203,7 +203,7 @@ async def vendor_update(
 
     db.commit()
     set_flash_success(request, f"Vendor '{name}' updated.")
-    return RedirectResponse("/vendors", status_code=302)
+    return RedirectResponse("/master-data/vendors", status_code=302)
 
 
 @router.post("/{vendor_id}/toggle")
@@ -221,7 +221,7 @@ async def vendor_toggle(
             item.status = VendorStatus.active
             set_flash_success(request, f"'{item.name}' activated.")
         db.commit()
-    return RedirectResponse("/vendors", status_code=302)
+    return RedirectResponse("/master-data/vendors", status_code=302)
 
 
 # ── Vendor Employees ───────────────────────────────────────────────────────────
@@ -235,7 +235,7 @@ async def employee_list(
     vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
     if not vendor:
         set_flash_error(request, "Vendor not found.")
-        return RedirectResponse("/vendors", status_code=302)
+        return RedirectResponse("/master-data/vendors", status_code=302)
     return templates.TemplateResponse("vendors/employees.html", {
         "request": request, "current_user": current_user,
         "vendor": vendor, "employees": vendor.employees,

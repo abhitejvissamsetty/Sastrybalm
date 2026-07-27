@@ -16,7 +16,7 @@ from app.utils.csv_import import parse_csv_bytes
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 
-router = APIRouter(prefix="/outlets", tags=["outlets"])
+router = APIRouter(prefix="/master-data/outlets", tags=["outlets"])
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -209,7 +209,7 @@ async def outlet_create(
     db.add(outlet)
     db.commit()
     set_flash_success(request, f"Outlet '{name}' created successfully.")
-    return RedirectResponse("/outlets", status_code=302)
+    return RedirectResponse("/master-data/outlets", status_code=302)
 
 
 @router.get("/{outlet_id}", response_class=HTMLResponse)
@@ -221,7 +221,7 @@ async def outlet_detail(
     item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
     if not item:
         set_flash_error(request, "Outlet not found.")
-        return RedirectResponse("/outlets", status_code=302)
+        return RedirectResponse("/master-data/outlets", status_code=302)
     from app.models.order import Order, OrderStatus
     from app.models.timesheet import VisitRecord
     recent_orders = (
@@ -247,7 +247,7 @@ async def outlet_edit(
     item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
     if not item:
         set_flash_error(request, "Outlet not found.")
-        return RedirectResponse("/outlets", status_code=302)
+        return RedirectResponse("/master-data/outlets", status_code=302)
     beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
     territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
     return templates.TemplateResponse("outlets/form.html", {
@@ -281,13 +281,13 @@ async def outlet_update(
     item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
     if not item:
         set_flash_error(request, "Outlet not found.")
-        return RedirectResponse("/outlets", status_code=302)
+        return RedirectResponse("/master-data/outlets", status_code=302)
 
     allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
     if allowed_geo_ids is not None:
         if item.territory_id and item.territory_id not in allowed_geo_ids:
             set_flash_error(request, "Access denied. You can only edit outlets in your assigned geography.")
-            return RedirectResponse("/outlets", status_code=302)
+            return RedirectResponse("/master-data/outlets", status_code=302)
 
     beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
     territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
@@ -338,7 +338,7 @@ async def outlet_update(
         db.add(flag)
         db.commit()
         set_flash_success(request, f"Changes to outlet '{item.name}' submitted for Admin approval.")
-        return RedirectResponse(f"/outlets/{outlet_id}", status_code=302)
+        return RedirectResponse(f"/master-data/outlets/{outlet_id}", status_code=302)
 
     # Admin direct edit — Snapshot current state first
     _snapshot_outlet_version(db, item, current_user.id, f"Edited by Admin {current_user.full_name}")
@@ -359,7 +359,7 @@ async def outlet_update(
     item.gps_lng = float(gps_lng) if gps_lng else None
     db.commit()
     set_flash_success(request, f"Outlet '{name}' updated and version snapshot saved.")
-    return RedirectResponse(f"/outlets/{outlet_id}", status_code=302)
+    return RedirectResponse(f"/master-data/outlets/{outlet_id}", status_code=302)
 
 
 @router.get("/{outlet_id}/history", response_class=HTMLResponse)
@@ -371,7 +371,7 @@ async def outlet_history(
     item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
     if not item:
         set_flash_error(request, "Outlet not found.")
-        return RedirectResponse("/outlets", status_code=302)
+        return RedirectResponse("/master-data/outlets", status_code=302)
     versions = db.query(OutletVersion).filter(OutletVersion.outlet_id == outlet_id).order_by(OutletVersion.version_number.desc()).all()
     return templates.TemplateResponse("outlets/history.html", {
         "request": request, "current_user": current_user,
@@ -389,7 +389,7 @@ async def outlet_revert(
     ver = db.query(OutletVersion).filter(OutletVersion.id == version_id, OutletVersion.outlet_id == outlet_id).first()
     if not item or not ver:
         set_flash_error(request, "Version snapshot not found.")
-        return RedirectResponse(f"/outlets/{outlet_id}", status_code=302)
+        return RedirectResponse(f"/master-data/outlets/{outlet_id}", status_code=302)
 
     # Snapshot current state before reverting
     _snapshot_outlet_version(db, item, current_user.id, f"Reverted back to Version #{ver.version_number} by Admin {current_user.full_name}")
@@ -414,7 +414,7 @@ async def outlet_revert(
             pass
     db.commit()
     set_flash_success(request, f"Outlet '{item.name}' successfully reverted to Version #{ver.version_number}.")
-    return RedirectResponse(f"/outlets/{outlet_id}", status_code=302)
+    return RedirectResponse(f"/master-data/outlets/{outlet_id}", status_code=302)
 
 
 @router.post("/{outlet_id}/toggle")
@@ -432,7 +432,7 @@ async def outlet_toggle(
             item.status = OutletStatus.active
             set_flash_success(request, f"'{item.name}' activated.")
         db.commit()
-    return RedirectResponse("/outlets", status_code=302)
+    return RedirectResponse("/master-data/outlets", status_code=302)
 
 
 @router.post("/import")
@@ -479,7 +479,7 @@ async def outlet_import(
         set_flash_error(request, msg)
     else:
         set_flash_success(request, msg)
-    return RedirectResponse("/outlets", status_code=302)
+    return RedirectResponse("/master-data/outlets", status_code=302)
 
 
 @router.get("/export")

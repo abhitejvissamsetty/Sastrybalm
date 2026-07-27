@@ -12,12 +12,11 @@ from app.models.attendance import Attendance, ApprovalStatus
 from app.models.expense import Expense, ExpenseStatus
 from app.models.material_request import MaterialRequest, MRStatus
 from app.models.outlet import Outlet, OutletStatus
-from app.models.payment_submission import PaymentSubmission, SubmissionStatus
 from app.models.timesheet import Timesheet, TimesheetApproval
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash
 
-router = APIRouter(prefix="/approvals", tags=["approvals"])
+router = APIRouter(prefix="/action-center/approvals", tags=["approvals"])
 templates = Jinja2Templates(directory="app/templates")
 
 _ADMIN_MANAGER = require_web_roles(UserRole.admin, UserRole.territory_manager)
@@ -72,12 +71,6 @@ async def approvals_hub(
         ts_q = ts_q.join(User, Timesheet.user_id == User.id).filter(User.geography_id.in_(allowed_geo_ids))
     pending_timesheets = ts_q.scalar() or 0
 
-    # Payment submission approvals
-    ps_q = db.query(func.count(PaymentSubmission.id)).filter(PaymentSubmission.status == SubmissionStatus.pending)
-    if allowed_geo_ids is not None:
-        ps_q = ps_q.join(User, PaymentSubmission.user_id == User.id).filter(User.geography_id.in_(allowed_geo_ids))
-    pending_submissions = ps_q.scalar() or 0
-
     # Expense approvals
     exp_q = db.query(func.count(Expense.id)).filter(Expense.status == ExpenseStatus.submitted)
     if allowed_geo_ids is not None:
@@ -120,13 +113,6 @@ async def approvals_hub(
             "count": pending_timesheets,
             "url": "/tracking/timesheets",
             "description": "Timesheet entries awaiting approval",
-        },
-        {
-            "name": "Payment Submissions",
-            "icon": "💰",
-            "count": pending_submissions,
-            "url": "/payment-submissions?status=pending",
-            "description": "Rep payment batches awaiting verification",
         },
         {
             "name": "Expenses",

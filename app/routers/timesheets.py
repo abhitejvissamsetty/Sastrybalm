@@ -11,7 +11,7 @@ from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error
 from app.utils.pagination import paginate
 
-router = APIRouter(prefix="/timesheets", tags=["timesheets"])
+router = APIRouter(prefix="/operations/timesheets", tags=["timesheets"])
 templates = Jinja2Templates(directory="app/templates")
 
 

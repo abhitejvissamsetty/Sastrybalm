@@ -1,4 +1,7 @@
 {% set path = request.url.path %}
+{% set mods = current_user.active_modules() if current_user else [] %}
+{% set is_admin = current_user and current_user.role and current_user.role.value == 'admin' %}
+{% set is_tm_or_admin = current_user and current_user.role and current_user.role.value in ['admin', 'territory_manager'] %}
 
 <div class="flex grow flex-col gap-y-5 overflow-y-auto bg-slate-900 px-4 pb-4">
 
@@ -18,7 +21,7 @@
   <nav class="flex flex-1 flex-col text-sm">
     <ul class="flex flex-1 flex-col gap-y-6">
 
-      <!-- Dashboard -->
+      <!-- Dashboard (always visible) -->
       <li>
         <ul class="space-y-0.5">
           <li>
@@ -35,37 +38,40 @@
       </li>
 
       <!-- Field Tracking -->
+      {% if 'attendance' in mods or 'visits' in mods or 'gps_map' in mods %}
       <li>
         <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Field Tracking</p>
         <ul class="space-y-0.5">
+          {% if 'attendance' in mods %}
           <li>
-            <a href="/attendance"
+            <a href="/tracking/attendance"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/attendance') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/attendance') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/tracking/attendance') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/tracking/attendance') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 9v7.5" />
               </svg>
               Attendance
             </a>
           </li>
-          {% if current_user.role.value in ['admin', 'territory_manager'] %}
+          {% endif %}
+          {% if 'visits' in mods and is_tm_or_admin %}
           <li>
-            <a href="/timesheets/visits/all"
+            <a href="/tracking/visits"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/timesheets/visits') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/timesheets/visits') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/tracking/visits') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/tracking/visits') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
               </svg>
               Visit Records
             </a>
           </li>
           {% endif %}
-          {% if current_user.role.value in ['admin', 'territory_manager'] %}
+          {% if 'gps_map' in mods and is_tm_or_admin %}
           <li>
             <a href="/tracking/map"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/tracking') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/tracking') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/tracking/map') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/tracking/map') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" />
               </svg>
               GPS Map View
@@ -74,94 +80,109 @@
           {% endif %}
         </ul>
       </li>
+      {% endif %}
 
       <!-- Operations -->
+      {% if 'orders' in mods or 'expenses' in mods or 'timesheets' in mods or 'inventory' in mods %}
       <li>
         <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Operations</p>
         <ul class="space-y-0.5">
+          {% if 'orders' in mods %}
           <li>
-            <a href="/orders"
+            <a href="/operations/orders"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/orders') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/orders') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/operations/orders') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/operations/orders') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
               </svg>
               Orders
             </a>
           </li>
+          {% endif %}
+          {% if 'expenses' in mods %}
           <li>
-            <a href="/expenses"
+            <a href="/operations/expenses"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/expenses') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/expenses') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/operations/expenses') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/operations/expenses') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0c1.1.128 1.907 1.077 1.907 2.185Z" />
               </svg>
               Expenses
             </a>
           </li>
+          {% endif %}
+          {% if 'timesheets' in mods %}
           <li>
-            <a href="/timesheets"
+            <a href="/operations/timesheets"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/timesheets') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/timesheets') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/operations/timesheets') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/operations/timesheets') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
               Timesheets
             </a>
           </li>
+          {% endif %}
+          {% if 'inventory' in mods or is_admin %}
           <li>
-            <a href="/material-requests"
+            <a href="/operations/material-requests"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/material-requests') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/material-requests') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/operations/material-requests') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/operations/material-requests') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z" />
               </svg>
               Material Requests
             </a>
           </li>
+          {% endif %}
+          {% if 'inventory' in mods or is_admin %}
           <li>
-            <a href="/asset-capitalizations"
+            <a href="/operations/marketing-assets"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/asset-capitalizations') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/asset-capitalizations') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/operations/marketing-assets') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/operations/marketing-assets') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
               </svg>
               Marketing Assets
             </a>
           </li>
+          {% endif %}
         </ul>
       </li>
+      {% endif %}
 
       <!-- Action Center -->
-      {% if current_user.role.value in ['admin', 'territory_manager'] %}
+      {% if is_tm_or_admin and ('approvals' in mods or is_admin) %}
       <li>
         <p class="px-3 text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-1">Action Center</p>
         <ul class="space-y-0.5">
+          {% if 'approvals' in mods or is_admin %}
           <li>
-            <a href="/approvals"
+            <a href="/action-center/approvals"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/approvals') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/approvals') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/action-center/approvals') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/action-center/approvals') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
               Approval Hub
             </a>
           </li>
+          {% endif %}
           <li>
-            <a href="/analytics/alerts"
+            <a href="/action-center/alerts"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/analytics/alerts') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/analytics/alerts') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/action-center/alerts') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/action-center/alerts') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
               </svg>
               Alerts &amp; Notifications
             </a>
           </li>
           <li>
-            <a href="/flags"
+            <a href="/action-center/flags"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/flags') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/flags') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/action-center/flags') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/action-center/flags') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
               </svg>
               Auto-Flags
@@ -172,7 +193,7 @@
       {% endif %}
 
       <!-- Analytics & Reports -->
-      {% if current_user.role.value in ['admin', 'territory_manager'] %}
+      {% if is_tm_or_admin and ('analytics' in mods or is_admin) %}
       <li>
         <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Analytics</p>
         <ul class="space-y-0.5">
@@ -221,15 +242,16 @@
       {% endif %}
 
       <!-- Catalogue -->
+      {% if 'inventory' in mods or is_admin %}
       <li>
         <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Catalogue</p>
         <ul class="space-y-0.5">
-          {% if current_user and current_user.role and current_user.role.value == 'admin' %}
+          {% if is_admin %}
           <li>
-            <a href="/products"
+            <a href="/catalogue/products"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/products') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/products') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/catalogue/products') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/catalogue/products') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.25 6a2.25 2.25 0 1 1 4.5 0v4.5h-4.5V6Z" />
               </svg>
               Products
@@ -237,20 +259,20 @@
           </li>
           {% endif %}
           <li>
-            <a href="/inventory"
+            <a href="/catalogue/inventory"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/inventory') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/inventory') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/catalogue/inventory') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/catalogue/inventory') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
               </svg>
               Inventory
             </a>
           </li>
           <li>
-            <a href="/warehouses"
+            <a href="/catalogue/warehouses"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/warehouses') or path.startswith('/settings/warehouses') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not (path.startswith('/warehouses') or path.startswith('/settings/warehouses')) %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/catalogue/warehouses') or path.startswith('/settings/warehouses') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not (path.startswith('/catalogue/warehouses') or path.startswith('/settings/warehouses')) %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5s.75 0 .75.75v1.5s0 .75-.75.75H9s-.75 0-.75-.75v-1.5s0-.75.75-.75zm6 0h1.5s.75 0 .75.75v1.5s0 .75-.75.75H15s-.75 0-.75-.75v-1.5s0-.75.75-.75zM9 12h1.5s.75 0 .75.75v1.5s0 .75-.75.75H9s-.75 0-.75-.75v-1.5s0-.75.75-.75zm6 0h1.5s.75 0 .75.75v1.5s0 .75-.75.75H15s-.75 0-.75-.75v-1.5s0-.75.75-.75z" />
               </svg>
               Warehouses
@@ -258,38 +280,39 @@
           </li>
         </ul>
       </li>
+      {% endif %}
 
       <!-- Master Data -->
-      {% if current_user and current_user.role and current_user.role.value in ['admin', 'territory_manager'] %}
+      {% if is_tm_or_admin %}
       <li>
         <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Master Data</p>
         <ul class="space-y-0.5">
           <li>
-            <a href="/geography"
+            <a href="/master-data/geography"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/geography') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/geography') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/master-data/geography') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/master-data/geography') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" />
               </svg>
               Geography
             </a>
           </li>
-          {% if current_user and current_user.role and current_user.role.value == 'admin' %}
+          {% if is_admin %}
           <li>
-            <a href="/users"
+            <a href="/master-data/users"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/users') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/users') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/master-data/users') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/master-data/users') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
               </svg>
               Users &amp; Reps
             </a>
           </li>
           <li>
-            <a href="/positions"
+            <a href="/master-data/positions"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/positions') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/positions') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/master-data/positions') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/master-data/positions') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006-3.75 1.5m0 0-3.75 1.5-3.75-1.5m3.75 1.5v5.25m0-5.25-3.75-1.5m3.75 1.5 3.75-1.5m-3.75-8.25L12 3m0 0-3.75 2.25M12 3l3.75 2.25" />
               </svg>
               Positions
@@ -297,41 +320,41 @@
           </li>
           {% endif %}
           <li>
-            <a href="/beats"
+            <a href="/master-data/beats"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/beats') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/beats') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/master-data/beats') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/master-data/beats') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
               </svg>
               Beats &amp; Routes
             </a>
           </li>
           <li>
-            <a href="/outlets"
+            <a href="/master-data/outlets"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/outlets') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/outlets') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/master-data/outlets') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/master-data/outlets') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016 2.993 2.993 0 0 0 2.25-1.015 3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" />
               </svg>
               Outlets
             </a>
           </li>
           <li>
-            <a href="/channel-partners"
+            <a href="/master-data/channel-partners"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/channel-partners') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/channel-partners') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/master-data/channel-partners') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/master-data/channel-partners') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.25A2.25 2.25 0 0 1 0 18.75V10.5M13.5 21h7.5A2.25 2.25 0 0 0 23.25 18.75V10.5" />
               </svg>
               Channel Partners
             </a>
           </li>
-          {% if current_user and current_user.role and current_user.role.value in ['admin', 'territory_manager'] %}
+          {% if is_tm_or_admin %}
           <li>
-            <a href="/vendors"
+            <a href="/master-data/vendors"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
-                      {% if path.startswith('/vendors') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
-              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/vendors') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      {% if path.startswith('/master-data/vendors') %}bg-indigo-600 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+              <svg class="h-5 w-5 flex-shrink-0 {% if not path.startswith('/master-data/vendors') %}text-slate-400{% endif %}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
               </svg>
               Vendors
@@ -342,8 +365,8 @@
       </li>
       {% endif %}
 
-      <!-- Configuration -->
-      {% if current_user.role.value == 'admin' %}
+      <!-- Configuration (admin only — always visible for admin) -->
+      {% if is_admin %}
       <li>
         <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Configuration</p>
         <ul class="space-y-0.5">
