@@ -51,6 +51,11 @@ async def onboarding_submit(
     phone: str = Form(...),
     password: str = Form(...),
     confirm_password: str = Form(...),
+    s3_endpoint: str = Form(...),
+    s3_bucket: str = Form(...),
+    s3_access_key: str = Form(...),
+    s3_secret_key: str = Form(...),
+    s3_region: Optional[str] = Form(default="us-east-1"),
     restore_choice: str = Form("none"),
     selected_backup: Optional[str] = Form(default=None),
     backup_file: Optional[UploadFile] = File(default=None),
@@ -60,6 +65,11 @@ async def onboarding_submit(
         "full_name": full_name,
         "email": email,
         "phone": phone,
+        "s3_endpoint": s3_endpoint,
+        "s3_bucket": s3_bucket,
+        "s3_access_key": s3_access_key,
+        "s3_secret_key": s3_secret_key,
+        "s3_region": s3_region,
     }
 
     err = None
@@ -73,6 +83,12 @@ async def onboarding_submit(
         err = "Password must be at least 6 characters long."
     elif password != confirm_password:
         err = "Passwords do not match."
+    elif not s3_bucket or not s3_bucket.strip():
+        err = "S3/MinIO Bucket Name is mandatory."
+    elif not s3_access_key or not s3_access_key.strip():
+        err = "S3/MinIO Access Key ID is mandatory."
+    elif not s3_secret_key or not s3_secret_key.strip():
+        err = "S3/MinIO Secret Access Key is mandatory."
 
     if err:
         return templates.TemplateResponse("auth/onboarding.html", {
@@ -111,17 +127,29 @@ async def onboarding_submit(
             "form_data": form_data,
         })
 
-    # Complete onboarding, restore data if backup provided, and save encrypted Admin password in users table
-    admin_user = complete_system_onboarding(
-        db=db,
-        username=username.strip(),
-        full_name=full_name.strip(),
-        email=email.strip(),
-        phone=phone.strip(),
-        password=password,
-        backup_file_path=target_backup_filepath,
-    )
+    try:
+        admin_user = complete_system_onboarding(
+            db=db,
+            username=username.strip(),
+            full_name=full_name.strip(),
+            email=email.strip(),
+            phone=phone.strip(),
+            password=password,
+            s3_endpoint=s3_endpoint.strip(),
+            s3_bucket=s3_bucket.strip(),
+            s3_access_key=s3_access_key.strip(),
+            s3_secret_key=s3_secret_key.strip(),
+            s3_region=s3_region.strip() if s3_region else "us-east-1",
+            backup_file_path=target_backup_filepath,
+        )
+    except ValueError as ve:
+        return templates.TemplateResponse("auth/onboarding.html", {
+            "request": request,
+            "existing_backups": list_existing_backups(),
+            "error": str(ve),
+            "form_data": form_data,
+        })
 
     request.session["user_id"] = admin_user.id
-    set_flash_success(request, f"System onboarding completed successfully! Welcome to Sastrybalm SFA Enterprise, {admin_user.full_name}.")
+    set_flash_success(request, f"System onboarding completed successfully with mandatory S3 storage! Welcome to Sastrybalm SFA Enterprise, {admin_user.full_name}.")
     return RedirectResponse("/dashboard", status_code=302)

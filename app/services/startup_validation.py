@@ -29,7 +29,7 @@ def validate_admin_account(db: Session) -> bool:
 
 def validate_s3_configuration(db: Session) -> dict:
     """Check S3/MinIO credentials and attempt a basic health check ping."""
-    from app.models.company import SystemConfiguration, SystemSetting
+    from app.models.company import SystemConfiguration
 
     settings = {}
     sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
@@ -40,18 +40,11 @@ def validate_s3_configuration(db: Session) -> dict:
         settings["s3_secret_key"] = sys_config.s3_secret_access_key
         settings["s3_region"] = sys_config.s3_region_name
 
-    # Fallback/override check SystemSetting table
-    setting_keys = ["s3_endpoint", "s3_bucket", "s3_access_key", "s3_secret_key", "s3_region", "s3_use_ssl"]
-    for key in setting_keys:
-        s = db.query(SystemSetting).filter(SystemSetting.key == key).first()
-        if s and s.value:
-            settings[key] = s.value
-
     bucket = settings.get("s3_bucket")
     access_key = settings.get("s3_access_key")
 
     if not bucket or not access_key:
-        logger.warning("Startup check WARNING: S3/MinIO storage is not configured! Uploads will default to local storage.")
+        logger.warning("Startup check WARNING: S3/MinIO storage is not configured!")
         return {"configured": False, "status": "Not configured", "settings": settings}
 
     try:
@@ -62,10 +55,10 @@ def validate_s3_configuration(db: Session) -> dict:
             return {"configured": True, "status": "Verified", "message": msg, "settings": settings}
         else:
             logger.warning(f"Startup check WARNING: S3/MinIO connection failed: {msg}")
-            return {"configured": True, "status": "Connection failed", "message": msg, "settings": settings}
+            return {"configured": False, "status": "Connection failed", "message": msg, "settings": settings}
     except Exception as e:
         logger.warning(f"Startup check WARNING: Error during S3 connectivity test: {e}")
-        return {"configured": True, "status": f"Error: {e}", "settings": settings}
+        return {"configured": False, "status": f"Error: {e}", "settings": settings}
 
 
 def validate_admin_and_s3_config():

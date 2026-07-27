@@ -83,10 +83,52 @@
 
         <hr class="border-white/10">
 
-        <!-- Step 2: Database Backup & Data Restoration (Optional) -->
+        <!-- Step 2: Mandatory S3 / MinIO Object Storage Configuration -->
         <div class="space-y-4">
           <h3 class="text-base font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-2">
             <span class="h-6 w-6 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center">2</span>
+            Mandatory S3 / MinIO Object Storage Configuration <span class="text-red-400 font-bold">*</span>
+          </h3>
+          <p class="text-xs text-slate-400">Configure your S3 bucket or MinIO instance to store images (Outlets, Assets, Material Requests, Maintenance Logs) and daily backup dumps securely.</p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">S3 / MinIO Endpoint URL <span class="text-red-400">*</span></label>
+              <input type="text" name="s3_endpoint" value="{{ form_data.s3_endpoint if form_data else 'http://127.0.0.1:9000' }}" required placeholder="e.g. http://127.0.0.1:9000 or https://s3.amazonaws.com"
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Bucket Name <span class="text-red-400">*</span></label>
+              <input type="text" name="s3_bucket" value="{{ form_data.s3_bucket if form_data else 'sastrybalm-assets' }}" required placeholder="e.g. sastrybalm-assets"
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Access Key ID <span class="text-red-400">*</span></label>
+              <input type="text" name="s3_access_key" value="{{ form_data.s3_access_key if form_data else 'minioadmin' }}" required placeholder="Access key"
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Secret Access Key <span class="text-red-400">*</span></label>
+              <input type="password" name="s3_secret_key" value="{{ form_data.s3_secret_key if form_data else 'minioadmin' }}" required placeholder="Secret key"
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Region</label>
+              <input type="text" name="s3_region" value="{{ form_data.s3_region if form_data else 'us-east-1' }}" placeholder="us-east-1"
+                     class="w-full rounded-xl bg-slate-900/80 border border-slate-700 text-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+            </div>
+          </div>
+        </div>
+
+        <hr class="border-white/10">
+
+        <!-- Step 3: Database Backup & Data Restoration (Optional) -->
+        <div class="space-y-4">
+          <h3 class="text-base font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-2">
+            <span class="h-6 w-6 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center">3</span>
             Database Backup &amp; Data Restoration (Optional)
           </h3>
           <p class="text-xs text-slate-400">Choose whether to initialize a clean system or load existing data from a <code class="font-mono text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">.sql</code> database backup file.</p>

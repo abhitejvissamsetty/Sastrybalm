@@ -14,6 +14,7 @@ description: >-
 Sastrybalm ERP is a comprehensive FMCG Sales & Distribution Management System built with **FastAPI**, **SQLAlchemy**, **Jinja2 Templates**, and **MySQL (MAMP)**.
 
 The system orchestrates:
+- **Mandatory S3 Storage & Onboarding Trigger**: If S3/MinIO bucket storage is not configured or fails connectivity checks, `is_system_onboarded(db)` returns `False`, forcing redirection to `/onboarding` to configure S3 endpoint, bucket name, and credentials mandatorily before allowing access to the dashboard.
 - **Server Startup Validation & S3/MinIO Storage**: Server restart (`lifespan`) validation of active Admin account and S3 bucket connection, asset storage, daily backups, and time-bound pre-signed URLs.
 - **Geography & Regional Warehouse Architecture**: Multi-tier hierarchy (`Zone` → `Region` → `Territory`) with region-level warehouse mapping and unified scoping (`get_user_allowed_geography_ids` & `get_user_allowed_warehouse_ids`).
 - **Position Hierarchy**: 4-level organizational hierarchy (`L1` to `L4`) with automatic reporting parent warehouse inheritance resolution.

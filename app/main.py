@@ -64,6 +64,30 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+from app.database import SessionLocal
+from app.services.auth import is_system_onboarded
+
+
+@app.middleware("http")
+async def enforce_onboarding_middleware(request: Request, call_next):
+    path = request.url.path
+    # Exempt static files, API calls, and the onboarding route itself
+    if path.startswith("/static") or path.startswith("/onboarding") or path.startswith("/api/"):
+        return await call_next(request)
+
+    db = SessionLocal()
+    try:
+        if not is_system_onboarded(db):
+            return RedirectResponse("/onboarding", status_code=302)
+    except Exception as e:
+        print(f"Onboarding middleware check error: {e}")
+        return RedirectResponse("/onboarding", status_code=302)
+    finally:
+        db.close()
+
+    return await call_next(request)
+
+
 _templates = Jinja2Templates(directory="app/templates")
 
 from app.routers import backup, channel_partners, warehouses
