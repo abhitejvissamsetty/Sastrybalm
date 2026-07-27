@@ -9,7 +9,7 @@ from app.dependencies import get_db, require_web_roles
 from app.models.company import CompanyProfile
 from app.models.geography import Geography, GeoLevel
 from app.models.position import Position
-from app.models.user import ModuleName, PaymentMode, User, UserModuleAccess, UserRole
+from app.models.user import ModuleName, PaymentMode, User, UserModuleAccess, UserRole, user_positions
 from app.models.vendor import Vendor, VendorStatus
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
@@ -61,7 +61,6 @@ def _form_context(db: Session, user: Optional[User] = None, for_role: str = "", 
     company_profiles = db.query(CompanyProfile).filter(CompanyProfile.is_active == True).order_by(CompanyProfile.name).all()
     
     # Map of position_id -> assigned User full_name for active users
-    from app.models.user import user_positions
     q_assigned_pos = db.query(user_positions.c.position_id, User.full_name).join(
         User, User.id == user_positions.c.user_id
     ).filter(User.is_active == True)
