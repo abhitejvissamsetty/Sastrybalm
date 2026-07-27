@@ -278,10 +278,10 @@
       <tbody class="divide-y divide-slate-700/50">
         {% for p in payments %}
         <tr>
-          <td class="px-4 py-3 text-sm font-mono text-white">{{ p.reference_no or ('PAY-' ~ p.id) }}</td>
-          <td class="px-4 py-3 text-sm text-slate-300 uppercase font-medium">{{ p.payment_mode.value }}</td>
+          <td class="px-4 py-3 text-sm font-mono text-white">{{ p.payment_ref or ('PAY-' ~ p.id) }}</td>
+          <td class="px-4 py-3 text-sm text-slate-300 uppercase font-medium">{{ p.method.value }}</td>
           <td class="px-4 py-3 text-sm font-bold text-emerald-400 text-right">₹{{ "%.2f"|format(p.amount) }}</td>
-          <td class="px-4 py-3 text-xs text-slate-400">{{ p.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="px-4 py-3 text-xs text-slate-400">{{ p.collected_at.strftime('%Y-%m-%d %H:%M') if p.collected_at else p.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
         </tr>
         {% endfor %}
       </tbody>

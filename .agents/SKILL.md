@@ -432,3 +432,13 @@ All Web UI routes are structured with section prefixes corresponding to their si
 - **Process & Database Session Enforcement (`app/database.py`)**: OS process environment variable `TZ=Asia/Kolkata` enforced. SQLAlchemy engine event listener automatically executes `SET time_zone = '+05:30';` on every database connection.
 - **Transaction & Model Defaults**: All transaction defaults (`order_date`, `expense_date`, `work_date`, reference number prefix date generation, checkin/checkout timestamps, visit timestamps) evaluate in IST.
 - **Jinja2 Template Filter**: Registered `format_ist` Jinja2 filter in `app/main.py` for rendering IST formatted timestamps.
+
+### J. Primary vs Secondary Order Flow Rules & Direct Payment Fulfillment
+- **Secondary Order Flow (`OrderType.secondary`)**:
+  - **Mandatory Visit Association**: Every Secondary Order MUST be associated with a valid, active `VisitRecord` against the selected `Outlet` logged on `ist_today()`. If no visit record exists, order creation is blocked with a validation error.
+  - **Fulfillment Entity Selection**: Lists Channel Partners serving the Beat along with a default option: **`Regional Company`** (`is_regional_company=True`).
+  - **Direct Payment Collection Flow**: If **`Regional Company`** is selected as the fulfillment entity, immediate payment collection details (`amount_collected`, `payment_method`, `transaction_ref`) are captured, creating a `Payment` record and computing `payment_settlement` status (`paid`, `partial`, `unpaid`) and outstanding balance.
+- **Primary Order Flow (`OrderType.primary`)**:
+  - **User Role Restriction**: Available ONLY for L2/L3/L4 users (`territory_manager` and `admin`). Blocked for L1 (`field_rep`) users with HTTP 403 / validation error.
+  - **Direct Channel Partner Target**: Placed directly against a `Channel Partner` (`channel_partner_id`). `outlet_id` and `visit_id` are `None` (no visit or outlet record required).
+  - **Payment Flow Bypassed**: Payment collection flow is completely skipped for Primary Orders.

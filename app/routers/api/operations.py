@@ -318,25 +318,83 @@ async def checkout_visit(
 
 @router.post("/orders")
 async def create_order(
-    outlet_id: int,
     items: list[dict],  # [{product_id, quantity, unit_price, gst_rate, discount_pct}]
+    order_type: str = "Secondary",
+    outlet_id: Optional[int] = None,
+    channel_partner_id: Optional[int] = None,
+    is_regional_company: bool = False,
+    visit_id: Optional[int] = None,
     beat_id: Optional[int] = None,
     notes: Optional[str] = None,
+    amount_collected: Optional[float] = 0.0,
+    payment_method: Optional[str] = "cash",
+    transaction_ref: Optional[str] = None,
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
-    outlet = db.query(Outlet).filter(Outlet.id == outlet_id, Outlet.status == OutletStatus.active).first()
-    if not outlet:
-        raise HTTPException(status_code=404, detail="Outlet not found.")
+    from app.models.order import OrderType, PaymentSettlementStatus
+    from app.models.payment import Payment, PaymentMethod, PaymentStatus
+    from app.models.timesheet import VisitRecord
+    from app.utils.ref_generator import payment_ref
+    from app.utils.timezone import ist_today, ist_now
+    from decimal import Decimal
+
     if not items:
         raise HTTPException(status_code=400, detail="Order must have at least one item.")
+
+    try:
+        ot = OrderType(order_type)
+    except ValueError:
+        ot = OrderType.secondary
+
+    target_outlet_id = None
+    target_cp_id = None
+    target_visit_id = None
+
+    if ot == OrderType.primary:
+        # L1 user restriction (field_rep)
+        if current_user.role == UserRole.field_rep:
+            raise HTTPException(status_code=403, detail="Primary Orders are restricted to Territory Managers and Administrators (L2/L3/L4) only.")
+        if not channel_partner_id or is_regional_company:
+            raise HTTPException(status_code=400, detail="Primary Orders must be placed directly against a valid Channel Partner.")
+        target_cp_id = channel_partner_id
+    else:
+        # Secondary Order
+        if not outlet_id:
+            raise HTTPException(status_code=400, detail="Outlet ID is required for Secondary Orders.")
+        outlet = db.query(Outlet).filter(Outlet.id == outlet_id, Outlet.status == OutletStatus.active).first()
+        if not outlet:
+            raise HTTPException(status_code=404, detail="Outlet not found.")
+        target_outlet_id = outlet_id
+
+        # Mandatory Visit Record Check
+        visit = None
+        if visit_id:
+            visit = db.query(VisitRecord).filter(VisitRecord.id == visit_id, VisitRecord.user_id == current_user.id).first()
+        if not visit:
+            visit = db.query(VisitRecord).filter(
+                VisitRecord.user_id == current_user.id,
+                VisitRecord.outlet_id == target_outlet_id,
+                func.date(VisitRecord.visit_time) == ist_today()
+            ).order_by(VisitRecord.visit_time.desc()).first()
+
+        if not visit:
+            raise HTTPException(status_code=400, detail="A mandatory Visit record against the outlet is required for Secondary Orders.")
+
+        target_visit_id = visit.id
+        if not is_regional_company:
+            target_cp_id = channel_partner_id
 
     ord_num = order_number(db, Order)
     o = Order(
         order_number=ord_num,
-        outlet_id=outlet_id,
+        outlet_id=target_outlet_id,
         user_id=current_user.id,
         beat_id=beat_id,
+        channel_partner_id=target_cp_id,
+        is_regional_company=is_regional_company,
+        visit_id=target_visit_id,
+        order_type=ot,
         company_profile_id=current_user.company_profile_id,
         status=OrderStatus.draft,
         notes=notes,
@@ -353,13 +411,47 @@ async def create_order(
             gst_rate=it.get("gst_rate", 0),
             discount_pct=it.get("discount_pct", 0),
         ))
+    db.flush()
+    db.refresh(o)
+
+    # Process Payments Flow for Secondary Orders with Regional Company
+    if ot == OrderType.secondary and is_regional_company:
+        amt_col = float(amount_collected) if amount_collected else 0.0
+        if amt_col > 0:
+            pay_ref_str = payment_ref(db, Payment)
+            pm = PaymentMethod(payment_method) if payment_method in [m.value for m in PaymentMethod] else PaymentMethod.cash
+            pay = Payment(
+                payment_ref=pay_ref_str,
+                order_id=o.id,
+                outlet_id=o.outlet_id,
+                user_id=current_user.id,
+                amount=Decimal(str(amt_col)),
+                method=pm,
+                transaction_ref=transaction_ref or None,
+                status=PaymentStatus.collected,
+                collected_at=ist_now(),
+            )
+            db.add(pay)
+            db.flush()
+
+        order_total_val = float(o.total_amount)
+        if amt_col >= order_total_val and order_total_val > 0:
+            o.payment_settlement = PaymentSettlementStatus.paid
+        elif amt_col > 0:
+            o.payment_settlement = PaymentSettlementStatus.partial
+        else:
+            o.payment_settlement = PaymentSettlementStatus.unpaid
+
     db.commit()
     db.refresh(o)
     return {
         "id": o.id,
         "order_number": o.order_number,
+        "order_type": o.order_type.value,
         "status": o.status.value,
         "total_amount": o.total_amount,
+        "is_regional_company": o.is_regional_company,
+        "payment_settlement": o.payment_settlement.value,
         "item_count": o.item_count,
     }
 

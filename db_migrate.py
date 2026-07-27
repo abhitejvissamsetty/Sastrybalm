@@ -53,6 +53,12 @@ def run_migrations():
         add_column_safely(conn, "alerts", "geography_id", "INT NULL")
         add_column_safely(conn, "alerts", "vendor_id", "INT NULL")
         add_column_safely(conn, "orders", "order_type", "VARCHAR(20) NOT NULL DEFAULT 'Secondary'")
+        add_column_safely(conn, "orders", "visit_id", "INT NULL")
+        add_column_safely(conn, "orders", "is_regional_company", "BOOLEAN NOT NULL DEFAULT 0")
+        try:
+            conn.execute(text("ALTER TABLE orders MODIFY COLUMN outlet_id INT NULL"))
+        except Exception:
+            pass
             
         # Users
         try:

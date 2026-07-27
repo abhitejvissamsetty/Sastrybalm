@@ -16,12 +16,12 @@
       <div>
         <div class="flex items-center gap-x-3">
           <h1 class="text-3xl font-bold text-white tracking-tight">New Order</h1>
-          <span class="inline-flex items-center gap-x-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            Sales Scope Confined
+          <span id="flow-badge" class="inline-flex items-center gap-x-1.5 rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-400 ring-1 ring-inset ring-indigo-500/20">
+            <span class="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+            Secondary Order Flow
           </span>
         </div>
-        <p class="mt-1 text-sm text-slate-400 font-medium">Create a sales order with real-time tax &amp; discount calculation</p>
+        <p class="mt-1 text-sm text-slate-400 font-medium">Create a Primary or Secondary sales order with real-time tax &amp; payment tracking</p>
       </div>
     </div>
   </div>
@@ -37,20 +37,35 @@
 
   <form method="post" id="order-form" class="space-y-8">
 
-    <!-- 1. Order Header Card -->
+    <!-- 1. Order Configuration Card -->
     <div class="glass rounded-3xl p-6 lg:p-8 border border-white/5 space-y-6 shadow-2xl shadow-black/40">
       <div class="flex items-center justify-between border-b border-white/5 pb-4">
         <h2 class="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">1. Order Configuration</h2>
-        <span class="text-xs text-slate-500">Step 1 of 2</span>
+        <span class="text-xs text-slate-500">Step 1 of 3</span>
       </div>
 
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 items-end">
-        <!-- Outlet -->
+        
+        <!-- Order Type -->
         <div class="space-y-2">
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center">
+            Order Type <span class="text-rose-400 ml-1">*</span>
+          </label>
+          <select name="order_type" id="order_type" required onchange="toggleFlow()"
+                  class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+            <option value="Secondary" selected>Secondary Order</option>
+            <option value="Primary" {% if current_user.role.value == 'field_rep' %}disabled{% endif %}>
+              Primary Order {% if current_user.role.value == 'field_rep' %}(L2+ Only){% endif %}
+            </option>
+          </select>
+        </div>
+
+        <!-- Outlet (Secondary Orders Only) -->
+        <div id="outlet-container" class="space-y-2">
           <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center">
             Outlet <span class="text-rose-400 ml-1">*</span>
           </label>
-          <select name="outlet_id" required
+          <select name="outlet_id" id="outlet_id"
                   class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
             <option value="">Select outlet…</option>
             {% for o in outlets %}
@@ -59,46 +74,51 @@
           </select>
         </div>
 
-        <!-- Channel Partner -->
-        <div class="space-y-2">
-          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center" title="Channel Partner (Fulfillment)">
-            Channel Partner (Fulfillment) <span class="text-rose-400 ml-1">*</span>
+        <!-- Visit Record (Mandatory for Secondary Orders) -->
+        <div id="visit-container" class="space-y-2">
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center" title="Mandatory Visit Record">
+            Visit Record <span class="text-rose-400 ml-1">*</span>
           </label>
-          <select name="channel_partner_id" required
+          <select name="visit_id" id="visit_id"
                   class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
-            <option value="">Select Channel Partner…</option>
+            {% if active_visits %}
+              {% for v in active_visits %}
+              <option value="{{ v.id }}" selected>Visit #{{ v.id }} - {{ v.outlet.name if v.outlet else 'Outlet' }} ({{ v.visit_time.strftime('%H:%M') }})</option>
+              {% endfor %}
+            {% else %}
+              <option value="">No visit logged today — log visit first</option>
+            {% endif %}
+          </select>
+        </div>
+
+        <!-- Channel Partner / Fulfillment -->
+        <div id="cp-container" class="space-y-2">
+          <label id="cp-label" class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center" title="Fulfillment Entity">
+            Fulfillment Entity <span class="text-rose-400 ml-1">*</span>
+          </label>
+          <select name="channel_partner_id" id="channel_partner_id" required onchange="toggleFlow()"
+                  class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+            <option value="">Select Fulfillment Entity…</option>
+            <option value="regional_company" id="opt-regional">Regional Company (Direct)</option>
             {% for cp in channel_partners %}
             <option value="{{ cp.id }}">{{ cp.name }} ({{ cp.partner_type }})</option>
             {% endfor %}
           </select>
         </div>
 
-        <!-- Order Type -->
-        <div class="space-y-2">
-          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center">
-            Order Type <span class="text-rose-400 ml-1">*</span>
-          </label>
-          <select name="order_type" required
-                  class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
-            {% for ot in OrderType %}
-            <option value="{{ ot.value }}" {% if ot.value == 'Secondary' %}selected{% endif %}>{{ ot.value }} Order</option>
-            {% endfor %}
-          </select>
-        </div>
-
         <!-- Notes -->
-        <div class="space-y-2">
+        <div class="space-y-2 sm:col-span-2 lg:col-span-4">
           <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center">
             Notes
           </label>
           <input type="text" name="notes"
                  class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
-                 placeholder="Optional notes or instructions">
+                 placeholder="Optional notes or delivery instructions">
         </div>
       </div>
     </div>
 
-    <!-- 2. Line Items Card -->
+    <!-- 2. Products & Line Items Card -->
     <div class="glass rounded-3xl p-6 lg:p-8 border border-white/5 space-y-6 shadow-2xl shadow-black/40">
       <div class="flex items-center justify-between border-b border-white/5 pb-4">
         <div>
@@ -170,10 +190,71 @@
       </div>
 
       <div class="flex items-center justify-between pt-6 border-t border-white/5">
-        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Order Summary</span>
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Order Financial Summary</span>
         <div class="flex items-center gap-x-3 bg-slate-900/80 px-5 py-3 rounded-2xl border border-white/10">
-          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Grand Total:</span>
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Order Total:</span>
           <span id="grand-total" class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">₹0.00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Immediate Payment Flow (Regional Company Fulfillment Only) -->
+    <div id="payment-section" class="glass rounded-3xl p-6 lg:p-8 border border-amber-500/20 space-y-6 shadow-2xl shadow-black/40 hidden">
+      <div class="flex items-center justify-between border-b border-amber-500/20 pb-4">
+        <div>
+          <div class="flex items-center gap-x-2">
+            <h2 class="text-xs font-bold text-amber-400 uppercase tracking-[0.2em]">3. Payment Collection (Regional Company)</h2>
+            <span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-bold">Direct Fulfillment</span>
+          </div>
+          <p class="mt-1 text-xs text-slate-400">Record cash/digital payment collected against this direct Regional Company order</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-3 items-end">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            Amount Collected (₹)
+          </label>
+          <input type="number" name="amount_collected" id="amount_collected" step="0.01" min="0" value="0" oninput="updateFinancialSummary()"
+                 class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all"
+                 placeholder="0.00">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            Payment Method
+          </label>
+          <select name="payment_method"
+                  class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all">
+            {% for pm in PaymentMethod %}
+            <option value="{{ pm.value }}">{{ pm.value.upper() }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            Transaction / Cheque / UPI Ref
+          </label>
+          <input type="text" name="transaction_ref"
+                 class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all"
+                 placeholder="Optional ref or cheque number">
+        </div>
+      </div>
+
+      <!-- Financial Breakdown Card -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-white/5">
+        <div class="bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+          <span class="text-xs text-slate-400 font-medium uppercase tracking-wider block mb-1">Order Amount</span>
+          <span id="summary-order-total" class="text-lg font-bold text-white">₹0.00</span>
+        </div>
+        <div class="bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+          <span class="text-xs text-emerald-400 font-medium uppercase tracking-wider block mb-1">Amount Collected</span>
+          <span id="summary-collected" class="text-lg font-bold text-emerald-400">₹0.00</span>
+        </div>
+        <div class="bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+          <span class="text-xs text-rose-400 font-medium uppercase tracking-wider block mb-1">Outstanding Balance</span>
+          <span id="summary-outstanding" class="text-lg font-bold text-rose-400">₹0.00</span>
         </div>
       </div>
     </div>
@@ -235,6 +316,60 @@
 </template>
 
 <script>
+let currentGrandTotal = 0;
+
+function toggleFlow() {
+  const orderType = document.getElementById('order_type').value;
+  const cpSel = document.getElementById('channel_partner_id');
+  const cpVal = cpSel.value;
+  const outletContainer = document.getElementById('outlet-container');
+  const visitContainer = document.getElementById('visit-container');
+  const outletSelect = document.getElementById('outlet_id');
+  const visitSelect = document.getElementById('visit_id');
+  const optRegional = document.getElementById('opt-regional');
+  const paymentSection = document.getElementById('payment-section');
+  const flowBadge = document.getElementById('flow-badge');
+  const cpLabel = document.getElementById('cp-label');
+
+  if (orderType === 'Primary') {
+    // Primary Order: Placed against Channel Partner (No Outlet, No Visit, No Payment)
+    flowBadge.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse"></span> Primary Order Flow (CP Direct)';
+    flowBadge.className = 'inline-flex items-center gap-x-1.5 rounded-full bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-400 ring-1 ring-inset ring-purple-500/20';
+
+    outletContainer.classList.add('hidden');
+    visitContainer.classList.add('hidden');
+    outletSelect.removeAttribute('required');
+    visitSelect.removeAttribute('required');
+
+    optRegional.disabled = true;
+    if (cpVal === 'regional_company') cpSel.value = '';
+    cpLabel.innerHTML = 'Channel Partner <span class="text-rose-400 ml-1">*</span>';
+    paymentSection.classList.add('hidden');
+
+  } else {
+    // Secondary Order: Placed against Outlet with Mandatory Visit & CP / Regional Company fulfillment
+    flowBadge.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse"></span> Secondary Order Flow (Outlet)';
+    flowBadge.className = 'inline-flex items-center gap-x-1.5 rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-400 ring-1 ring-inset ring-indigo-500/20';
+
+    outletContainer.classList.remove('hidden');
+    visitContainer.classList.remove('hidden');
+    outletSelect.setAttribute('required', 'required');
+    visitSelect.setAttribute('required', 'required');
+
+    optRegional.disabled = false;
+    cpLabel.innerHTML = 'Fulfillment Entity <span class="text-rose-400 ml-1">*</span>';
+
+    // Payment Section shown ONLY when Regional Company fulfillment is selected
+    if (cpVal === 'regional_company') {
+      paymentSection.classList.remove('hidden');
+    } else {
+      paymentSection.classList.add('hidden');
+    }
+  }
+
+  updateFinancialSummary();
+}
+
 function calcRow(row) {
   const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
   const price = parseFloat(row.querySelector('.price-input').value) || 0;
@@ -250,7 +385,18 @@ function calcRow(row) {
 function calcGrand() {
   let total = 0;
   document.querySelectorAll('.item-row').forEach(r => { total += calcRow(r); });
+  currentGrandTotal = total;
   document.getElementById('grand-total').textContent = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  updateFinancialSummary();
+}
+
+function updateFinancialSummary() {
+  const amtCol = parseFloat(document.getElementById('amount_collected').value) || 0;
+  const outstanding = Math.max(0, currentGrandTotal - amtCol);
+
+  document.getElementById('summary-order-total').textContent = '₹' + currentGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  document.getElementById('summary-collected').textContent = '₹' + amtCol.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  document.getElementById('summary-outstanding').textContent = '₹' + outstanding.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 document.getElementById('items-body').addEventListener('input', calcGrand);
@@ -279,6 +425,11 @@ document.getElementById('items-body').addEventListener('click', e => {
     btn.closest('.item-row').remove();
     calcGrand();
   }
+});
+
+// Initialize form flow on load
+document.addEventListener('DOMContentLoaded', () => {
+  toggleFlow();
 });
 </script>
 {% endblock %}

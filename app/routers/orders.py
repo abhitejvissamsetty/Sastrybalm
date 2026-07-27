@@ -7,14 +7,17 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_web_auth, require_web_roles
 from app.models.alert import Alert, AlertSeverity, AlertType
 from app.models.company import CompanyProfile
-from app.models.order import FlowType, Order, OrderItem, OrderStatus, OrderType, SyncStatus
+from app.models.order import FlowType, Order, OrderItem, OrderStatus, OrderType, SyncStatus, PaymentSettlementStatus
 from app.models.outlet import Outlet, OutletStatus
+from app.models.payment import Payment, PaymentMethod, PaymentStatus
 from app.models.product import Product, ProductCategory
+from app.models.timesheet import VisitRecord
 from app.models.product_mapping import ProductAliasMap
 from app.models.user import User, UserRole
 from app.utils.encryption import decrypt
@@ -92,6 +95,8 @@ async def order_new(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
+    from app.utils.timezone import ist_today
+
     outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
     # Confine to Products with Category Scope = Sales
     products = db.query(Product).filter(
@@ -107,11 +112,17 @@ async def order_new(
         cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_ids))
     channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
 
+    # Active visits today for current user
+    active_visits = db.query(VisitRecord).filter(
+        VisitRecord.user_id == current_user.id,
+        func.date(VisitRecord.visit_time) == ist_today()
+    ).order_by(VisitRecord.visit_time.desc()).all()
+
     return templates.TemplateResponse("orders/form.html", {
         "request": request, "current_user": current_user,
         "item": None, "outlets": outlets, "products": products,
-        "channel_partners": channel_partners,
-        "OrderType": OrderType, "error": None,
+        "channel_partners": channel_partners, "active_visits": active_visits,
+        "OrderType": OrderType, "PaymentMethod": PaymentMethod, "error": None,
     })
 
 
@@ -121,18 +132,28 @@ async def order_create(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
+    from app.utils.timezone import ist_today, ist_now
+    from app.models.local_distribution import LocalChannelPartner
+    from app.utils.ref_generator import payment_ref
+    from decimal import Decimal
+
     form = await request.form()
     outlet_id = form.get("outlet_id")
     channel_partner_id = form.get("channel_partner_id")
     order_type_val = form.get("order_type", "Secondary")
+    visit_id_val = form.get("visit_id")
     notes = form.get("notes", "")
+
+    amount_collected_val = form.get("amount_collected", "0")
+    payment_method_val = form.get("payment_method", "cash")
+    transaction_ref_val = form.get("transaction_ref", "")
+
     product_ids = form.getlist("product_id[]")
     quantities = form.getlist("quantity[]")
     unit_prices = form.getlist("unit_price[]")
     gst_rates = form.getlist("gst_rate[]")
     discount_pcts = form.getlist("discount_pct[]")
 
-    from app.models.local_distribution import LocalChannelPartner
     cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
     if current_user.role == UserRole.territory_manager:
         from app.routers.channel_partners import _get_tm_allowed_geo_ids
@@ -144,41 +165,120 @@ async def order_create(
         Product.is_active == True,
         Product.category_type == ProductCategory.sales
     ).order_by(Product.name).all()
-
-    if not outlet_id or not channel_partner_id or not product_ids:
-        outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
-        return templates.TemplateResponse("orders/form.html", {
-            "request": request, "current_user": current_user,
-            "item": None, "outlets": outlets, "products": sales_products,
-            "channel_partners": channel_partners,
-            "OrderType": OrderType,
-            "error": "Outlet, Channel Partner (Fulfillment), and at least one product are required.",
-        })
+    outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
+    active_visits = db.query(VisitRecord).filter(
+        VisitRecord.user_id == current_user.id,
+        func.date(VisitRecord.visit_time) == ist_today()
+    ).order_by(VisitRecord.visit_time.desc()).all()
 
     try:
         ot = OrderType(order_type_val)
     except ValueError:
         ot = OrderType.secondary
 
+    # Validate Order Flow Scoping & Targets
+    target_outlet_id = None
+    target_cp_id = None
+    target_visit_id = None
+    is_regional = False
+
+    if ot == OrderType.primary:
+        # Primary Order: Available ONLY for L2/L3/L4 users (Not L1 field_rep)
+        if current_user.role == UserRole.field_rep:
+            return templates.TemplateResponse("orders/form.html", {
+                "request": request, "current_user": current_user,
+                "item": None, "outlets": outlets, "products": sales_products,
+                "channel_partners": channel_partners, "active_visits": active_visits,
+                "OrderType": OrderType, "PaymentMethod": PaymentMethod,
+                "error": "Primary Orders are restricted to Territory Managers and Administrators (L2/L3/L4) only.",
+            })
+
+        if not channel_partner_id or channel_partner_id == "regional_company":
+            return templates.TemplateResponse("orders/form.html", {
+                "request": request, "current_user": current_user,
+                "item": None, "outlets": outlets, "products": sales_products,
+                "channel_partners": channel_partners, "active_visits": active_visits,
+                "OrderType": OrderType, "PaymentMethod": PaymentMethod,
+                "error": "Primary Orders must be placed directly against a valid Channel Partner.",
+            })
+        target_cp_id = int(channel_partner_id) if str(channel_partner_id).isdigit() else None
+        target_outlet_id = None
+        target_visit_id = None
+
+    else:
+        # Secondary Order: Must be associated with an active Visit Record against Outlet
+        if not outlet_id or not str(outlet_id).isdigit():
+            return templates.TemplateResponse("orders/form.html", {
+                "request": request, "current_user": current_user,
+                "item": None, "outlets": outlets, "products": sales_products,
+                "channel_partners": channel_partners, "active_visits": active_visits,
+                "OrderType": OrderType, "PaymentMethod": PaymentMethod,
+                "error": "Outlet is required for Secondary Orders.",
+            })
+
+        target_outlet_id = int(outlet_id)
+
+        # Retrieve & Verify Mandatory Visit Record
+        visit = None
+        if visit_id_val and str(visit_id_val).isdigit():
+            visit = db.query(VisitRecord).filter(
+                VisitRecord.id == int(visit_id_val),
+                VisitRecord.user_id == current_user.id
+            ).first()
+        if not visit:
+            visit = db.query(VisitRecord).filter(
+                VisitRecord.user_id == current_user.id,
+                VisitRecord.outlet_id == target_outlet_id,
+                func.date(VisitRecord.visit_time) == ist_today()
+            ).order_by(VisitRecord.visit_time.desc()).first()
+
+        if not visit:
+            return templates.TemplateResponse("orders/form.html", {
+                "request": request, "current_user": current_user,
+                "item": None, "outlets": outlets, "products": sales_products,
+                "channel_partners": channel_partners, "active_visits": active_visits,
+                "OrderType": OrderType, "PaymentMethod": PaymentMethod,
+                "error": "A mandatory Visit record against the selected outlet is required for Secondary Orders. Please log an outlet visit first.",
+            })
+
+        target_visit_id = visit.id
+
+        if channel_partner_id == "regional_company" or channel_partner_id == "0":
+            target_cp_id = None
+            is_regional = True
+        else:
+            target_cp_id = int(channel_partner_id) if channel_partner_id and str(channel_partner_id).isdigit() else None
+            is_regional = False
+
+    if not product_ids:
+        return templates.TemplateResponse("orders/form.html", {
+            "request": request, "current_user": current_user,
+            "item": None, "outlets": outlets, "products": sales_products,
+            "channel_partners": channel_partners, "active_visits": active_visits,
+            "OrderType": OrderType, "PaymentMethod": PaymentMethod,
+            "error": "At least one sales product line is required.",
+        })
+
     ord_num = order_number(db, Order)
-    cp_id_int = int(channel_partner_id) if channel_partner_id and str(channel_partner_id).isdigit() else None
     o = Order(
         order_number=ord_num,
-        outlet_id=int(outlet_id),
+        outlet_id=target_outlet_id,
         user_id=current_user.id,
-        channel_partner_id=cp_id_int,
+        channel_partner_id=target_cp_id,
+        is_regional_company=is_regional,
+        visit_id=target_visit_id,
         company_profile_id=current_user.company_profile_id,
         order_type=ot,
         flow_type=FlowType.zap_invoice,
         sync_status=SyncStatus.not_applicable,
-        status=OrderStatus.submitted,  # Submitted, pending TM approval or auto-approval cutoff
+        status=OrderStatus.submitted,
         notes=notes or None,
     )
     db.add(o)
     db.flush()
 
     for i, pid in enumerate(product_ids):
-        if not pid:
+        if not pid or not str(pid).isdigit():
             continue
         try:
             db.add(OrderItem(
@@ -192,12 +292,46 @@ async def order_create(
         except (ValueError, IndexError):
             continue
 
+    db.flush()
+    db.refresh(o)
+
+    # Process Payments Flow for Secondary Orders fulfilled by Regional Company
+    if ot == OrderType.secondary and is_regional:
+        amt_col = float(amount_collected_val) if amount_collected_val else 0.0
+        if amt_col > 0:
+            pay_ref_str = payment_ref(db, Payment)
+            pm = PaymentMethod(payment_method_val) if payment_method_val in [m.value for m in PaymentMethod] else PaymentMethod.cash
+            pay = Payment(
+                payment_ref=pay_ref_str,
+                order_id=o.id,
+                outlet_id=o.outlet_id,
+                user_id=current_user.id,
+                amount=Decimal(str(amt_col)),
+                method=pm,
+                transaction_ref=transaction_ref_val or None,
+                status=PaymentStatus.collected,
+                collected_at=ist_now(),
+            )
+            db.add(pay)
+            db.flush()
+
+        # Update Payment Settlement Status
+        order_total_val = float(o.total_amount)
+        if amt_col >= order_total_val and order_total_val > 0:
+            o.payment_settlement = PaymentSettlementStatus.paid
+        elif amt_col > 0:
+            o.payment_settlement = PaymentSettlementStatus.partial
+        else:
+            o.payment_settlement = PaymentSettlementStatus.unpaid
+
     db.commit()
     db.refresh(o)
 
     # Auto-allocate channel partner & record creation history log
     from app.services.channel_partner_notification import auto_allocate_channel_partner_for_order, record_order_history_log
-    auto_allocate_channel_partner_for_order(db, o)
+    if not is_regional and o.channel_partner_id:
+        auto_allocate_channel_partner_for_order(db, o)
+
     record_order_history_log(
         db=db,
         order_id=o.id,
@@ -205,10 +339,10 @@ async def order_create(
         performed_by_id=current_user.id,
         new_status=o.status.value,
         channel_partner_id=o.channel_partner_id,
-        notes=f"Order {o.order_number} created for outlet {o.outlet.name if o.outlet else 'N/A'}"
+        notes=f"{o.order_type.value} Order {o.order_number} created" + (f" for outlet {o.outlet.name}" if o.outlet else f" for partner {o.channel_partner.name if o.channel_partner else 'N/A'}")
     )
 
-    set_flash_success(request, f"Order {ord_num} created successfully.")
+    set_flash_success(request, f"{o.order_type.value} Order {ord_num} created successfully.")
     return RedirectResponse(f"/operations/orders/{o.id}", status_code=302)
 
 
