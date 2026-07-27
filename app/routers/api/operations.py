@@ -777,3 +777,206 @@ async def create_asset_capitalization_api(
         "sync_status": ac.sync_status.value,
     }
 
+
+# ── Mobile History & List Endpoints ──────────────────────────────────────────
+
+@router.get("/attendance/history")
+async def attendance_history(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """List authenticated user's past attendance & timesheet history."""
+    query = db.query(Timesheet).filter(Timesheet.user_id == current_user.id).order_by(Timesheet.work_date.desc())
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "items": [
+            {
+                "id": ts.id,
+                "work_date": ts.work_date.isoformat(),
+                "checkin_time": ts.checkin_time.isoformat() if ts.checkin_time else None,
+                "checkout_time": ts.checkout_time.isoformat() if ts.checkout_time else None,
+                "hours_worked": ts.hours_worked,
+                "visit_count": ts.visit_count,
+                "status": ts.status.value,
+            }
+            for ts in items
+        ],
+    }
+
+
+@router.get("/visits/my")
+async def my_visits(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    target_date: Optional[str] = Query(default=None),
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """List authenticated user's visit records."""
+    query = db.query(VisitRecord).filter(VisitRecord.user_id == current_user.id)
+    if target_date:
+        try:
+            d = date.fromisoformat(target_date)
+            query = query.filter(func.date(VisitRecord.visit_time) == d)
+        except ValueError:
+            pass
+    query = query.order_by(VisitRecord.visit_time.desc())
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "items": [
+            {
+                "id": v.id,
+                "outlet_id": v.outlet_id,
+                "outlet_name": v.outlet.name if v.outlet else None,
+                "visit_time": v.visit_time.isoformat() if v.visit_time else None,
+                "checkout_time": v.checkout_time.isoformat() if v.checkout_time else None,
+                "duration_minutes": v.duration_minutes,
+                "purpose": v.purpose,
+                "notes": v.notes,
+                "distance_from_outlet": v.distance_from_outlet,
+            }
+            for v in items
+        ],
+    }
+
+
+@router.get("/payments/my")
+async def my_payments(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """List payments collected by authenticated user."""
+    query = db.query(Payment).filter(Payment.user_id == current_user.id).order_by(Payment.collected_at.desc())
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "items": [
+            {
+                "id": p.id,
+                "payment_ref": p.payment_ref,
+                "outlet_id": p.outlet_id,
+                "outlet_name": p.outlet.name if p.outlet else None,
+                "amount": float(p.amount),
+                "method": p.method.value,
+                "payment_type": p.payment_type.value,
+                "status": p.status.value,
+                "collected_at": p.collected_at.isoformat() if p.collected_at else None,
+            }
+            for p in items
+        ],
+    }
+
+
+@router.get("/expenses/my")
+async def my_expenses(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """List expenses submitted by authenticated user."""
+    query = db.query(Expense).filter(Expense.user_id == current_user.id).order_by(Expense.expense_date.desc())
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "items": [
+            {
+                "id": e.id,
+                "category": e.category.value,
+                "amount": float(e.amount),
+                "description": e.description,
+                "expense_date": e.expense_date.isoformat() if e.expense_date else None,
+                "status": e.status.value,
+                "receipt_url": e.receipt_url,
+            }
+            for e in items
+        ],
+    }
+
+
+@router.get("/material-requests/my")
+async def my_material_requests(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """List material requests submitted by authenticated user."""
+    query = db.query(MaterialRequest).filter(MaterialRequest.user_id == current_user.id).order_by(MaterialRequest.created_at.desc())
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "items": [
+            {
+                "id": mr.id,
+                "mr_number": mr.mr_number,
+                "outlet_id": mr.outlet_id,
+                "outlet_name": mr.outlet.name if mr.outlet else None,
+                "category": mr.category,
+                "description": mr.description,
+                "status": mr.status.value,
+                "cmms_ref": mr.cmms_ref,
+                "submitted_at": mr.submitted_at.isoformat() if mr.submitted_at else None,
+            }
+            for mr in items
+        ],
+    }
+
+
+@router.get("/work-orders/pending-qc")
+async def pending_qc_work_orders(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """List pending work orders for mobile QC inspection."""
+    from app.models.procurement import WorkOrder, QCStatus
+    if current_user.role not in [UserRole.admin, UserRole.territory_manager, UserRole.qc_manager]:
+        raise HTTPException(status_code=403, detail="QC inspection role required.")
+
+    query = db.query(WorkOrder).filter(WorkOrder.qc_status == QCStatus.pending).order_by(WorkOrder.created_at.desc())
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "items": [
+            {
+                "id": wo.id,
+                "wo_number": wo.wo_number,
+                "title": wo.title,
+                "description": wo.description,
+                "vendor_id": wo.vendor_id,
+                "vendor_name": wo.vendor.name if wo.vendor else None,
+                "amount": float(wo.amount) if wo.amount else 0,
+                "status": wo.status.value,
+                "qc_status": wo.qc_status.value,
+                "created_at": wo.created_at.isoformat() if wo.created_at else None,
+            }
+            for wo in items
+        ],
+    }
+

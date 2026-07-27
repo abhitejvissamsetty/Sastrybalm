@@ -162,11 +162,12 @@ async def system_config(
             "gps_threshold_metres": 100,
             "sync_interval_seconds": 300,
         }
+    pm = config.payment_mode.value if (config and config.payment_mode) else "cash_and_online"
     return {
-        "payment_mode": config.payment_mode.value,
-        "denomination_mandatory": config.denomination_mandatory,
-        "gps_threshold_metres": config.gps_threshold_metres,
-        "sync_interval_seconds": config.sync_interval_seconds,
+        "payment_mode": pm,
+        "denomination_mandatory": bool(config.denomination_mandatory),
+        "gps_threshold_metres": config.gps_threshold_metres or 100,
+        "sync_interval_seconds": config.sync_interval_seconds or 300,
     }
 
 
@@ -340,4 +341,90 @@ async def create_outlet(
         "gps_lat": outlet.gps_lat,
         "gps_lng": outlet.gps_lng,
     }
+
+
+@router.get("/beats/my")
+async def get_my_beats(
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """List beats assigned to the authenticated user via their positions."""
+    assigned_beat_ids = set()
+    if hasattr(current_user, "positions"):
+        for pos in current_user.positions:
+            if getattr(pos, "is_active", True):
+                for b in pos.beats:
+                    if b.is_active:
+                        assigned_beat_ids.add(b.id)
+
+    if assigned_beat_ids:
+        beats = db.query(Beat).filter(Beat.id.in_(assigned_beat_ids), Beat.is_active == True).order_by(Beat.name).all()
+    else:
+        beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
+
+    return {
+        "items": [
+            {
+                "id": b.id,
+                "name": b.name,
+                "code": b.code,
+                "beat_type": b.beat_type.value,
+                "beat_grade": b.beat_grade.value if b.beat_grade else None,
+                "territory_id": b.territory_id,
+            }
+            for b in beats
+        ]
+    }
+
+
+class OutletLocationUpdateSchema(BaseModel):
+    gps_lat: float
+    gps_lng: float
+
+
+@router.get("/outlets/{outlet_id}")
+async def get_outlet_detail(
+    outlet_id: int,
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """Detailed view of a single outlet."""
+    o = db.query(Outlet).filter(Outlet.id == outlet_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Outlet not found.")
+    return {
+        "id": o.id,
+        "name": o.name,
+        "code": o.code,
+        "owner_name": o.owner_name,
+        "mobile": o.mobile,
+        "address": o.address,
+        "pincode": o.pincode,
+        "gstin": o.gstin,
+        "channel": o.channel.value if o.channel else None,
+        "shop_type": o.shop_type.value if o.shop_type else None,
+        "beat_id": o.beat_id,
+        "beat_name": o.beat.name if o.beat else None,
+        "territory_id": o.territory_id,
+        "gps_lat": o.gps_lat,
+        "gps_lng": o.gps_lng,
+        "status": o.status.value,
+    }
+
+
+@router.patch("/outlets/{outlet_id}/location")
+async def update_outlet_location(
+    outlet_id: int,
+    payload: OutletLocationUpdateSchema,
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """Update outlet GPS coordinates captured by Field Rep on mobile."""
+    o = db.query(Outlet).filter(Outlet.id == outlet_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Outlet not found.")
+    o.gps_lat = payload.gps_lat
+    o.gps_lng = payload.gps_lng
+    db.commit()
+    return {"id": o.id, "gps_lat": o.gps_lat, "gps_lng": o.gps_lng, "message": "Outlet location updated successfully."}
 

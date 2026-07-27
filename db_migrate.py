@@ -250,6 +250,18 @@ def run_migrations():
             conn.execute(text("ALTER TABLE timesheets ADD CONSTRAINT fk_timesheet_approved_by FOREIGN KEY (approved_by_id) REFERENCES users(id) ON DELETE SET NULL"))
         except Exception: pass
 
+        # Archival & Retention Columns for Parquet Hybrid Lifecycle
+        add_column_safely(conn, "system_configuration", "archival_retention_days", "INT NOT NULL DEFAULT 90")
+        
+        archival_tables = [
+            "orders", "order_items", "payments", "attendance", "timesheets",
+            "expenses", "material_requests", "material_request_history_logs",
+            "vendor_quotations", "work_orders", "stock_movements"
+        ]
+        for tbl in archival_tables:
+            add_column_safely(conn, tbl, "is_archived", "BOOLEAN NOT NULL DEFAULT 0")
+            add_column_safely(conn, tbl, "archived_at", "DATETIME NULL")
+
         # Warehouses
         add_column_safely(conn, "warehouses", "contact_person", "VARCHAR(255) NULL")
         add_column_safely(conn, "warehouses", "mobile", "VARCHAR(20) NULL")
