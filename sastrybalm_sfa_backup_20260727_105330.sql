@@ -1,8 +1,8 @@
 -- ========================================================
--- Sastrybalm SFA Enterprise SQL Database Backup
+-- Safar SFA Enterprise SQL Database Backup
 -- Generated At: 2026-07-27 10:53:30
 -- Database Engine: MySQL / MariaDB
--- Software Version: Sastrybalm SFA v2.0 Enterprise
+-- Software Version: Safar SFA v2.0 Enterprise
 -- ========================================================
 
 SET FOREIGN_KEY_CHECKS=0;
@@ -236,8 +236,8 @@ CREATE TABLE `products` (
 
 -- Dumping data for table `products`
 INSERT INTO `products` (`id`, `erp_id`, `sku`, `name`, `division`, `category_type`, `primary_category`, `secondary_category`, `mrp`, `unit_cost`, `stock_qty`, `reorder_level`, `warehouse_id`, `warehouse_location`, `gst_rate`, `must_sell`, `is_active`, `created_at`, `updated_at`, `company_profile_id`, `is_stockable`) VALUES
-(1, NULL, 'SASB-5INR', 'SASTRY BALM 5 INR SACHET', NULL, 'Sales', NULL, NULL, 5.00, 4.30, 0, 10, NULL, NULL, 5.00, 0, 1, '2026-07-25 08:09:17', '2026-07-25 08:09:17', NULL, 0),
-(2, NULL, 'SASB-50INR', 'SASTRY BALM 50 INR GLASS BOTTLE', NULL, 'Sales', NULL, NULL, 50.00, 43.00, 0, 10, NULL, NULL, 5.00, 0, 1, '2026-07-25 08:10:15', '2026-07-25 08:10:27', NULL, 0),
+(1, NULL, 'SASB-5INR', 'Safar 5 INR SACHET', NULL, 'Sales', NULL, NULL, 5.00, 4.30, 0, 10, NULL, NULL, 5.00, 0, 1, '2026-07-25 08:09:17', '2026-07-25 08:09:17', NULL, 0),
+(2, NULL, 'SASB-50INR', 'Safar 50 INR GLASS BOTTLE', NULL, 'Sales', NULL, NULL, 50.00, 43.00, 0, 10, NULL, NULL, 5.00, 0, 1, '2026-07-25 08:10:15', '2026-07-25 08:10:27', NULL, 0),
 (3, NULL, 'BACKLIT-BOARD', 'BACKLIT BOARD', NULL, 'Marketing - Procurement', NULL, NULL, 0.00, 0.00, 45, 10, 3, NULL, 18.00, 0, 1, '2026-07-25 08:17:41', '2026-07-26 12:27:00', NULL, 1),
 (4, NULL, 'FRONTLIT-BOARD', 'FRONTLIT BOARD', NULL, 'Marketing - Procurement', NULL, NULL, 0.00, 0.00, 0, 10, NULL, NULL, 18.00, 0, 1, '2026-07-25 08:20:17', '2026-07-25 08:20:17', NULL, 1),
 (5, NULL, 'DANGLER-001', 'DANGLERS', NULL, 'Marketing - Stock', NULL, NULL, 0.00, 0.00, 0, 10, NULL, NULL, 18.00, 0, 1, '2026-07-25 08:20:45', '2026-07-25 10:29:12', NULL, 1);

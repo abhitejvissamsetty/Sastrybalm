@@ -1,5 +1,5 @@
 ---
-name: sastrybalm-erp
+name: safar-erp
 description: >-
   FMCG Sales & Distribution ERP system workflow guide. Covers Warehouses,
   Geographies (Zones, Regions, Territories), Position Hierarchy (L1-L4) with
@@ -8,10 +8,10 @@ description: >-
   Alerts, Auto-Flags), Sidebar Navigation, Server Restart S3 Validation, and Scheduled Analytics.
 ---
 
-# Sastrybalm ERP — Sales & Distribution System Guide
+# Safar ERP — Sales & Distribution System Guide
 
 ## Overview
-Sastrybalm ERP is a comprehensive FMCG Sales & Distribution Management System built with **FastAPI**, **SQLAlchemy**, **Jinja2 Templates**, and **MySQL (MAMP)**.
+Safar ERP is a comprehensive FMCG Sales & Distribution Management System built with **FastAPI**, **SQLAlchemy**, **Jinja2 Templates**, and **MySQL (MAMP)**.
 
 The system orchestrates:
 - **Admin Onboarding & Dual-Bucket S3 Storage**: Onboarding handles Administrator account password setup and optional database backup restoration. S3 Object Storage is configured in **Admin Dashboard → System Settings → S3 Storage**, supporting two separate buckets: **Permanent Files - Bucket** (`s3_bucket_name`) for outlet photos, material requests, QC pictures, avatars, and **Parquet Daily Rolling Backups**, and **Temporary Files - Bucket** (`s3_files_bucket_name`) for database backups, PDF exports, & temporary reports.
@@ -32,7 +32,7 @@ The system orchestrates:
 ## 🏛️ System Architecture & Data Models
 
 ### Database Connection & Lifespan Validation
-- **DB Engine**: MySQL (MAMP default on `127.0.0.1:8889`, database `sastrybalm_db`, user `root`, password `root`).
+- **DB Engine**: MySQL (MAMP default on `127.0.0.1:8889`, database `safar_db`, user `root`, password `root`).
 - **ORM Base**: SQLAlchemy 2.0.
 - **Lifespan Startup Health Check**: `app/services/startup_validation.py` executes `validate_admin_and_s3_config()` inside FastAPI lifespan (`app/main.py`) on every server restart to verify an active Admin user exists and ping S3/MinIO storage.
 - **S3 / MinIO Storage Adapter**: `app/adapters/s3_storage.py` manages image uploads (Outlets, Assets, Material Requests, Work Orders, Maintenance Logs), daily database backups, and pre-signed CSV report downloads.
@@ -215,7 +215,7 @@ python3 -m py_compile app/main.py app/services/startup_validation.py app/adapter
 
 ### Image Architecture & Dependency Encapsulation
 - **Multi-Stage Dockerfile (`Dockerfile`)**: Pre-compiles and installs all mandatory dependencies from `requirements.txt` (`boto3`, `botocore`, `gunicorn`, `cryptography`, `fastapi`, `pymysql`, `sqlalchemy`) into `/usr/local`.
-- **Zero-Installation Target Deployment**: When built locally or via CI/CD, the Docker image encapsulates all Python packages into an immutable container artifact. Target servers loading the container image via Docker Hub/Registry or `docker load < sastrybalm-app.tar.gz` run instantly without downloading or installing any dependencies from scratch.
+- **Zero-Installation Target Deployment**: When built locally or via CI/CD, the Docker image encapsulates all Python packages into an immutable container artifact. Target servers loading the container image via Docker Hub/Registry or `docker load < safar-app.tar.gz` run instantly without downloading or installing any dependencies from scratch.
 - **Docker Entrypoint Migration Architecture (`entrypoint.sh`)**: Database migrations (`python db_migrate.py`) run **once in PID 1** before Gunicorn forks workers. This prevents multi-worker `ALTER TABLE` deadlocks (MySQL 1213) and ensures all tables exist before any worker serves requests. The FastAPI `lifespan` handler does NOT run migrations — only startup validation and scheduler init.
 - **Gunicorn `--timeout 120`**: Workers get 120 seconds (up from default 30) to complete startup, preventing premature SIGABRT on slow MySQL connections.
 - **Docker Compose Architecture (`docker-compose.yml`)**:
@@ -230,10 +230,10 @@ python3 -m py_compile app/main.py app/services/startup_validation.py app/adapter
 docker compose build
 
 # Export image package for offline target server deployment
-docker save sastrybalm-app:latest | gzip > sastrybalm-app.tar.gz
+docker save safar-app:latest | gzip > safar-app.tar.gz
 
 # Load and launch on target environment
-docker load < sastrybalm-app.tar.gz
+docker load < safar-app.tar.gz
 docker compose up -d
 ```
 
@@ -381,13 +381,13 @@ All Web UI routes are structured with section prefixes corresponding to their si
   - `GET /api/v1/orders/my`, `GET /api/v1/payments/my`: Rep's history endpoints.
   - `GET /api/v1/work-orders/pending-qc` & `POST /api/v1/work-orders/{id}/qc-approve`: QC inspection approval with photo upload.
 
-### C. Module Access Restriction Rules
-- **Access Rule**: **Expenses**, **Timesheets**, and **Material Requests** are restricted ONLY to:
+### C. Module Access Restriction & Beat Creation Rules
+- **Access Rule**: **Beat Creation**, **Expenses**, **Timesheets**, and **Material Requests** are restricted ONLY to:
   1. `admin` users.
   2. `territory_manager` users whose assigned Geography level is `>= Region` (`Zone` or `Region`).
-  3. All other roles (`field_rep`, `vendor_admin`, `vendor_technician`, `qc_manager`, or `territory_manager` assigned to `Territory` level below Region) are strictly blocked with `HTTP 403`.
+  3. All other roles (`field_rep`, `vendor_admin`, `vendor_technician`, `qc_manager`, or `territory_manager` assigned to `Territory` level below Region) are strictly blocked with `HTTP 403 Access Denied`.
 - **Model Property (`User.can_access_restricted_modules`)**: Evaluates role and geography level depth safely, handling `DetachedInstanceError` when un-sessioned.
-- **Dependency Guard (`app/dependencies.py`)**: `require_restricted_module_web_access` and `require_restricted_module_api_access` enforce permissions on web and API endpoints. Eager loading `joinedload(User.geography)` prevents lazy loading session detachments.
+- **Dependency Guard (`app/dependencies.py`)**: `require_restricted_module_web_access` and `require_restricted_module_api_access` enforce permissions on web (`/master-data/beats/new`, `/master-data/beats/{id}/edit`, etc.) and API (`POST /api/v1/beats`) endpoints.
 - **Mobile UI Dynamic Quick Actions**: `dashboard_tab.dart` dynamically switches Quick Action cards based on `user.canAccessRestrictedModules`.
 
 ### D. Complete Legacy Module Purge (`payment_submissions`)
@@ -421,4 +421,14 @@ All Web UI routes are structured with section prefixes corresponding to their si
   - Legacy offline sync items (`ZAP Sync`, `CMMS Sync`, `CONNECT Sync`) have been completely purged from the dashboard panel.
   - The **Core Infrastructure** panel (`API Core`, `Datastore`, `Job Scheduler`) is strictly scoped and visible **ONLY to System Administrators** (`{% if current_user.role.value == 'admin' %}`). Hidden for Territory Managers and Field Reps.
 
+### H. Order Creation, OrderType & Sales Category Scoping
+- **Purged Legacy `Flow Type`**: Removed `Flow Type` dropdown from order forms (`/operations/orders/new`) and templates.
+- **`Order Type` Field (`Order.order_type`)**: Introduced `OrderType` enum (`Primary`, `Secondary`). Saved on `Order.order_type` column and displayed as colored badges (`Primary Order` in purple, `Secondary Order` in indigo) across order lists.
+- **Product Category Scope Validation**: Product selection dropdowns in `/operations/orders/new` are strictly confined and validated for **`Product.category_type == ProductCategory.sales`** (`"Sales"` category). Marketing & procurement stock items are excluded from order creation dropdowns.
+- **Executive Dark Glassmorphic Design**: Redesigned `/operations/orders/new` with executive glass cards (`bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-3xl p-8`), interactive line item calculation, and grand total pills.
 
+### I. Centralized Indian Standard Time (IST, GMT +5:30) Architecture
+- **Environment & Timezone Utility (`app/utils/timezone.py`)**: Centralized datetime helper module providing `ist_now()`, `ist_today()`, and `format_ist()` configured strictly to `Asia/Kolkata` (GMT +5:30).
+- **Process & Database Session Enforcement (`app/database.py`)**: OS process environment variable `TZ=Asia/Kolkata` enforced. SQLAlchemy engine event listener automatically executes `SET time_zone = '+05:30';` on every database connection.
+- **Transaction & Model Defaults**: All transaction defaults (`order_date`, `expense_date`, `work_date`, reference number prefix date generation, checkin/checkout timestamps, visit timestamps) evaluate in IST.
+- **Jinja2 Template Filter**: Registered `format_ist` Jinja2 filter in `app/main.py` for rendering IST formatted timestamps.

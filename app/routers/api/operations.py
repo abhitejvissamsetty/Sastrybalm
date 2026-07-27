@@ -6,6 +6,8 @@ All endpoints require Bearer JWT auth.
 from datetime import date, datetime
 from typing import List, Optional
 
+from app.utils.timezone import ist_now, ist_today
+
 from fastapi import APIRouter, Body, Depends, Form, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -40,7 +42,7 @@ async def checkin(
     db: Session = Depends(get_db),
 ):
     from app.models.attendance import Attendance, ApprovalStatus
-    today = date.today()
+    today = ist_today()
     existing = db.query(Timesheet).filter(
         Timesheet.user_id == current_user.id,
         Timesheet.work_date == today,
@@ -57,20 +59,20 @@ async def checkin(
         att = Attendance(
             user_id=current_user.id,
             date=today,
-            checkin_time=datetime.now(),
+            checkin_time=ist_now(),
             approval_status=ApprovalStatus.pending,
         )
         db.add(att)
         db.flush()
     elif not att.checkin_time:
-        att.checkin_time = datetime.now()
+        att.checkin_time = ist_now()
         db.flush()
 
     ts = Timesheet(
         user_id=current_user.id,
         attendance_id=att.id,
         work_date=today,
-        checkin_time=datetime.now(),
+        checkin_time=ist_now(),
         checkin_lat=gps_lat,
         checkin_lng=gps_lng,
         checkin_address=address,
@@ -93,7 +95,7 @@ async def checkout(
 ):
     from app.models.attendance import Attendance, AttendanceType
     from app.models.asset_capitalization import AssetCapitalization
-    today = date.today()
+    today = ist_today()
     ts = db.query(Timesheet).filter(
         Timesheet.user_id == current_user.id,
         Timesheet.work_date == today,
@@ -102,7 +104,7 @@ async def checkout(
     if not ts:
         raise HTTPException(status_code=400, detail="No open timesheet found for today.")
 
-    ts.checkout_time = datetime.now()
+    ts.checkout_time = ist_now()
     ts.checkout_lat = gps_lat
     ts.checkout_lng = gps_lng
     ts.checkout_address = address
@@ -121,7 +123,7 @@ async def checkout(
         ).first()
 
     if att:
-        att.checkout_time = datetime.now()
+        att.checkout_time = ist_now()
         db.flush()
         
         # Calculate suggested shift status
@@ -218,7 +220,7 @@ async def attendance_today(
 ):
     ts = db.query(Timesheet).filter(
         Timesheet.user_id == current_user.id,
-        Timesheet.work_date == date.today(),
+        Timesheet.work_date == ist_today(),
     ).first()
     if not ts:
         return {"checked_in": False}
@@ -252,7 +254,7 @@ async def log_visit(
     if outlet.gps_lat and outlet.gps_lng:
         distance = haversine_distance(gps_lat, gps_lng, outlet.gps_lat, outlet.gps_lng)
 
-    today = date.today()
+    today = ist_today()
     ts = db.query(Timesheet).filter(
         Timesheet.user_id == current_user.id,
         Timesheet.work_date == today,

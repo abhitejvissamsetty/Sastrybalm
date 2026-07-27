@@ -39,7 +39,7 @@ def test_restricted_module_access():
             admin_user = User(
                 username="admin",
                 full_name="System Admin",
-                email="admin@sastrybalm.com",
+                email="admin@safar.com",
                 hashed_password=hash_password("adminpass"),
                 role=UserRole.admin,
                 is_active=True
@@ -56,7 +56,7 @@ def test_restricted_module_access():
             tm_region = User(
                 username="tm_region_test",
                 full_name="Region Manager",
-                email="tm_region@sastrybalm.com",
+                email="tm_region@safar.com",
                 hashed_password=hash_password("tmpassword"),
                 role=UserRole.territory_manager,
                 geography_id=region_geo.id,
@@ -74,7 +74,7 @@ def test_restricted_module_access():
             tm_territory = User(
                 username="tm_territory_test",
                 full_name="Territory Manager Low",
-                email="tm_territory@sastrybalm.com",
+                email="tm_territory@safar.com",
                 hashed_password=hash_password("tmpassword"),
                 role=UserRole.territory_manager,
                 geography_id=territory_geo.id,
@@ -92,7 +92,7 @@ def test_restricted_module_access():
             rep = User(
                 username="rep1",
                 full_name="Field Rep 1",
-                email="rep1@sastrybalm.com",
+                email="rep1@safar.com",
                 hashed_password=hash_password("reppassword"),
                 role=UserRole.field_rep,
                 is_active=True

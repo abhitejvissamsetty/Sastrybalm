@@ -78,11 +78,11 @@ def test_deactivation_rules():
 async def test_integrations_fetch():
     print("Testing Integrations Fetch (CMMS & CONNECT)...")
     # Mock CMMS adapter response
-    mock_cmms_response_asset = {"data": [{"name": "CMMS-ASSET-01", "item_name": "Sastry Balm Asset"}]}
-    mock_cmms_response_stocked = {"data": [{"name": "CMMS-STOCK-01", "item_name": "Sastry Balm Stocked"}]}
-    mock_cmms_response_service = {"data": [{"name": "CMMS-SERVICE-01", "item_name": "Sastry Balm Service"}]}
+    mock_cmms_response_asset = {"data": [{"name": "CMMS-ASSET-01", "item_name": "Safar Asset"}]}
+    mock_cmms_response_stocked = {"data": [{"name": "CMMS-STOCK-01", "item_name": "Safar Stocked"}]}
+    mock_cmms_response_service = {"data": [{"name": "CMMS-SERVICE-01", "item_name": "Safar Service"}]}
     
-    mock_connect_response = {"data": [{"name": "CONN-PROD-01", "item_name": "Sastry Balm Connect"}]}
+    mock_connect_response = {"data": [{"name": "CONN-PROD-01", "item_name": "Safar Connect"}]}
 
     with patch("app.adapters.cmms.CMSAdapter._request_with_retry", new_callable=AsyncMock) as mock_cmms_request, \
          patch("app.adapters.connect.ConnectAdapter.get_connect_items", new_callable=AsyncMock) as mock_connect_request:

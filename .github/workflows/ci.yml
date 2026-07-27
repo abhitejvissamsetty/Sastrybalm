@@ -15,7 +15,7 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: sastrybalm_test
+          MYSQL_DATABASE: safar_test
         ports:
           - 3306:3306
         options: >-
@@ -46,7 +46,7 @@ jobs:
           DB_PORT: 3306
           DB_USER: root
           DB_PASSWORD: root
-          DB_NAME: sastrybalm_test
+          DB_NAME: safar_test
           SECRET_KEY: ci-test-secret-key-not-for-production
         run: |
           python -m pytest tests/ -v --tb=short

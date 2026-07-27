@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `sastrybalm_db`
+-- Database: `safar_db`
 --
 
 -- --------------------------------------------------------
@@ -360,7 +360,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `email`, `username`, `full_name`, `hashed_password`, `role`, `is_active`, `employee_id`, `phone`, `imei`, `position_id`, `zone_id`, `company_profile_id`, `created_at`, `updated_at`) VALUES
-(1, 'admin@sastrybalm.com', 'admin', 'System Administrator', '$2b$12$zJ51FENe8DAeJohoUNPr9eCPmQL5d7cZ23a0B5UITg1p8gVqfClMa', 'admin', 1, NULL, NULL, NULL, NULL, NULL, NULL, '2026-05-13 17:46:25', '2026-05-13 17:46:25');
+(1, 'admin@safar.com', 'admin', 'System Administrator', '$2b$12$zJ51FENe8DAeJohoUNPr9eCPmQL5d7cZ23a0B5UITg1p8gVqfClMa', 'admin', 1, NULL, NULL, NULL, NULL, NULL, NULL, '2026-05-13 17:46:25', '2026-05-13 17:46:25');
 
 -- --------------------------------------------------------
 

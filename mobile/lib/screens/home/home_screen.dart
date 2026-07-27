@@ -36,24 +36,24 @@ class HomeScreen extends ConsumerWidget {
     final pendingSyncs = ref.watch(syncProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FC),
+      backgroundColor: const Color(0xFFFAFAFA), // Zinc 50
       body: child,
       bottomNavigationBar: SafeArea(
         child: Container(
           margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-          height: 68,
+          height: 64,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: const Color(0xFFE2E8F0),
-              width: 1.2,
+              color: const Color(0xFFE4E4E7), // Zinc 200
+              width: 1.0,
             ),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
+                color: Color(0x0A000000),
+                blurRadius: 16,
+                offset: Offset(0, 4),
               ),
             ],
           ),
@@ -102,25 +102,26 @@ class HomeScreen extends ConsumerWidget {
     int badgeCount = 0,
   }) {
     final isSelected = index == selectedIndex;
-    final activeColor = const Color(0xFF4F46E5);
-    final inactiveColor = const Color(0xFF94A3B8);
+    const activeColor = Color(0xFF09090B);    // Zinc 950
+    const inactiveColor = Color(0xFF71717A);  // Zinc 500
+    const activeBg = Color(0xFFF4F4F5);       // Zinc 100
 
     return Expanded(
       child: InkWell(
         onTap: () => _onItemTapped(index, context),
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
+              duration: const Duration(milliseconds: 180),
               curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
               decoration: BoxDecoration(
-                color: isSelected ? activeColor.withOpacity(0.12) : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
+                color: isSelected ? activeBg : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Stack(
                 clipBehavior: Clip.none,
@@ -128,7 +129,7 @@ class HomeScreen extends ConsumerWidget {
                   Icon(
                     isSelected ? activeIcon : icon,
                     color: isSelected ? activeColor : inactiveColor,
-                    size: 22,
+                    size: 20,
                   ),
                   if (badgeCount > 0)
                     Positioned(
@@ -137,7 +138,7 @@ class HomeScreen extends ConsumerWidget {
                       child: Container(
                         padding: const EdgeInsets.all(3),
                         decoration: const BoxDecoration(
-                          color: Color(0xFFF59E0B),
+                          color: Color(0xFF09090B),
                           shape: BoxShape.circle,
                         ),
                         constraints: const BoxConstraints(
@@ -149,7 +150,7 @@ class HomeScreen extends ConsumerWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 8,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w800,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -158,13 +159,13 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
                 color: isSelected ? activeColor : inactiveColor,
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                fontSize: 10.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 letterSpacing: -0.2,
               ),
             ),

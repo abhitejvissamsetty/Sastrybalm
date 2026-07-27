@@ -17,7 +17,7 @@ def test_api():
                 username="admin",
                 hashed_password=hash_password("adminpassword"),
                 full_name="System Admin",
-                email="admin@sastrybalm.com",
+                email="admin@safar.com",
                 role=UserRole.admin,
                 is_active=True
             )
@@ -36,7 +36,7 @@ def test_api():
                 username="rep1",
                 hashed_password=hash_password("password123"),
                 full_name="Field Rep 1",
-                email="rep1@sastrybalm.com",
+                email="rep1@safar.com",
                 role=UserRole.field_rep,
                 is_active=True
             )

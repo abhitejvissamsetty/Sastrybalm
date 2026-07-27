@@ -1,6 +1,6 @@
-# Sastrybalm SFA — Deployment & Operations Guide
+# Safar SFA — Deployment & Operations Guide
 
-This guide covers deployment and local execution options for the **Sastrybalm SFA** FastAPI application.
+This guide covers deployment and local execution options for the **Safar SFA** FastAPI application.
 
 ---
 
@@ -13,7 +13,7 @@ This guide covers deployment and local execution options for the **Sastrybalm SF
 ### Setup & Run
 ```bash
 # 1. Clone the repository and enter directory
-cd Sastrybalm
+cd Safar
 
 # 2. Configure environment variables (.env)
 cp .env.example .env
@@ -23,7 +23,7 @@ cp .env.example .env
 python3 db_migrate.py
 
 # 4. Start the application server
-./start_sastrybalm.sh
+./start_safar.sh
 # OR manually run:
 python3 run.py
 ```
@@ -48,7 +48,7 @@ The application will be accessible at:
 │  │  :8080 / :443 │    │      :8090      │    │   :3306   │  │
 │  └───────────────┘    └─────────────────┘    └───────────┘  │
 │                                                             │
-│   ── sastrybalm-net (bridge network) ────────────────────  │
+│   ── safar-net (bridge network) ────────────────────  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -76,7 +76,7 @@ docker compose logs -f app
 
 ### Step 1: Clone & Virtual Environment
 ```bash
-cd /var/www/sastrybalm
+cd /var/www/safar
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
@@ -90,18 +90,18 @@ python3 db_migrate.py
 ```
 
 ### Step 3: Configure Systemd Service
-Create `/etc/systemd/system/sastrybalm.service`:
+Create `/etc/systemd/system/safar.service`:
 
 ```ini
 [Unit]
-Description=Sastrybalm SFA FastAPI Daemon
+Description=Safar SFA FastAPI Daemon
 After=network.target
 
 [Service]
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/sastrybalm
-ExecStart=/var/www/sastrybalm/venv/bin/gunicorn \
+WorkingDirectory=/var/www/safar
+ExecStart=/var/www/safar/venv/bin/gunicorn \
           --workers 4 \
           --worker-class uvicorn.workers.UvicornWorker \
           --bind 127.0.0.1:8090 \
@@ -114,8 +114,8 @@ WantedBy=multi-user.target
 Enable and start the service:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl start sastrybalm
-sudo systemctl enable sastrybalm
+sudo systemctl start safar
+sudo systemctl enable safar
 ```
 
 ---
@@ -124,13 +124,13 @@ sudo systemctl enable sastrybalm
 
 | Key | Example Value | Description |
 |---|---|---|
-| `APP_NAME` | `Sastrybalm SFA` | Application Display Name |
+| `APP_NAME` | `Safar SFA` | Application Display Name |
 | `SECRET_KEY` | *(random long string)* | JWT Signing & Session Secret |
 | `DB_HOST` | `127.0.0.1` | MySQL Host IP |
 | `DB_PORT` | `8889` (MAMP) / `3308` (Docker) | MySQL Server Port |
-| `DB_USER` | `sastrybalm_user` | MySQL Database Username |
-| `DB_PASSWORD` | `sastrybalm_password` | MySQL Database Password |
-| `DB_NAME` | `sastrybalm_db` | MySQL Database Name |
+| `DB_USER` | `safar_user` | MySQL Database Username |
+| `DB_PASSWORD` | `safar_password` | MySQL Database Password |
+| `DB_NAME` | `safar_db` | MySQL Database Name |
 | `ADMIN_USERNAME` | `admin` | Admin Portal Username |
 | `ADMIN_PASSWORD` | `admin123` | Admin Portal Password |
 | `JWT_EXPIRE_MINUTES` | `10080` | Token Expiration (7 days) |
@@ -150,5 +150,5 @@ kill -9 $(lsof -ti:8090)
 python3 db_migrate.py
 
 # Restart app using startup script
-./start_sastrybalm.sh
+./start_safar.sh
 ```

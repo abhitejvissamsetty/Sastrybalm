@@ -16,11 +16,11 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 FROM python:3.12-slim AS production
 
 # Labels
-LABEL maintainer="Sastrybalm <admin@sastrybalm.com>"
-LABEL description="Sastrybalm SFA — FastAPI backend & admin dashboard"
+LABEL maintainer="Safar <admin@safar.com>"
+LABEL description="Safar SFA — FastAPI backend & admin dashboard"
 
 # Non-root user for security
-RUN groupadd -r sastrybalm && useradd -r -g sastrybalm -d /app -s /sbin/nologin sastrybalm
+RUN groupadd -r safar && useradd -r -g safar -d /app -s /sbin/nologin safar
 
 WORKDIR /app
 
@@ -37,10 +37,10 @@ COPY migrations/ ./migrations/
 
 # Create uploads directory and set ownership
 RUN mkdir -p /app/app/static/uploads && \
-    chown -R sastrybalm:sastrybalm /app
+    chown -R safar:safar /app
 
 # Switch to non-root user
-USER sastrybalm
+USER safar
 
 # Expose the application port
 EXPOSE 8090

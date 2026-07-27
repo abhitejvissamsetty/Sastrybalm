@@ -9,7 +9,7 @@ conn = pymysql.connect(
     port=int(os.getenv("DB_PORT", 8889)),
     user=os.getenv("DB_USER", "root"),
     password=os.getenv("DB_PASSWORD", "root"),
-    database=os.getenv("DB_NAME", "sastrybalm_db")
+    database=os.getenv("DB_NAME", "safar_db")
 )
 
 try:

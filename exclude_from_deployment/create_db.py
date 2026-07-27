@@ -73,7 +73,7 @@ def seed_admin() -> None:
             print("[skip] Admin user already exists.")
         else:
             admin = User(
-                email="admin@sastrybalm.com",
+                email="admin@safar.com",
                 username="admin",
                 full_name="System Administrator",
                 hashed_password=hash_password("Admin@123"),
@@ -119,7 +119,7 @@ def seed_products() -> None:
         else:
             products = [
                 Product(
-                    name="Sastry Balm Regular",
+                    name="Safar Regular",
                     erp_id="PROD-BALM-REG",
                     sku="SB-REG-25G",
                     division="OTC",
@@ -131,7 +131,7 @@ def seed_products() -> None:
                     is_active=True
                 ),
                 Product(
-                    name="Sastry Balm Extra Strong",
+                    name="Safar Extra Strong",
                     erp_id="PROD-BALM-EXT",
                     sku="SB-EXT-25G",
                     division="OTC",
@@ -143,7 +143,7 @@ def seed_products() -> None:
                     is_active=True
                 ),
                 Product(
-                    name="Sastry Pain Relief Spray",
+                    name="Safar Pain Relief Spray",
                     erp_id="PROD-SPRAY-PR",
                     sku="SB-SPRAY-50ML",
                     division="OTC",
@@ -155,7 +155,7 @@ def seed_products() -> None:
                     is_active=True
                 ),
                 Product(
-                    name="Sastry Inhaler",
+                    name="Safar Inhaler",
                     erp_id="PROD-INH-01",
                     sku="SB-INH-2ML",
                     division="OTC",
@@ -167,7 +167,7 @@ def seed_products() -> None:
                     is_active=True
                 ),
                 Product(
-                    name="Sastry Herbal Ointment",
+                    name="Safar Herbal Ointment",
                     erp_id="PROD-OINT-HB",
                     sku="SB-OINT-30G",
                     division="OTC",
@@ -188,7 +188,7 @@ def seed_products() -> None:
 
 
 if __name__ == "__main__":
-    print("=== Sastrybalm DB Setup ===")
+    print("=== Safar DB Setup ===")
     create_database()
     create_tables()
     apply_schema_updates()

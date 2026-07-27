@@ -6,6 +6,7 @@ from sqlalchemy import (Boolean, Column, Date, DateTime, Enum, ForeignKey, Integ
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base
+from app.utils.timezone import ist_now, ist_today
 
 
 class OrderStatus(str, enum.Enum):
@@ -15,6 +16,11 @@ class OrderStatus(str, enum.Enum):
     dispatched = "dispatched"
     delivered = "delivered"
     cancelled = "cancelled"
+
+
+class OrderType(str, enum.Enum):
+    primary = "Primary"
+    secondary = "Secondary"
 
 
 class FlowType(str, enum.Enum):
@@ -45,6 +51,7 @@ class Order(Base):
     beat_id = Column(Integer, ForeignKey("beats.id", ondelete="SET NULL"), nullable=True)
     company_profile_id = Column(Integer, ForeignKey("company_profiles.id", ondelete="SET NULL"), nullable=True)
     channel_partner_id = Column(Integer, ForeignKey("local_channel_partners.id", ondelete="SET NULL"), nullable=True, index=True)
+    order_type = Column(Enum(OrderType), default=OrderType.secondary, nullable=False)
     status = Column(Enum(OrderStatus), default=OrderStatus.draft, nullable=False)
     flow_type = Column(Enum(FlowType), default=FlowType.zap_invoice, nullable=False)
     sync_status = Column(Enum(SyncStatus), default=SyncStatus.not_applicable, nullable=False)
@@ -54,7 +61,7 @@ class Order(Base):
         nullable=False,
     )
     connect_ref = Column(String(100), nullable=True)
-    order_date = Column(Date, nullable=False, default=date.today)
+    order_date = Column(Date, nullable=False, default=ist_today)
     notes = Column(Text, nullable=True)
     sync_error = Column(Text, nullable=True)
     sync_retries = Column(Integer, nullable=False, default=0)

@@ -149,7 +149,7 @@ async def test_live_cmms():
                 {
                     "item_code": "MBLIT",
                     "qty": 1,
-                    "custom_request_description": "Auto-generated test material request from Sastrybalm",
+                    "custom_request_description": "Auto-generated test material request from Safar",
                     "schedule_date": schedule_date,
                     "warehouse": "Stores - SE-AK",
                     "uom": "Nos",
@@ -190,7 +190,7 @@ async def test_live_cmms():
                     "cost_center": "Main - SE-AK"
                 }
             ],
-            "custom_installation_notes": "Auto-generated test asset capitalization from Sastrybalm",
+            "custom_installation_notes": "Auto-generated test asset capitalization from Safar",
             "custom_installation_photo_1": "",
             "custom_installation_length": 8,
             "custom_installation_height": 5,

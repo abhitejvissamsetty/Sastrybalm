@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.user import User, UserRole
 
-logger = logging.getLogger("sastrybalm.startup")
+logger = logging.getLogger("safar.startup")
 
 
 def validate_admin_account(db: Session) -> bool:

@@ -3,11 +3,11 @@ import os
 from datetime import datetime, timedelta
 
 # Set up python path to find 'app'
-sys.path.append("/Users/johnwesleygovada/Desktop/Sastrybalm")
+sys.path.append("/Users/johnwesleygovada/Desktop/Safar")
 
 # Load environment
 from dotenv import load_dotenv
-load_dotenv("/Users/johnwesleygovada/Desktop/Sastrybalm/.env")
+load_dotenv("/Users/johnwesleygovada/Desktop/Safar/.env")
 
 from app.database import SessionLocal
 from app.models.timesheet import VisitRecord
@@ -55,7 +55,7 @@ def run_tests():
         # 3. Seed temporary User
         print("Seeding temporary User...")
         user = User(
-            email="testrep@sastrybalm.com",
+            email="testrep@safar.com",
             username="testrep",
             full_name="Test Representative",
             hashed_password="dummy",

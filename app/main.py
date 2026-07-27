@@ -86,6 +86,8 @@ async def enforce_onboarding_middleware(request: Request, call_next):
 
 
 _templates = Jinja2Templates(directory="app/templates")
+from app.utils.timezone import format_ist
+_templates.env.filters["format_ist"] = format_ist
 
 from app.routers import backup, channel_partners, warehouses
 

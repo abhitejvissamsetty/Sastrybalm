@@ -28,7 +28,7 @@ def get_smtp_config_from_db(db: Session) -> dict:
                 "port": int(row[1] or 587),
                 "user": row[2] or "",
                 "password": pwd,
-                "from_email": row[4] or row[2] or "noreply@sastrybalm.com",
+                "from_email": row[4] or row[2] or "noreply@safar.com",
                 "use_tls": bool(row[5]) if row[5] is not None else True,
             }
     except Exception as exc:
@@ -39,7 +39,7 @@ def get_smtp_config_from_db(db: Session) -> dict:
         "port": 587,
         "user": "",
         "password": "",
-        "from_email": "noreply@sastrybalm.com",
+        "from_email": "noreply@safar.com",
         "use_tls": True,
     }
 

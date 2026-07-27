@@ -88,7 +88,7 @@ def setup_test_data():
 
     # Create Product
     product = Product(
-        name="Sastry Balm 50g",
+        name="Safar 50g",
         sku="SB50G",
         mrp=100.0,
         gst_rate=12.0,

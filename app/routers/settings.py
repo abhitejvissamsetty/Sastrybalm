@@ -39,7 +39,7 @@ async def smtp_settings_form(
         "smtp_port": "587",
         "smtp_user": "",
         "smtp_password": "",
-        "smtp_from": "noreply@sastrybalm.com",
+        "smtp_from": "noreply@safar.com",
         "smtp_use_tls": True,
     }
     try:
@@ -61,7 +61,7 @@ async def smtp_settings_form(
                 "smtp_port": str(row[1] or 587),
                 "smtp_user": row[2] or "",
                 "smtp_password": pwd,
-                "smtp_from": row[4] or "noreply@sastrybalm.com",
+                "smtp_from": row[4] or "noreply@safar.com",
                 "smtp_use_tls": bool(row[5]) if row[5] is not None else True,
             }
     except Exception as exc:
@@ -84,7 +84,7 @@ async def smtp_settings_save(
     smtp_port: int = Form(587),
     smtp_user: str = Form(""),
     smtp_password: str = Form(""),
-    smtp_from: str = Form("noreply@sastrybalm.com"),
+    smtp_from: str = Form("noreply@safar.com"),
     smtp_use_tls: Optional[str] = Form(default=None),
 ):
     """Save SMTP settings into database system_configuration table with UPSERT guarantee."""
@@ -126,7 +126,7 @@ async def smtp_settings_test(
     smtp_port: int = Form(587),
     smtp_user: str = Form(""),
     smtp_password: str = Form(""),
-    smtp_from: str = Form("noreply@sastrybalm.com"),
+    smtp_from: str = Form("noreply@safar.com"),
     smtp_use_tls: Optional[str] = Form(default=None),
 ):
     """Test SMTP Connection and send a test email verification."""
@@ -147,8 +147,8 @@ async def smtp_settings_test(
 
         test_recipient = current_user.email or smtp_from or smtp_user
         if test_recipient:
-            msg = MIMEText(f"Hello {current_user.full_name},\n\nThis is a test email sent from Sastrybalm SFA to verify your SMTP server configuration.\n\nTime: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
-            msg["Subject"] = "Sastrybalm SFA — Test SMTP Connection Successful"
+            msg = MIMEText(f"Hello {current_user.full_name},\n\nThis is a test email sent from Safar SFA to verify your SMTP server configuration.\n\nTime: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            msg["Subject"] = "Safar SFA — Test SMTP Connection Successful"
             msg["From"] = smtp_from or smtp_user
             msg["To"] = test_recipient
             server.sendmail(smtp_from or smtp_user, [test_recipient], msg.as_string())
@@ -424,7 +424,7 @@ async def webhook_test(
         "timestamp": datetime.utcnow().isoformat(),
         "test": True,
         "webhook_id": wh.id,
-        "message": f"Test delivery for Sastrybalm SFA event '{wh.event_type.value}'",
+        "message": f"Test delivery for Safar SFA event '{wh.event_type.value}'",
         "data": {
             "sample_order_number": "ORD-TEST-9901",
             "sample_amount": 1500.00,
@@ -436,7 +436,7 @@ async def webhook_test(
     req = urllib.request.Request(
         wh.endpoint_url,
         data=data_bytes,
-        headers={"Content-Type": "application/json", "User-Agent": "SastrybalmSFA-Webhook/1.0"},
+        headers={"Content-Type": "application/json", "User-Agent": "SafarSFA-Webhook/1.0"},
         method="POST"
     )
 

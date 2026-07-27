@@ -73,7 +73,7 @@
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1">Permanent Files Bucket Name</label>
           <input type="text" name="s3_bucket_name" value="{{ config.s3_bucket_name or '' }}"
-                 placeholder="e.g. sastrybalm-permanent-files-bucket"
+                 placeholder="e.g. safar-permanent-files-bucket"
                  class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
           <p class="mt-1 text-[11px] text-slate-500">Dedicated bucket name for permanent image &amp; asset storage.</p>
         </div>
@@ -102,7 +102,7 @@
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1">Public CDN / URL Prefix (Optional)</label>
           <input type="text" name="s3_public_url_prefix" value="{{ config.s3_public_url_prefix or '' }}"
-                 placeholder="e.g. https://f004.backblazeb2.com/file/sastrybalm-permanent-files-bucket"
+                 placeholder="e.g. https://f004.backblazeb2.com/file/safar-permanent-files-bucket"
                  class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
           <p class="mt-1 text-[11px] text-slate-500">Custom CDN domain or public URL prefix for permanent files.</p>
         </div>
@@ -150,7 +150,7 @@
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1">Temporary Files Bucket Name</label>
           <input type="text" name="s3_files_bucket_name" value="{{ config.s3_files_bucket_name or '' }}"
-                 placeholder="e.g. sastrybalm-temporary-files-bucket"
+                 placeholder="e.g. safar-temporary-files-bucket"
                  class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
           <p class="mt-1 text-[11px] text-slate-500">Dedicated bucket name for backups and temporary document files.</p>
         </div>
@@ -179,7 +179,7 @@
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1">Temporary Files Public CDN / URL Prefix (Optional)</label>
           <input type="text" name="s3_files_public_url_prefix" value="{{ config.s3_files_public_url_prefix or '' }}"
-                 placeholder="e.g. https://f004.backblazeb2.com/file/sastrybalm-temporary-files-bucket"
+                 placeholder="e.g. https://f004.backblazeb2.com/file/safar-temporary-files-bucket"
                  class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
           <p class="mt-1 text-[11px] text-slate-500">Custom CDN domain or public URL prefix for temporary files.</p>
         </div>

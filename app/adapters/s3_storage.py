@@ -7,7 +7,7 @@ import logging
 from typing import Optional, Tuple
 from datetime import datetime, timedelta
 
-logger = logging.getLogger("sastrybalm.s3")
+logger = logging.getLogger("safar.s3")
 
 
 def get_s3_client(s3_config: dict):

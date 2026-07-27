@@ -7,6 +7,7 @@ from sqlalchemy import (Boolean, Column, Date, DateTime, Enum, Float, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base
+from app.utils.timezone import ist_now, ist_today
 
 
 class TimesheetStatus(str, enum.Enum):
@@ -26,7 +27,7 @@ class Timesheet(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     attendance_id = Column(Integer, ForeignKey("attendance.id", ondelete="SET NULL"), nullable=True)
-    work_date = Column(Date, nullable=False, default=date.today)
+    work_date = Column(Date, nullable=False, default=ist_today)
     checkin_time = Column(DateTime, nullable=True)
     checkout_time = Column(DateTime, nullable=True)
     checkin_lat = Column(Float, nullable=True)

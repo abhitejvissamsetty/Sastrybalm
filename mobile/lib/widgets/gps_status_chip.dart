@@ -73,41 +73,43 @@ class _GpsStatusChipState extends State<GpsStatusChip> {
 
   @override
   Widget build(BuildContext context) {
-    Color chipColor;
-    IconData icon;
-
+    Color dotColor;
     if (_checking) {
-      chipColor = const Color(0xFFFBBF24); // Amber 400
-      icon = Icons.location_searching_rounded;
+      dotColor = const Color(0xFFEAB308); // Yellow 500
     } else if (_hasGps) {
-      chipColor = const Color(0xFF34D399); // Emerald 400
-      icon = Icons.gps_fixed_rounded;
+      dotColor = const Color(0xFF22C55E); // Green 500
     } else {
-      chipColor = const Color(0xFFF87171); // Rose 400
-      icon = Icons.gps_off_rounded;
+      dotColor = const Color(0xFFEF4444); // Red 500
     }
 
     return GestureDetector(
       onTap: _checkGps,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.18),
+          color: const Color(0xFF27272A), // Zinc 800
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
+          border: Border.all(color: const Color(0xFF3F3F46), width: 1), // Zinc 700
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: chipColor, size: 13),
-            const SizedBox(width: 5),
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: dotColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
             Text(
               _message,
-              style: TextStyle(
-                color: Colors.white,
+              style: const TextStyle(
+                color: Color(0xFFFAFAFA),
                 fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
               ),
             ),
           ],

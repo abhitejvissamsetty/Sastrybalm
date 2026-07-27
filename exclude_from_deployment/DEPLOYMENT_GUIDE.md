@@ -1,6 +1,6 @@
-# Sastrybalm SFA: VPS Deployment Guide
+# Safar SFA: VPS Deployment Guide
 
-This guide outlines the steps to deploy the Sastrybalm SFA platform to a Linux VPS (Ubuntu 22.04+ recommended).
+This guide outlines the steps to deploy the Safar SFA platform to a Linux VPS (Ubuntu 22.04+ recommended).
 
 ## 1. Prerequisites
 - A VPS with at least 2GB RAM.
@@ -29,9 +29,9 @@ sudo mysql -u root -p
 
 Run the following SQL commands:
 ```sql
-CREATE DATABASE sastrybalm_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'sastry_admin'@'localhost' IDENTIFIED BY 'STRONG_PASSWORD_HERE';
-GRANT ALL PRIVILEGES ON sastrybalm_db.* TO 'sastry_admin'@'localhost';
+CREATE DATABASE safar_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'safar_admin'@'localhost' IDENTIFIED BY 'STRONG_PASSWORD_HERE';
+GRANT ALL PRIVILEGES ON safar_db.* TO 'safar_admin'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
@@ -41,9 +41,9 @@ EXIT;
 Clone the repository and set up the virtual environment:
 ```bash
 cd /var/www
-sudo git clone <your-repo-url> sastrybalm
-sudo chown -R $USER:$USER sastrybalm
-cd sastrybalm
+sudo git clone <your-repo-url> safar
+sudo chown -R $USER:$USER safar
+cd safar
 
 python3.11 -m venv venv
 source venv/bin/activate
@@ -61,11 +61,11 @@ nano .env
 ```
 
 **Required Changes for Production:**
-- `APP_NAME="Sastrybalm SFA"`
+- `APP_NAME="Safar SFA"`
 - `SECRET_KEY`: Generate a random string using `openssl rand -hex 32`.
 - `DB_HOST=localhost`
 - `DB_PORT=3306` (Standard MySQL port)
-- `DB_USER=sastry_admin`
+- `DB_USER=safar_admin`
 - `DB_PASSWORD`: Your strong password from Step 3.
 - `JWT_ALGORITHM=HS256`
 
@@ -82,21 +82,21 @@ alembic upgrade head
 
 Create a service file to manage the FastAPI process:
 ```bash
-sudo nano /etc/systemd/system/sastrybalm.service
+sudo nano /etc/systemd/system/safar.service
 ```
 
 Paste the following configuration:
 ```ini
 [Unit]
-Description=Gunicorn instance to serve Sastrybalm SFA
+Description=Gunicorn instance to serve Safar SFA
 After=network.target
 
 [Service]
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/sastrybalm
-Environment="PATH=/var/www/sastrybalm/venv/bin"
-ExecStart=/var/www/sastrybalm/venv/bin/gunicorn \
+WorkingDirectory=/var/www/safar
+Environment="PATH=/var/www/safar/venv/bin"
+ExecStart=/var/www/safar/venv/bin/gunicorn \
     -w 4 \
     -k uvicorn.workers.UvicornWorker \
     -b 127.0.0.1:8000 \
@@ -108,16 +108,16 @@ WantedBy=multi-user.target
 
 Enable and start the service:
 ```bash
-sudo chown -R www-data:www-data /var/www/sastrybalm
-sudo systemctl start sastrybalm
-sudo systemctl enable sastrybalm
+sudo chown -R www-data:www-data /var/www/safar
+sudo systemctl start safar
+sudo systemctl enable safar
 ```
 
 ## 8. Nginx Reverse Proxy & SSL
 
 Configure Nginx as a reverse proxy:
 ```bash
-sudo nano /etc/nginx/sites-available/sastrybalm
+sudo nano /etc/nginx/sites-available/safar
 ```
 
 Paste the following:
@@ -138,7 +138,7 @@ server {
 
 Enable the site and restart Nginx:
 ```bash
-sudo ln -s /etc/nginx/sites-available/sastrybalm /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/safar /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -151,14 +151,14 @@ sudo certbot --nginx -d yourdomain.com
 
 ## 9. Maintenance Commands
 
-- **Check Logs:** `journalctl -u sastrybalm -f`
-- **Restart App:** `sudo systemctl restart sastrybalm`
+- **Check Logs:** `journalctl -u safar -f`
+- **Restart App:** `sudo systemctl restart safar`
 - **Update App:**
   ```bash
-  cd /var/www/sastrybalm
+  cd /var/www/safar
   git pull
   source venv/bin/activate
   pip install -r requirements.txt
   alembic upgrade head
-  sudo systemctl restart sastrybalm
+  sudo systemctl restart safar
   ```

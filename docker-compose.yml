@@ -2,13 +2,13 @@ services:
   # ── MySQL Database ──────────────────────────────────────────────────────────
   db:
     image: mysql:8.0
-    container_name: sastrybalm-db
+    container_name: safar-db
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-      MYSQL_DATABASE: ${DB_NAME:-sastrybalm_db}
-      MYSQL_USER: ${DB_USER:-sastrybalm_user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-sastrybalm_password}
+      MYSQL_DATABASE: ${DB_NAME:-safar_db}
+      MYSQL_USER: ${DB_USER:-safar_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-safar_password}
     ports:
       - "3308:3306"     # host:3308 → container:3306 to avoid conflicts with Docker Desktop
     volumes:
@@ -20,24 +20,24 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - sastrybalm-net
+      - safar-net
 
   # ── Web DB Manager (Adminer) ────────────────────────────────────────────────
   adminer:
     image: adminer:latest
-    container_name: sastrybalm-adminer
+    container_name: safar-adminer
     restart: unless-stopped
     ports:
       - "8081:8080"
     networks:
-      - sastrybalm-net
+      - safar-net
 
   # ── FastAPI Application ─────────────────────────────────────────────────────
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: sastrybalm-app
+    container_name: safar-app
     restart: unless-stopped
     expose:
       - "8090"
@@ -45,13 +45,13 @@ services:
       db:
         condition: service_healthy
     environment:
-      - APP_NAME=${APP_NAME:-Sastrybalm SFA}
+      - APP_NAME=${APP_NAME:-Safar SFA}
       - SECRET_KEY=${SECRET_KEY:-change-this-to-a-long-random-string-in-production}
       - DB_HOST=db
       - DB_PORT=3306
-      - DB_USER=${DB_USER:-sastrybalm_user}
-      - DB_PASSWORD=${DB_PASSWORD:-sastrybalm_password}
-      - DB_NAME=${DB_NAME:-sastrybalm_db}
+      - DB_USER=${DB_USER:-safar_user}
+      - DB_PASSWORD=${DB_PASSWORD:-safar_password}
+      - DB_NAME=${DB_NAME:-safar_db}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - JWT_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-10080}
       - CMMS_BASE_URL=${CMMS_BASE_URL:-}
@@ -62,18 +62,18 @@ services:
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
-      - SMTP_FROM=${SMTP_FROM:-noreply@sastrybalm.com}
+      - SMTP_FROM=${SMTP_FROM:-noreply@safar.com}
     volumes:
       - ./app:/app/app
       - ./db_migrate.py:/app/db_migrate.py
       - uploads_data:/app/app/static/uploads
     networks:
-      - sastrybalm-net
+      - safar-net
 
   # ── Nginx Reverse Proxy ────────────────────────────────────────────────────
   nginx:
     image: nginx:1.27-alpine
-    container_name: sastrybalm-nginx
+    container_name: safar-nginx
     restart: unless-stopped
     ports:
       - "8080:80"
@@ -83,12 +83,12 @@ services:
     depends_on:
       - app
     networks:
-      - sastrybalm-net
+      - safar-net
 
 volumes:
   mysql_data:
   uploads_data:
 
 networks:
-  sastrybalm-net:
+  safar-net:
     driver: bridge

@@ -12,7 +12,7 @@ def seed_products():
 
         products = [
             Product(
-                name="Sastry Balm Regular",
+                name="Safar Regular",
                 erp_id="PROD-BALM-REG",
                 sku="SB-REG-25G",
                 division="OTC",
@@ -24,7 +24,7 @@ def seed_products():
                 is_active=True
             ),
             Product(
-                name="Sastry Balm Extra Strong",
+                name="Safar Extra Strong",
                 erp_id="PROD-BALM-EXT",
                 sku="SB-EXT-25G",
                 division="OTC",
@@ -36,7 +36,7 @@ def seed_products():
                 is_active=True
             ),
             Product(
-                name="Sastry Pain Relief Spray",
+                name="Safar Pain Relief Spray",
                 erp_id="PROD-SPRAY-PR",
                 sku="SB-SPRAY-50ML",
                 division="OTC",
@@ -48,7 +48,7 @@ def seed_products():
                 is_active=True
             ),
             Product(
-                name="Sastry Inhaler",
+                name="Safar Inhaler",
                 erp_id="PROD-INH-01",
                 sku="SB-INH-2ML",
                 division="OTC",
@@ -60,7 +60,7 @@ def seed_products():
                 is_active=True
             ),
             Product(
-                name="Sastry Herbal Ointment",
+                name="Safar Herbal Ointment",
                 erp_id="PROD-OINT-HB",
                 sku="SB-OINT-30G",
                 division="OTC",

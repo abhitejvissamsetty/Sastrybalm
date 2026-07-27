@@ -1,24 +1,44 @@
 ---
-name: sastrybalm-sfa-mobile
+name: safar-mobile
 description: >-
-  Sastrybalm SFA Mobile App technical guide and troubleshooting documentation.
+  Safar Mobile App technical guide and troubleshooting documentation.
   Covers Flutter, Riverpod, GoRouter, Hive offline storage, Geolocator GPS,
-  deserialization & null-safety rules, attendance check-in/out workflows,
+  shadcn minimalist monochrome UI design system, attendance check-in/out workflows,
   restricted module scoping, payment collection, beat routes, and runtime error fixes.
 ---
 
-# Sastrybalm SFA Mobile App — Architecture & Troubleshooting Guide
+# Safar Mobile App — Architecture, Design System & Troubleshooting Guide
 
 ## Overview
-The Sastrybalm SFA (Sales Force Automation) Mobile App is built with **Flutter 3.x**, **Riverpod 2.x**, **GoRouter 13.x**, **Dio 5.x**, **Hive (Encrypted)**, and **Geolocator**. It provides field sales representatives and territory managers with an executive dashboard, beat plan route management, order booking, payment collections, and offline sync capabilities.
+The Safar Mobile App is built with **Flutter 3.x**, **Riverpod 2.x**, **GoRouter 13.x**, **Dio 5.x**, **Hive (Encrypted)**, and **Geolocator**. It provides field sales representatives and territory managers with a professional, high-contrast monochrome **shadcn UI** minimalist interface, beat plan route management, order booking, payment collections, and offline sync capabilities.
 
 Key Features:
-- **Executive Dashboard**: Workday shift check-in / check-out status, GPS status chip, quick operational actions, and overview metrics.
+- **Shadcn Minimalist Monochrome UI**: High-contrast Zinc/Neutral color system, clean 1px borders, subtle 10-14px radii, and refined typography.
+- **Executive Dashboard**: Workday shift check-in / check-out status, minimalist GPS status badge, quick operational actions, and overview metrics.
 - **Beat Plan & Outlets**: Route planning, outlet visits, and distance-based GPS tracking.
 - **Orders & History**: Order creation with PTR pricing and GST calculations, sync status tracking.
 - **Payment Collection & Submissions**: Cash and UPI collections, denomination validation, offline submission queuing.
 - **Restricted Module Scoping**: Access control for Expenses, Timesheets, and Material Requests based on user roles and geography levels.
 - **Offline Sync Engine**: Encrypted Hive queue (`pending_ops`) that auto-syncs when network connectivity is restored.
+
+---
+
+## 🎨 Shadcn Minimalist Design System
+
+### 1. Color Palette (Zinc / Neutral Tokens)
+- **Background**: `#FAFAFA` (Zinc 50 Light) / `#09090B` (Zinc 950 Dark)
+- **Surface / Cards**: `#FFFFFF` (Pure White) / `#18181B` (Zinc 900)
+- **Primary / Actions**: `#09090B` (Zinc 950 Black) / `#FAFAFA` (Zinc 50 White)
+- **Secondary / Containers**: `#F4F4F5` (Zinc 100) / `#27272A` (Zinc 800)
+- **Borders**: `#E4E4E7` (Zinc 200) / `#27272A` (Zinc 800) 1.0px width
+- **Text Primary**: `#09090B` (Zinc 950) / `#FAFAFA` (Zinc 50)
+- **Text Secondary**: `#71717A` (Zinc 500) / `#A1A1AA` (Zinc 400)
+
+### 2. Component Guidelines
+- **Hero Shift Card**: Solid `#09090B` dark zinc card with `#27272A` border, clean status pill, and high-contrast white action button.
+- **Bottom Navigation**: Floating rounded card with `#FFFFFF` surface, `#E4E4E7` border, `#09090B` active tab icon/label, and `#F4F4F5` background pill.
+- **Action Cards & Metric Tiles**: Minimalist white background `#FFFFFF`, 1px `#E4E4E7` border, dark icon containers `#F4F4F5` with `#09090B` icons.
+- **Form Inputs & Buttons**: `#FFFFFF` fill, `#E4E4E7` border, `#09090B` focus border, 10px corner radius.
 
 ---
 

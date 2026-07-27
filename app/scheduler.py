@@ -1,5 +1,5 @@
 """
-APScheduler background jobs for Sastrybalm SFA.
+APScheduler background jobs for Safar SFA.
 Started via FastAPI lifespan in main.py.
 Handles field tracking alerts, payment verification reminders, and order SLAs.
 """

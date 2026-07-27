@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Sastrybalm Entrypoint ==="
+echo "=== Safar Entrypoint ==="
 
 # ── Step 1: Run database migrations ONCE before Gunicorn workers fork ──
 echo "Running database migrations (pre-fork, single process)..."

@@ -1,4 +1,4 @@
-package `in`.sastrybalm.sfa_mobile
+package `in`.safar.sfa_mobile
 
 import io.flutter.embedding.android.FlutterActivity
 

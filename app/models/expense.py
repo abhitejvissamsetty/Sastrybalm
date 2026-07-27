@@ -6,6 +6,7 @@ from sqlalchemy import (Boolean, Column, Date, DateTime, Enum, ForeignKey, Integ
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base
+from app.utils.timezone import ist_now, ist_today
 
 
 class ExpenseCategory(str, enum.Enum):
@@ -31,7 +32,7 @@ class Expense(Base):
     category = Column(Enum(ExpenseCategory), nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     description = Column(Text, nullable=True)
-    expense_date = Column(Date, nullable=False, default=date.today)
+    expense_date = Column(Date, nullable=False, default=ist_today)
     receipt_url = Column(String(500), nullable=True)
     status = Column(Enum(ExpenseStatus), nullable=False, default=ExpenseStatus.draft)
     approved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

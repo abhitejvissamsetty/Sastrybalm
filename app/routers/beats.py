@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, require_web_auth, require_web_roles
+from app.dependencies import get_db, require_web_auth, require_web_roles, require_restricted_module_web_access
 from app.models.beat import Beat, BeatType, BeatGrade, parse_beat_type, parse_beat_grade
 from app.models.geography import Geography, GeoLevel
 from app.models.user import User, UserRole
@@ -51,7 +51,7 @@ async def beat_list(
 @router.get("/new", response_class=HTMLResponse)
 async def beat_new(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_restricted_module_web_access),
     db: Session = Depends(get_db),
 ):
     from app.models.local_distribution import LocalChannelPartner
@@ -79,7 +79,7 @@ async def beat_new(
 @router.post("/new")
 async def beat_create(
     request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_restricted_module_web_access),
     db: Session = Depends(get_db),
     name: str = Form(...),
     code: str = Form(...),
@@ -139,7 +139,7 @@ async def beat_create(
 @router.get("/{beat_id}/edit", response_class=HTMLResponse)
 async def beat_edit(
     beat_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_restricted_module_web_access),
     db: Session = Depends(get_db),
 ):
     from app.models.local_distribution import LocalChannelPartner
@@ -176,7 +176,7 @@ async def beat_edit(
 @router.post("/{beat_id}/edit")
 async def beat_update(
     beat_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_restricted_module_web_access),
     db: Session = Depends(get_db),
     name: str = Form(...),
     code: str = Form(...),
@@ -197,10 +197,15 @@ async def beat_update(
         return RedirectResponse("/master-data/beats", status_code=302)
     if db.query(Beat).filter(Beat.code == code.upper(), Beat.id != beat_id).first():
         cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
+        allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
         if allowed_geo_ids is not None:
             cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_geo_ids))
         channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
         attached_ids = [bcp.channel_partner_id for bcp in db.query(BeatChannelPartner).filter(BeatChannelPartner.beat_id == beat_id).all()]
+        terr_query = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True)
+        if allowed_geo_ids is not None:
+            terr_query = terr_query.filter(Geography.id.in_(allowed_geo_ids))
+        territories = terr_query.order_by(Geography.name).all()
         return templates.TemplateResponse("beats/form.html", {
             "request": request, "current_user": current_user,
             "item": item, "territories": territories, "channel_partners": channel_partners,
@@ -229,7 +234,7 @@ async def beat_update(
 @router.post("/{beat_id}/activate")
 async def beat_activate(
     beat_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_restricted_module_web_access),
     db: Session = Depends(get_db),
 ):
     item = db.query(Beat).filter(Beat.id == beat_id).first()
@@ -243,7 +248,7 @@ async def beat_activate(
 @router.post("/{beat_id}/delete")
 async def beat_delete(
     beat_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
+    current_user: User = Depends(require_restricted_module_web_access),
     db: Session = Depends(get_db),
 ):
     item = db.query(Beat).filter(Beat.id == beat_id).first()

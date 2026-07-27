@@ -10,7 +10,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
-USER_AGENT = "SastrybalmSFA/1.0"
+USER_AGENT = "SafarSFA/1.0"
 
 
 async def reverse_geocode(lat: float, lng: float) -> dict:

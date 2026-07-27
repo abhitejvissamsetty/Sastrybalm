@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, require_api_auth
+from app.dependencies import get_db, require_api_auth, require_restricted_module_api_access
 from app.models.beat import Beat, BeatType, BeatGrade
 from app.models.company import SystemConfiguration
 from app.models.geography import Geography
@@ -207,7 +207,7 @@ async def get_beats(
 @router.post("/beats")
 async def create_beat(
     payload: BeatCreateSchema,
-    current_user: User = Depends(require_api_auth),
+    current_user: User = Depends(require_restricted_module_api_access),
     db: Session = Depends(get_db),
 ):
     """Create a new beat."""

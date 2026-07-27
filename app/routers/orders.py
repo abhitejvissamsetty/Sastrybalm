@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -11,9 +12,9 @@ from sqlalchemy.orm import Session
 from app.dependencies import get_db, require_web_auth, require_web_roles
 from app.models.alert import Alert, AlertSeverity, AlertType
 from app.models.company import CompanyProfile
-from app.models.order import FlowType, Order, OrderItem, OrderStatus, SyncStatus
+from app.models.order import FlowType, Order, OrderItem, OrderStatus, OrderType, SyncStatus
 from app.models.outlet import Outlet, OutletStatus
-from app.models.product import Product
+from app.models.product import Product, ProductCategory
 from app.models.product_mapping import ProductAliasMap
 from app.models.user import User, UserRole
 from app.utils.encryption import decrypt
@@ -72,7 +73,7 @@ async def order_list(
     pagination = paginate(query, page)
 
     partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
-    products = db.query(Product).filter(Product.is_active == True).order_by(Product.name).all()
+    products = db.query(Product).filter(Product.is_active == True, Product.category_type == ProductCategory.sales).order_by(Product.name).all()
 
     return templates.TemplateResponse("orders/list.html", {
         "request": request, "current_user": current_user,
@@ -80,7 +81,7 @@ async def order_list(
         "pincode": pincode, "partner_id": partner_id, "product_id": product_id,
         "all_time": all_time, "is_filtered_by_days": is_filtered_by_days,
         "partners": partners, "products": products,
-        "OrderStatus": OrderStatus, "FlowType": FlowType, "SyncStatus": SyncStatus,
+        "OrderStatus": OrderStatus, "FlowType": FlowType, "SyncStatus": SyncStatus, "OrderType": OrderType,
         **get_flash(request),
     })
 
@@ -92,7 +93,12 @@ async def order_new(
     db: Session = Depends(get_db),
 ):
     outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
-    products = db.query(Product).filter(Product.is_active == True).order_by(Product.name).all()
+    # Confine to Products with Category Scope = Sales
+    products = db.query(Product).filter(
+        Product.is_active == True,
+        Product.category_type == ProductCategory.sales
+    ).order_by(Product.name).all()
+
     from app.models.local_distribution import LocalChannelPartner
     cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
     if current_user.role == UserRole.territory_manager:
@@ -105,7 +111,7 @@ async def order_new(
         "request": request, "current_user": current_user,
         "item": None, "outlets": outlets, "products": products,
         "channel_partners": channel_partners,
-        "FlowType": FlowType, "error": None,
+        "OrderType": OrderType, "error": None,
     })
 
 
@@ -118,8 +124,8 @@ async def order_create(
     form = await request.form()
     outlet_id = form.get("outlet_id")
     channel_partner_id = form.get("channel_partner_id")
+    order_type_val = form.get("order_type", "Secondary")
     notes = form.get("notes", "")
-    flow_type_val = form.get("flow_type", "zap_invoice")
     product_ids = form.getlist("product_id[]")
     quantities = form.getlist("quantity[]")
     unit_prices = form.getlist("unit_price[]")
@@ -134,21 +140,25 @@ async def order_create(
         cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_ids))
     channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
 
+    sales_products = db.query(Product).filter(
+        Product.is_active == True,
+        Product.category_type == ProductCategory.sales
+    ).order_by(Product.name).all()
+
     if not outlet_id or not channel_partner_id or not product_ids:
         outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
-        products = db.query(Product).filter(Product.is_active == True).order_by(Product.name).all()
         return templates.TemplateResponse("orders/form.html", {
             "request": request, "current_user": current_user,
-            "item": None, "outlets": outlets, "products": products,
+            "item": None, "outlets": outlets, "products": sales_products,
             "channel_partners": channel_partners,
-            "FlowType": FlowType,
+            "OrderType": OrderType,
             "error": "Outlet, Channel Partner (Fulfillment), and at least one product are required.",
         })
 
     try:
-        ft = FlowType(flow_type_val)
+        ot = OrderType(order_type_val)
     except ValueError:
-        ft = FlowType.zap_invoice
+        ot = OrderType.secondary
 
     ord_num = order_number(db, Order)
     cp_id_int = int(channel_partner_id) if channel_partner_id and str(channel_partner_id).isdigit() else None
@@ -158,7 +168,8 @@ async def order_create(
         user_id=current_user.id,
         channel_partner_id=cp_id_int,
         company_profile_id=current_user.company_profile_id,
-        flow_type=ft,
+        order_type=ot,
+        flow_type=FlowType.zap_invoice,
         sync_status=SyncStatus.not_applicable,
         status=OrderStatus.submitted,  # Submitted, pending TM approval or auto-approval cutoff
         notes=notes or None,

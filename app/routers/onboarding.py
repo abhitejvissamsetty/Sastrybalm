@@ -99,7 +99,7 @@ async def onboarding_submit(
             err = "Uploaded backup file must be a .sql database dump."
         else:
             os.makedirs(BACKUP_DIR, exist_ok=True)
-            upload_filename = f"sastrybalm_upload_{backup_file.filename}"
+            upload_filename = f"safar_upload_{backup_file.filename}"
             upload_filepath = os.path.join(BACKUP_DIR, upload_filename)
             with open(upload_filepath, "wb") as buffer:
                 shutil.copyfileobj(backup_file.file, buffer)
@@ -132,5 +132,5 @@ async def onboarding_submit(
         })
 
     request.session["user_id"] = admin_user.id
-    set_flash_success(request, f"System onboarding completed successfully! Welcome to Sastrybalm SFA Enterprise, {admin_user.full_name}.")
+    set_flash_success(request, f"System onboarding completed successfully! Welcome to Safar SFA Enterprise, {admin_user.full_name}.")
     return RedirectResponse("/dashboard", status_code=302)

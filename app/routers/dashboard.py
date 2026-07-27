@@ -34,7 +34,8 @@ async def dashboard(
     db: Session = Depends(get_db),
 ):
     from app.utils.geography_scope import get_user_allowed_geography_ids
-    today = date.today()
+    from app.utils.timezone import ist_today
+    today = ist_today()
     role_val = getattr(current_user.role, "value", str(current_user.role or ""))
     is_admin = role_val == "admin"
     is_tm = role_val == "territory_manager"

@@ -45,10 +45,12 @@ def auto_allocate_channel_partner_for_order(db: Session, order: Order) -> Option
     """
     Auto-allocates and persists the fulfillment Channel Partner for an order based on the Outlet's Geography.
     """
-    if not order or not order.outlet or not order.outlet.geography_id:
+    if not order or not order.outlet:
         return None
 
-    out_geo_id = order.outlet.geography_id
+    out_geo_id = getattr(order.outlet, "territory_id", None) or (order.outlet.beat.geography_id if order.outlet.beat else None)
+    if not out_geo_id:
+        return None
     from app.models.geography import Geography
     geo = db.query(Geography).filter(Geography.id == out_geo_id).first()
     geo_ids = [out_geo_id]

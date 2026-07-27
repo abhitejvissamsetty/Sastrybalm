@@ -15,13 +15,12 @@ class DashboardTab extends ConsumerWidget {
     final userAsync = ref.watch(authStateProvider);
     final attendanceAsync = ref.watch(attendanceProvider);
     final syncCount = ref.watch(syncProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FC),
+      backgroundColor: const Color(0xFFFAFAFA), // Zinc 50
       body: SafeArea(
         child: RefreshIndicator(
-          color: const Color(0xFF4F46E5),
+          color: const Color(0xFF09090B),
           onRefresh: () async {
             ref.read(attendanceProvider.notifier).refresh();
             ref.read(syncProvider.notifier).updatePendingCount();
@@ -32,52 +31,38 @@ class DashboardTab extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Executive Top Header Bar ─────────────────────────────────
+                // ── Executive Minimal Header Bar ──────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
                         userAsync.when(
-                          data: (user) => Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF6366F1).withOpacity(0.3),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            padding: const EdgeInsets.all(2),
-                            child: CircleAvatar(
-                              backgroundColor: Colors.white,
-                              radius: 23,
-                              child: Text(
-                                user?.initials ?? 'SR',
-                                style: const TextStyle(
-                                  color: Color(0xFF4F46E5),
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 15,
-                                ),
+                          data: (user) => CircleAvatar(
+                            backgroundColor: const Color(0xFF09090B), // Zinc 950
+                            radius: 22,
+                            child: Text(
+                              user?.initials ?? 'SR',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
                               ),
                             ),
                           ),
                           loading: () => const CircleAvatar(
-                            radius: 23,
+                            radius: 22,
+                            backgroundColor: Color(0xFFE4E4E7),
                             child: SizedBox(
                               width: 14,
                               height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF09090B)),
                             ),
                           ),
                           error: (_, __) => const CircleAvatar(
-                            radius: 23,
-                            child: Icon(Icons.person),
+                            radius: 22,
+                            backgroundColor: Color(0xFF09090B),
+                            child: Icon(Icons.person_rounded, color: Colors.white, size: 20),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -92,41 +77,39 @@ class DashboardTab extends ConsumerWidget {
                                 return Text(
                                   'Hi, $firstName',
                                   style: const TextStyle(
-                                    color: Color(0xFF0F172A),
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 20,
-                                    letterSpacing: -0.6,
+                                    color: Color(0xFF09090B), // Zinc 950
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 19,
+                                    letterSpacing: -0.5,
                                   ),
                                 );
                               },
-                              loading: () => const Text('Loading...'),
-                              error: (_, __) => const Text('Sales Rep'),
+                              loading: () => const Text('Loading...', style: TextStyle(color: Color(0xFF71717A))),
+                              error: (_, __) => const Text('Sales Rep', style: TextStyle(color: Color(0xFF09090B))),
                             ),
                             const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEEF2FF),
-                                    borderRadius: BorderRadius.circular(10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF4F4F5), // Zinc 100
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.calendar_today_rounded, size: 10, color: Color(0xFF71717A)),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    DateFormatter.formatDate(DateTime.now()),
+                                    style: const TextStyle(
+                                      color: Color(0xFF71717A),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.calendar_today_rounded, size: 11, color: Color(0xFF4F46E5)),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        DateFormatter.formatDate(DateTime.now()),
-                                        style: const TextStyle(
-                                          color: Color(0xFF4338CA),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -151,23 +134,25 @@ class DashboardTab extends ConsumerWidget {
                         _buildHeaderIconButton(
                           icon: Icons.logout_rounded,
                           tooltip: 'Logout',
-                          color: const Color(0xFFEF4444),
+                          color: const Color(0xFFDC2626), // Red 600
                           onTap: () {
                             showDialog(
                               context: context,
                               builder: (ctx) => AlertDialog(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                 title: const Text('Confirm Logout', style: TextStyle(fontWeight: FontWeight.bold)),
                                 content: const Text('Are you sure you want to log out of your session?'),
                                 actions: [
                                   TextButton(
-                                    child: const Text('Cancel'),
+                                    child: const Text('Cancel', style: TextStyle(color: Color(0xFF71717A))),
                                     onPressed: () => Navigator.pop(ctx),
                                   ),
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFEF4444),
-                                      minimumSize: const Size(90, 40),
+                                      backgroundColor: const Color(0xFF09090B),
+                                      foregroundColor: Colors.white,
+                                      minimumSize: const Size(90, 38),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),
                                     child: const Text('Logout'),
                                     onPressed: () {
@@ -186,268 +171,223 @@ class DashboardTab extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // ── Vibrant Workday Hero Banner Card ───────────────────────────
+                // ── Sleek Workday Hero Card (shadcn Dark Zinc) ────────────────
                 attendanceAsync.when(
                   data: (att) {
                     final isCheckedIn = att.checkedIn && att.isOpen;
                     return Container(
                       width: double.infinity,
-                      clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: isCheckedIn
-                              ? [const Color(0xFF059669), const Color(0xFF10B981), const Color(0xFF34D399)]
-                              : [const Color(0xFF3B82F6), const Color(0xFF4F46E5), const Color(0xFF7C3AED)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
+                        color: const Color(0xFF09090B), // Zinc 950
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFF27272A), width: 1), // Zinc 800
+                        boxShadow: const [
                           BoxShadow(
-                            color: (isCheckedIn ? const Color(0xFF10B981) : const Color(0xFF4F46E5)).withOpacity(0.35),
-                            blurRadius: 24,
-                            offset: const Offset(0, 10),
+                            color: Color(0x1F000000),
+                            blurRadius: 16,
+                            offset: Offset(0, 6),
                           ),
                         ],
                       ),
-                      child: Stack(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Decorative 3D background ambient circles
-                          Positioned(
-                            right: -30,
-                            top: -30,
-                            child: Container(
-                              width: 150,
-                              height: 150,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withOpacity(0.12),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: -40,
-                            bottom: -40,
-                            child: Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.black.withOpacity(0.08),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF18181B), // Zinc 900
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFF27272A), width: 1),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      width: 6,
+                                      height: 6,
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(30),
-                                        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            width: 8,
-                                            height: 8,
-                                            decoration: const BoxDecoration(
-                                              color: Colors.white,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            isCheckedIn ? 'WORKDAY ACTIVE' : 'WORKDAY INACTIVE',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: 0.8,
-                                            ),
-                                          ),
-                                        ],
+                                        color: isCheckedIn ? const Color(0xFF22C55E) : const Color(0xFFA1A1AA),
+                                        shape: BoxShape.circle,
                                       ),
                                     ),
-                                    const GpsStatusChip(),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      isCheckedIn ? 'WORKDAY ACTIVE' : 'WORKDAY INACTIVE',
+                                      style: const TextStyle(
+                                        color: Color(0xFFFAFAFA),
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.6,
+                                      ),
+                                    ),
                                   ],
                                 ),
-                                const SizedBox(height: 24),
-                                Text(
-                                  isCheckedIn ? 'Shift Active' : 'Ready to Start?',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.5,
+                              ),
+                              const GpsStatusChip(),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            isCheckedIn ? 'Shift Active' : 'Ready to Start?',
+                            style: const TextStyle(
+                              color: Color(0xFFFAFAFA),
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            isCheckedIn
+                                ? 'Your shift check-in is confirmed. Beat route tracking & order booking are active.'
+                                : 'Check-in to enable orders, beats, payments, and customer check-ins.',
+                            style: const TextStyle(
+                              color: Color(0xFFA1A1AA), // Zinc 400
+                              fontSize: 13,
+                              height: 1.4,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color(0xFF09090B),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    minimumSize: const Size(double.infinity, 46),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  isCheckedIn
-                                      ? 'Your shift check-in is confirmed. Beat route tracking & order booking are active.'
-                                      : 'Check-in to enable orders, beats, payments, and customer check-ins.',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontSize: 13,
-                                    height: 1.45,
-                                    fontWeight: FontWeight.w500,
+                                  icon: Icon(
+                                    isCheckedIn ? Icons.stop_circle_outlined : Icons.play_circle_fill_rounded,
+                                    size: 18,
+                                    color: const Color(0xFF09090B),
                                   ),
-                                ),
-                                const SizedBox(height: 24),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(16),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.12),
-                                              blurRadius: 12,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ],
-                                        ),
-                                        child: ElevatedButton.icon(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.white,
-                                            foregroundColor: isCheckedIn ? const Color(0xFF059669) : const Color(0xFF4F46E5),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(16),
-                                            ),
-                                            elevation: 0,
-                                            padding: const EdgeInsets.symmetric(vertical: 14),
-                                            minimumSize: const Size(double.infinity, 50),
-                                          ),
-                                          icon: Icon(
-                                            isCheckedIn ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded,
-                                            size: 20,
-                                          ),
-                                          label: Text(
-                                            isCheckedIn ? 'Check Out of Shift' : 'Begin Workday',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 15,
-                                              letterSpacing: 0.3,
-                                            ),
-                                          ),
-                                          onPressed: () async {
-                                            try {
-                                              if (isCheckedIn) {
-                                                final notesCtrl = TextEditingController();
-                                                final confirm = await showDialog<bool>(
-                                                  context: context,
-                                                  builder: (ctx) => AlertDialog(
-                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                                    title: const Text('End Workday', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                    content: Column(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      children: [
-                                                        const Text('Are you sure you want to Check Out?'),
-                                                        const SizedBox(height: 12),
-                                                        TextField(
-                                                          controller: notesCtrl,
-                                                          decoration: const InputDecoration(
-                                                            labelText: 'End of day notes',
-                                                            hintText: 'e.g. Completed beat route',
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    actions: [
-                                                      TextButton(
-                                                        child: const Text('Cancel'),
-                                                        onPressed: () => Navigator.pop(ctx, false),
-                                                      ),
-                                                      ElevatedButton(
-                                                        style: ElevatedButton.styleFrom(
-                                                          backgroundColor: const Color(0xFFEF4444),
-                                                          minimumSize: const Size(100, 40),
-                                                        ),
-                                                        child: const Text('Check Out'),
-                                                        onPressed: () => Navigator.pop(ctx, true),
-                                                      ),
-                                                    ],
+                                  label: Text(
+                                    isCheckedIn ? 'Check Out of Shift' : 'Begin Workday',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    try {
+                                      if (isCheckedIn) {
+                                        final notesCtrl = TextEditingController();
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                            title: const Text('End Workday', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            content: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Text('Are you sure you want to Check Out?'),
+                                                const SizedBox(height: 12),
+                                                TextField(
+                                                  controller: notesCtrl,
+                                                  decoration: const InputDecoration(
+                                                    labelText: 'End of day notes',
+                                                    hintText: 'e.g. Completed beat route',
                                                   ),
-                                                );
-
-                                                if (confirm == true) {
-                                                  await ref.read(attendanceProvider.notifier).checkOut(notes: notesCtrl.text.trim());
-                                                }
-                                              } else {
-                                                await ref.read(attendanceProvider.notifier).checkIn();
-                                              }
-                                            } catch (e) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Error: ${e.toString().replaceAll('Exception:', '')}'),
-                                                  backgroundColor: const Color(0xFFEF4444),
-                                                  behavior: SnackBarBehavior.floating,
                                                 ),
-                                              );
-                                            }
-                                          },
+                                              ],
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                child: const Text('Cancel', style: TextStyle(color: Color(0xFF71717A))),
+                                                onPressed: () => Navigator.pop(ctx, false),
+                                              ),
+                                              ElevatedButton(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFF09090B),
+                                                  foregroundColor: Colors.white,
+                                                  minimumSize: const Size(100, 38),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                ),
+                                                child: const Text('Check Out'),
+                                                onPressed: () => Navigator.pop(ctx, true),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+
+                                        if (confirm == true) {
+                                          await ref.read(attendanceProvider.notifier).checkOut(notes: notesCtrl.text.trim());
+                                        }
+                                      } else {
+                                        await ref.read(attendanceProvider.notifier).checkIn();
+                                      }
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Error: ${e.toString().replaceAll('Exception:', '')}'),
+                                          backgroundColor: const Color(0xFFDC2626),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ),
+                              if (isCheckedIn && att.checkinTime != null) ...[
+                                const SizedBox(width: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF18181B), // Zinc 900
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: const Color(0xFF27272A)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'STARTED',
+                                        style: TextStyle(
+                                          color: Color(0xFFA1A1AA),
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.5,
                                         ),
                                       ),
-                                    ),
-                                    if (isCheckedIn && att.checkinTime != null) ...[
-                                      const SizedBox(width: 12),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.18),
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: Colors.white.withOpacity(0.25)),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'START TIME',
-                                              style: TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w900,
-                                                letterSpacing: 0.5,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              DateFormatter.formatTime(att.checkinTime!),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                            ),
-                                          ],
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        DateFormatter.formatTime(att.checkinTime!),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ],
-                            ),
+                            ],
                           ),
                         ],
                       ),
                     );
                   },
                   loading: () => Container(
-                    height: 160,
+                    height: 140,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE4E4E7)),
                     ),
-                    child: const Center(child: CircularProgressIndicator()),
+                    child: const Center(child: CircularProgressIndicator(color: Color(0xFF09090B))),
                   ),
                   error: (e, __) => Card(
                     child: ListTile(
@@ -460,7 +400,7 @@ class DashboardTab extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
 
                 // ── Overview Metrics Section ──────────────────────────────────
                 Row(
@@ -469,27 +409,32 @@ class DashboardTab extends ConsumerWidget {
                     const Text(
                       'Overview Metrics',
                       style: TextStyle(
-                        color: Color(0xFF0F172A),
-                        fontWeight: FontWeight.w900,
-                        fontSize: 17,
+                        color: Color(0xFF09090B),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
                         letterSpacing: -0.4,
                       ),
                     ),
                     TextButton.icon(
                       onPressed: () => context.go('/beat'),
-                      icon: const Icon(Icons.route_rounded, size: 16, color: Color(0xFF4F46E5)),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF09090B)),
                       label: const Text(
                         'View Route',
                         style: TextStyle(
-                          color: Color(0xFF4F46E5),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
+                          color: Color(0xFF09090B),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 attendanceAsync.when(
                   data: (att) {
                     final visits = att.checkedIn ? att.visitCount : 0;
@@ -502,11 +447,9 @@ class DashboardTab extends ConsumerWidget {
                             label: 'Customer Visits',
                             subtitle: 'Beat progress today',
                             icon: Icons.storefront_rounded,
-                            accentColor: const Color(0xFF6366F1),
-                            bgColor: const Color(0xFFEEF2FF),
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: _buildMetricTile(
                             context,
@@ -514,97 +457,7 @@ class DashboardTab extends ConsumerWidget {
                             label: 'Sync Status',
                             subtitle: syncCount == 0 ? 'All data up to date' : 'Requires network',
                             icon: syncCount == 0 ? Icons.cloud_done_rounded : Icons.cloud_upload_rounded,
-                            accentColor: syncCount == 0 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                            bgColor: syncCount == 0 ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
                           ),
-                        ),
-                      ],
-                    );
-                  },
-                  loading: () => const SizedBox(),
-                  error: (_, __) => const SizedBox(),
-                ),
-                const SizedBox(height: 28),
-
-                // ── Quick Operational Actions Grid ────────────────────────────
-                const Text(
-                  'Quick Actions',
-                  style: TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontWeight: FontWeight.w900,
-                    fontSize: 17,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                userAsync.when(
-                  data: (user) {
-                    final canAccessRestricted = user?.canAccessRestrictedModules ?? false;
-                    return GridView.count(
-                      crossAxisCount: 2,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisSpacing: 14,
-                      mainAxisSpacing: 14,
-                      childAspectRatio: 1.3,
-                      children: [
-                        _buildActionTile(
-                          context,
-                          title: 'Record Payment',
-                          subtitle: 'Cash & UPI entries',
-                          icon: Icons.payments_rounded,
-                          color: const Color(0xFFF59E0B),
-                          bgColor: const Color(0xFFFFFBEB),
-                          onTap: () => context.push('/payment/collect'),
-                        ),
-                        if (canAccessRestricted)
-                          _buildActionTile(
-                            context,
-                            title: 'Log Expense',
-                            subtitle: 'Claims & travel bills',
-                            icon: Icons.receipt_long_rounded,
-                            color: const Color(0xFF6366F1),
-                            bgColor: const Color(0xFFEEF2FF),
-                            onTap: () => context.push('/expense'),
-                          )
-                        else
-                          _buildActionTile(
-                            context,
-                            title: 'Create Order',
-                            subtitle: 'Book customer order',
-                            icon: Icons.add_shopping_cart_rounded,
-                            color: const Color(0xFF6366F1),
-                            bgColor: const Color(0xFFEEF2FF),
-                            onTap: () => context.push('/order/new'),
-                          ),
-                        if (canAccessRestricted)
-                          _buildActionTile(
-                            context,
-                            title: 'Material Request',
-                            subtitle: 'Stock & POSM allocation',
-                            icon: Icons.inventory_2_rounded,
-                            color: const Color(0xFF10B981),
-                            bgColor: const Color(0xFFECFDF5),
-                            onTap: () => context.push('/material-request'),
-                          )
-                        else
-                          _buildActionTile(
-                            context,
-                            title: 'Beat Plan',
-                            subtitle: 'Today\'s route outlets',
-                            icon: Icons.map_rounded,
-                            color: const Color(0xFF10B981),
-                            bgColor: const Color(0xFFECFDF5),
-                            onTap: () => context.go('/beat'),
-                          ),
-                        _buildActionTile(
-                          context,
-                          title: 'Asset Deploy',
-                          subtitle: 'Equipment & coolers',
-                          icon: Icons.build_circle_rounded,
-                          color: const Color(0xFF06B6D4),
-                          bgColor: const Color(0xFFCFFAFE),
-                          onTap: () => context.push('/asset-cap'),
                         ),
                       ],
                     );
@@ -613,6 +466,82 @@ class DashboardTab extends ConsumerWidget {
                   error: (_, __) => const SizedBox(),
                 ),
                 const SizedBox(height: 24),
+
+                // ── Quick Operational Actions Grid ────────────────────────────
+                const Text(
+                  'Quick Actions',
+                  style: TextStyle(
+                    color: Color(0xFF09090B),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                userAsync.when(
+                  data: (user) {
+                    final canAccessRestricted = user?.canAccessRestrictedModules ?? false;
+                    return GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.35,
+                      children: [
+                        _buildActionTile(
+                          context,
+                          title: 'Record Payment',
+                          subtitle: 'Cash & UPI entries',
+                          icon: Icons.payments_outlined,
+                          onTap: () => context.push('/payment/collect'),
+                        ),
+                        if (canAccessRestricted)
+                          _buildActionTile(
+                            context,
+                            title: 'Log Expense',
+                            subtitle: 'Claims & travel bills',
+                            icon: Icons.receipt_long_outlined,
+                            onTap: () => context.push('/expense'),
+                          )
+                        else
+                          _buildActionTile(
+                            context,
+                            title: 'Create Order',
+                            subtitle: 'Book customer order',
+                            icon: Icons.add_shopping_cart_rounded,
+                            onTap: () => context.push('/order/new'),
+                          ),
+                        if (canAccessRestricted)
+                          _buildActionTile(
+                            context,
+                            title: 'Material Request',
+                            subtitle: 'Stock & POSM allocation',
+                            icon: Icons.inventory_2_outlined,
+                            onTap: () => context.push('/material-request'),
+                          )
+                        else
+                          _buildActionTile(
+                            context,
+                            title: 'Beat Plan',
+                            subtitle: 'Today\'s route outlets',
+                            icon: Icons.map_outlined,
+                            onTap: () => context.go('/beat'),
+                          ),
+                        _buildActionTile(
+                          context,
+                          title: 'Asset Deploy',
+                          subtitle: 'Equipment & coolers',
+                          icon: Icons.build_circle_outlined,
+                          onTap: () => context.push('/asset-cap'),
+                        ),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox(),
+                  error: (_, __) => const SizedBox(),
+                ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -625,22 +554,26 @@ class DashboardTab extends ConsumerWidget {
     required IconData icon,
     required String tooltip,
     required VoidCallback onTap,
-    Color color = const Color(0xFF475569),
+    Color color = const Color(0xFF09090B),
   }) {
     return Container(
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
-        boxShadow: [
+        border: Border.all(color: const Color(0xFFE4E4E7), width: 1.0), // Zinc 200
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Color(0x08000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: IconButton(
-        icon: Icon(icon, color: color, size: 20),
+        padding: EdgeInsets.zero,
+        icon: Icon(icon, color: color, size: 18),
         tooltip: tooltip,
         onPressed: onTap,
       ),
@@ -653,22 +586,20 @@ class DashboardTab extends ConsumerWidget {
     required String label,
     required String subtitle,
     required IconData icon,
-    required Color accentColor,
-    required Color bgColor,
   }) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE4E4E7), width: 1.0), // Zinc 200
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+            color: Color(0x06000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
           ),
         ],
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -677,30 +608,31 @@ class DashboardTab extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(14),
+                  color: const Color(0xFFF4F4F5), // Zinc 100
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE4E4E7), width: 1.0),
                 ),
-                child: Icon(icon, color: accentColor, size: 22),
+                child: Icon(icon, color: const Color(0xFF09090B), size: 18),
               ),
               Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: accentColor,
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF09090B),
                   shape: BoxShape.circle,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: const Color(0xFF0F172A),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF09090B),
               letterSpacing: -0.5,
             ),
           ),
@@ -708,18 +640,18 @@ class DashboardTab extends ConsumerWidget {
           Text(
             label,
             style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF334155),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF18181B),
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Text(
             subtitle,
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF94A3B8),
+              color: Color(0xFF71717A),
             ),
           ),
         ],
@@ -732,26 +664,24 @@ class DashboardTab extends ConsumerWidget {
     required String title,
     required String subtitle,
     required IconData icon,
-    required Color color,
-    required Color bgColor,
     required VoidCallback onTap,
   }) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
-            boxShadow: [
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE4E4E7), width: 1.0), // Zinc 200
+            boxShadow: const [
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+                color: Color(0x06000000),
+                blurRadius: 8,
+                offset: Offset(0, 2),
               ),
             ],
           ),
@@ -760,20 +690,21 @@ class DashboardTab extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(14),
+                  color: const Color(0xFFF4F4F5), // Zinc 100
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE4E4E7), width: 1.0),
                 ),
-                child: Icon(icon, color: color, size: 22),
+                child: Icon(icon, color: const Color(0xFF09090B), size: 18),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF09090B),
                   letterSpacing: -0.3,
                 ),
               ),
@@ -781,9 +712,9 @@ class DashboardTab extends ConsumerWidget {
               Text(
                 subtitle,
                 style: const TextStyle(
-                  fontSize: 11,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF64748B),
+                  color: Color(0xFF71717A),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

@@ -48,7 +48,7 @@ def cleanup_old_backups(max_retain: int = MAX_BACKUP_RETENTION) -> None:
         return
     backup_files = []
     for fname in os.listdir(BACKUP_DIR):
-        if (fname.endswith(".sql") or fname.endswith(".zip")) and fname.startswith("sastrybalm_sfa_backup_"):
+        if (fname.endswith(".sql") or fname.endswith(".zip")) and fname.startswith("safar_sfa_backup_"):
             fpath = os.path.join(BACKUP_DIR, fname)
             stat = os.stat(fpath)
             backup_files.append((fpath, stat.st_mtime))
@@ -68,16 +68,16 @@ def create_full_system_backup() -> str:
     """Export all database tables into a clean, executable timestamped .sql file and retain the last 5 backups."""
     os.makedirs(BACKUP_DIR, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    sql_filename = f"sastrybalm_sfa_backup_{timestamp}.sql"
+    sql_filename = f"safar_sfa_backup_{timestamp}.sql"
     sql_filepath = os.path.join(BACKUP_DIR, sql_filename)
 
     db: Session = SessionLocal()
     sql_lines: List[str] = [
         "-- ========================================================",
-        "-- Sastrybalm SFA Enterprise SQL Database Backup",
+        "-- Safar SFA Enterprise SQL Database Backup",
         f"-- Generated At: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         "-- Database Engine: MySQL / MariaDB",
-        "-- Software Version: Sastrybalm SFA v2.0 Enterprise",
+        "-- Software Version: Safar SFA v2.0 Enterprise",
         "-- ========================================================\n",
         "SET FOREIGN_KEY_CHECKS=0;",
         "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";",
@@ -138,7 +138,7 @@ def list_existing_backups() -> list:
     os.makedirs(BACKUP_DIR, exist_ok=True)
     files = []
     for fname in os.listdir(BACKUP_DIR):
-        if (fname.endswith(".sql") or fname.endswith(".zip")) and fname.startswith("sastrybalm_sfa_backup_"):
+        if (fname.endswith(".sql") or fname.endswith(".zip")) and fname.startswith("safar_sfa_backup_"):
             fpath = os.path.join(BACKUP_DIR, fname)
             stat = os.stat(fpath)
             size_mb = round(stat.st_size / (1024 * 1024), 2)

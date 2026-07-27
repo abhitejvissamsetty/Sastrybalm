@@ -4,7 +4,7 @@ from app.database import SessionLocal
 from app.utils.backup_service import restore_sql_backup
 
 def run_restore():
-    sql_path = "/Users/johnwesleygovada/Desktop/Sastrybalm/sastrybalm_sfa_backup_20260725_115253.sql"
+    sql_path = "/Users/johnwesleygovada/Desktop/Safar/safar_sfa_backup_20260725_115253.sql"
     if not os.path.exists(sql_path):
         print(f"Error: Backup file '{sql_path}' not found.")
         return

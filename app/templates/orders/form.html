@@ -3,128 +3,164 @@
 {% block title %}New Order{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl space-y-6">
+<div class="max-w-5xl space-y-8">
 
-  <div class="flex items-center gap-x-4">
-    <a href="/operations/orders" class="text-slate-400 hover:text-white transition-colors">
-      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-      </svg>
-    </a>
-    <div>
-      <h1 class="text-2xl font-bold text-white">New Order</h1>
-      <p class="mt-1 text-sm text-slate-400">Create a sales order</p>
+  <!-- Executive Header -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-x-4">
+      <a href="/operations/orders" class="h-10 w-10 rounded-xl bg-slate-900/80 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:border-indigo-500/40 transition-all">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+        </svg>
+      </a>
+      <div>
+        <div class="flex items-center gap-x-3">
+          <h1 class="text-3xl font-bold text-white tracking-tight">New Order</h1>
+          <span class="inline-flex items-center gap-x-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            Sales Scope Confined
+          </span>
+        </div>
+        <p class="mt-1 text-sm text-slate-400 font-medium">Create a sales order with real-time tax &amp; discount calculation</p>
+      </div>
     </div>
   </div>
 
   {% if error %}
-  <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+  <div class="rounded-2xl bg-rose-950/50 border border-rose-500/30 p-4 text-sm text-rose-300 flex items-center gap-x-3 shadow-lg shadow-rose-950/20">
+    <svg class="h-5 w-5 text-rose-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+    <span>{{ error }}</span>
+  </div>
   {% endif %}
 
-  <form method="post" id="order-form" class="space-y-6">
+  <form method="post" id="order-form" class="space-y-8">
 
-    <!-- Header -->
-    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-4">
-      <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Order Details</h2>
-      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Outlet <span class="text-red-400">*</span></label>
+    <!-- 1. Order Header Card -->
+    <div class="glass rounded-3xl p-6 lg:p-8 border border-white/5 space-y-6 shadow-2xl shadow-black/40">
+      <div class="flex items-center justify-between border-b border-white/5 pb-4">
+        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">1. Order Configuration</h2>
+        <span class="text-xs text-slate-500">Step 1 of 2</span>
+      </div>
+
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 items-end">
+        <!-- Outlet -->
+        <div class="space-y-2">
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center">
+            Outlet <span class="text-rose-400 ml-1">*</span>
+          </label>
           <select name="outlet_id" required
-                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
             <option value="">Select outlet…</option>
             {% for o in outlets %}
             <option value="{{ o.id }}">{{ o.name }}{% if o.code %} ({{ o.code }}){% endif %}</option>
             {% endfor %}
           </select>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Channel Partner (Fulfillment) <span class="text-red-400">*</span></label>
+
+        <!-- Channel Partner -->
+        <div class="space-y-2">
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center" title="Channel Partner (Fulfillment)">
+            Channel Partner (Fulfillment) <span class="text-rose-400 ml-1">*</span>
+          </label>
           <select name="channel_partner_id" required
-                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
             <option value="">Select Channel Partner…</option>
             {% for cp in channel_partners %}
             <option value="{{ cp.id }}">{{ cp.name }} ({{ cp.partner_type }})</option>
             {% endfor %}
           </select>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Flow Type</label>
-          <select name="flow_type"
-                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            {% for ft in FlowType %}
-            <option value="{{ ft.value }}">{{ ft.value.replace('_',' ').upper() }}</option>
+
+        <!-- Order Type -->
+        <div class="space-y-2">
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center">
+            Order Type <span class="text-rose-400 ml-1">*</span>
+          </label>
+          <select name="order_type" required
+                  class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+            {% for ot in OrderType %}
+            <option value="{{ ot.value }}" {% if ot.value == 'Secondary' %}selected{% endif %}>{{ ot.value }} Order</option>
             {% endfor %}
           </select>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Notes</label>
+
+        <!-- Notes -->
+        <div class="space-y-2">
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap truncate h-5 flex items-center">
+            Notes
+          </label>
           <input type="text" name="notes"
-                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                 placeholder="Optional notes">
+                 class="w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+                 placeholder="Optional notes or instructions">
         </div>
       </div>
     </div>
 
-    <!-- Line Items -->
-    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-4">
-      <div class="flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Products</h2>
+    <!-- 2. Line Items Card -->
+    <div class="glass rounded-3xl p-6 lg:p-8 border border-white/5 space-y-6 shadow-2xl shadow-black/40">
+      <div class="flex items-center justify-between border-b border-white/5 pb-4">
+        <div>
+          <h2 class="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">2. Products &amp; Line Items</h2>
+          <p class="mt-1 text-xs text-slate-500">Products are strictly validated for Category Scope = Sales</p>
+        </div>
         <button type="button" id="add-row"
-                class="inline-flex items-center gap-x-1.5 rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-600 transition-colors">
-          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 px-4 py-2 text-xs font-bold text-indigo-300 hover:bg-indigo-600/40 hover:text-white transition-all">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
-          Add Row
+          Add Product Line
         </button>
       </div>
 
       <div class="overflow-x-auto">
         <table class="min-w-full" id="items-table">
           <thead>
-            <tr class="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              <th class="pb-2 pr-3">Product</th>
-              <th class="pb-2 pr-3 w-20">Qty</th>
-              <th class="pb-2 pr-3 w-28">Unit Price (₹)</th>
-              <th class="pb-2 pr-3 w-24">GST %</th>
-              <th class="pb-2 pr-3 w-24">Disc %</th>
-              <th class="pb-2 w-24 text-right">Line Total</th>
-              <th class="pb-2 w-8"></th>
+            <tr class="text-left text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5">
+              <th class="pb-3 pr-4">Sales Product</th>
+              <th class="pb-3 pr-4 w-24">Qty</th>
+              <th class="pb-3 pr-4 w-32">Unit Price (₹)</th>
+              <th class="pb-3 pr-4 w-24">GST %</th>
+              <th class="pb-3 pr-4 w-24">Disc %</th>
+              <th class="pb-3 pr-2 w-32 text-right">Line Total</th>
+              <th class="pb-3 w-10 text-center"></th>
             </tr>
           </thead>
-          <tbody id="items-body">
+          <tbody id="items-body" class="divide-y divide-white/5">
             <tr class="item-row">
-              <td class="pr-3 pb-3">
+              <td class="pr-4 py-3">
                 <select name="product_id[]"
-                        class="product-select w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="">Select product…</option>
+                        class="product-select w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+                  <option value="">Select sales product…</option>
                   {% for p in products %}
                   <option value="{{ p.id }}" data-price="{{ p.mrp or 0 }}" data-gst="{{ p.gst_rate or 0 }}">{{ p.name }}</option>
                   {% endfor %}
                 </select>
               </td>
-              <td class="pr-3 pb-3">
+              <td class="pr-4 py-3">
                 <input type="number" name="quantity[]" value="1" min="1"
-                       class="qty-input w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                       class="qty-input w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
               </td>
-              <td class="pr-3 pb-3">
+              <td class="pr-4 py-3">
                 <input type="number" name="unit_price[]" step="0.01" min="0" value="0"
-                       class="price-input w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                       class="price-input w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
               </td>
-              <td class="pr-3 pb-3">
+              <td class="pr-4 py-3">
                 <input type="number" name="gst_rate[]" step="0.01" min="0" value="0"
-                       class="gst-input w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                       class="gst-input w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
               </td>
-              <td class="pr-3 pb-3">
+              <td class="pr-4 py-3">
                 <input type="number" name="discount_pct[]" step="0.01" min="0" max="100" value="0"
-                       class="disc-input w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                       class="disc-input w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
               </td>
-              <td class="pb-3 text-right">
-                <span class="line-total text-sm font-medium text-white">₹0.00</span>
+              <td class="py-3 pr-2 text-right">
+                <span class="line-total text-sm font-bold text-white">₹0.00</span>
               </td>
-              <td class="pb-3 pl-2">
-                <button type="button" class="remove-row text-red-500 hover:text-red-400 transition-colors hidden">
+              <td class="py-3 text-center">
+                <button type="button" class="remove-row p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all hidden">
                   <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                   </svg>
                 </button>
               </td>
@@ -133,22 +169,24 @@
         </table>
       </div>
 
-      <div class="flex justify-end pt-2 border-t border-slate-700">
-        <div class="text-right">
-          <span class="text-sm text-slate-400">Order Total:</span>
-          <span id="grand-total" class="ml-2 text-lg font-bold text-white">₹0.00</span>
+      <div class="flex items-center justify-between pt-6 border-t border-white/5">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Order Summary</span>
+        <div class="flex items-center gap-x-3 bg-slate-900/80 px-5 py-3 rounded-2xl border border-white/10">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Grand Total:</span>
+          <span id="grand-total" class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">₹0.00</span>
         </div>
       </div>
     </div>
 
-    <div class="flex items-center justify-end gap-x-3">
-      <a href="/operations/orders" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Cancel</a>
+    <!-- Action Buttons -->
+    <div class="flex items-center justify-end gap-x-4 pt-4">
+      <a href="/operations/orders" class="rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors">Cancel</a>
       <button type="submit" name="action" value="draft"
-              class="rounded-lg border border-slate-600 px-5 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700 transition-colors">
+              class="rounded-xl border border-white/10 bg-slate-900/80 px-6 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-all">
         Save as Draft
       </button>
       <button type="submit"
-              class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+              class="premium-btn rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-8 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:to-violet-500 transition-all">
         Create Order
       </button>
     </div>
@@ -158,38 +196,38 @@
 
 <template id="row-template">
   <tr class="item-row">
-    <td class="pr-3 pb-3">
+    <td class="pr-4 py-3">
       <select name="product_id[]"
-              class="product-select w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <option value="">Select product…</option>
+              class="product-select w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+        <option value="">Select sales product…</option>
         {% for p in products %}
         <option value="{{ p.id }}" data-price="{{ p.mrp or 0 }}" data-gst="{{ p.gst_rate or 0 }}">{{ p.name }}</option>
         {% endfor %}
       </select>
     </td>
-    <td class="pr-3 pb-3">
+    <td class="pr-4 py-3">
       <input type="number" name="quantity[]" value="1" min="1"
-             class="qty-input w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500">
+             class="qty-input w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
     </td>
-    <td class="pr-3 pb-3">
+    <td class="pr-4 py-3">
       <input type="number" name="unit_price[]" step="0.01" min="0" value="0"
-             class="price-input w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500">
+             class="price-input w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
     </td>
-    <td class="pr-3 pb-3">
+    <td class="pr-4 py-3">
       <input type="number" name="gst_rate[]" step="0.01" min="0" value="0"
-             class="gst-input w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500">
+             class="gst-input w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
     </td>
-    <td class="pr-3 pb-3">
+    <td class="pr-4 py-3">
       <input type="number" name="discount_pct[]" step="0.01" min="0" max="100" value="0"
-             class="disc-input w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500">
+             class="disc-input w-full rounded-xl bg-slate-900/90 border border-white/10 text-white px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
     </td>
-    <td class="pb-3 text-right">
-      <span class="line-total text-sm font-medium text-white">₹0.00</span>
+    <td class="py-3 pr-2 text-right">
+      <span class="line-total text-sm font-bold text-white">₹0.00</span>
     </td>
-    <td class="pb-3 pl-2">
-      <button type="button" class="remove-row text-red-500 hover:text-red-400 transition-colors">
+    <td class="py-3 text-center">
+      <button type="button" class="remove-row p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all">
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
         </svg>
       </button>
     </td>
@@ -201,21 +239,18 @@ function calcRow(row) {
   const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
   const price = parseFloat(row.querySelector('.price-input').value) || 0;
   const disc = parseFloat(row.querySelector('.disc-input').value) || 0;
-  const gstRate = parseFloat(row.querySelector('.gst-input').value) || 0;
   
   const base = qty * price;
   const total = base - (base * disc / 100);
-  const lineTotalExclusive = total / (1 + gstRate / 100);
-  const gstAmt = total - lineTotalExclusive;
   
-  row.querySelector('.line-total').textContent = '₹' + total.toFixed(2);
+  row.querySelector('.line-total').textContent = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return total;
 }
 
 function calcGrand() {
   let total = 0;
   document.querySelectorAll('.item-row').forEach(r => { total += calcRow(r); });
-  document.getElementById('grand-total').textContent = '₹' + total.toFixed(2);
+  document.getElementById('grand-total').textContent = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 document.getElementById('items-body').addEventListener('input', calcGrand);
@@ -240,7 +275,10 @@ document.getElementById('items-body').addEventListener('click', e => {
   const btn = e.target.closest('.remove-row');
   if (!btn) return;
   const rows = document.querySelectorAll('.item-row');
-  if (rows.length > 1) { btn.closest('.item-row').remove(); calcGrand(); }
+  if (rows.length > 1) {
+    btn.closest('.item-row').remove();
+    calcGrand();
+  }
 });
 </script>
 {% endblock %}

@@ -56,7 +56,7 @@ def complete_system_onboarding(
         admin = User(
             username=username.strip(),
             full_name=full_name.strip() or "System Administrator",
-            email=email.strip() or "admin@sastrybalm.com",
+            email=email.strip() or "admin@safar.com",
             phone=phone_clean,
             role=UserRole.admin,
             is_active=True,
@@ -115,7 +115,7 @@ def generate_and_send_user_otp(db: Session, login_or_email: str) -> Dict[str, An
     if user.role == UserRole.admin:
         return {"success": False, "error": "System Admin must authenticate via password."}
 
-    user_email = user.email or f"{user.username}@sastrybalm.local"
+    user_email = user.email or f"{user.username}@safar.local"
     otp_code = f"{random.randint(100000, 999999)}"
     expires_at = datetime.utcnow() + timedelta(minutes=10)
 
@@ -145,12 +145,12 @@ def generate_and_send_user_otp(db: Session, login_or_email: str) -> Dict[str, An
     # Send HTML Email if SMTP configured
     sent = False
     if user.email and "@" in user.email:
-        subject = f"Your Sastrybalm Login OTP: {otp_code}"
+        subject = f"Your Safar Login OTP: {otp_code}"
         body_html = f"""
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-          <h2 style="color: #4f46e5; margin-top: 0;">Sastrybalm SFA Verification Code</h2>
+          <h2 style="color: #4f46e5; margin-top: 0;">Safar SFA Verification Code</h2>
           <p style="font-size: 15px; color: #334155;">Hello <strong>{user.full_name or user.username}</strong>,</p>
-          <p style="font-size: 14px; color: #475569;">Use the following 6-digit One-Time Password (OTP) to securely log in to your Sastrybalm SFA portal:</p>
+          <p style="font-size: 14px; color: #475569;">Use the following 6-digit One-Time Password (OTP) to securely log in to your Safar SFA portal:</p>
           <div style="background-color: #f1f5f9; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
             <span style="font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #1e1b4b;">{otp_code}</span>
           </div>

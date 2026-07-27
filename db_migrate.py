@@ -52,6 +52,7 @@ def run_migrations():
         add_column_safely(conn, "alerts", "user_id", "INT NULL")
         add_column_safely(conn, "alerts", "geography_id", "INT NULL")
         add_column_safely(conn, "alerts", "vendor_id", "INT NULL")
+        add_column_safely(conn, "orders", "order_type", "VARCHAR(20) NOT NULL DEFAULT 'Secondary'")
             
         # Users
         try:

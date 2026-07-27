@@ -188,7 +188,7 @@ def stop_mock_server():
 
 async def run_diagnostics():
     print("\n" + "="*80)
-    print("🚀 STARTING SASTRYBALM ZAP API INTEGRATION DIAGNOSTIC TEST SUITE")
+    print("🚀 STARTING SAFAR ZAP API INTEGRATION DIAGNOSTIC TEST SUITE")
     print("="*80)
 
     # 1. Start Server
