@@ -147,6 +147,17 @@ def job_daily_parquet_backup() -> None:
     """Automated daily rolling Parquet backup of transactional/operational data to Permanent Files Bucket."""
     db = SessionLocal()
     try:
+        from app.utils.s3_service import get_s3_config, test_s3_connection
+        config = get_s3_config(db)
+        if not config.get("s3_is_enabled"):
+            logger.info("[SCHEDULER] Skipping daily Parquet rolling backup because Permanent S3 Bucket is not enabled.")
+            return
+
+        s3_ok, s3_msg = test_s3_connection(config, bucket_type="permanent")
+        if not s3_ok:
+            logger.warning(f"[SCHEDULER] Skipping daily Parquet rolling backup because Permanent S3 Bucket connection failed: {s3_msg}")
+            return
+
         from app.services.parquet_backup_service import run_daily_parquet_rolling_backup
         res = run_daily_parquet_rolling_backup(db)
         logger.info(f"Automated daily Parquet rolling backup complete: {res.get('total_tables')} tables, {res.get('total_records')} records exported.")

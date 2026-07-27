@@ -99,6 +99,14 @@ def run_daily_parquet_rolling_backup(db: Session, target_date: Optional[date] = 
 
     config = get_s3_config(db)
     is_s3_enabled = config.get("s3_is_enabled")
+    if not is_s3_enabled:
+        raise ValueError("Parquet Rolling Backup is disabled: Permanent S3 Storage is not enabled in S3 Settings.")
+
+    from app.utils.s3_service import test_s3_connection
+    s3_ok, s3_msg = test_s3_connection(config, bucket_type="permanent")
+    if not s3_ok:
+        raise ValueError(f"Parquet Rolling Backup is disabled: Permanent S3 Storage connection failed ({s3_msg}).")
+
     s3_endpoint = config.get("s3_endpoint_url")
     s3_bucket = config.get("s3_bucket_name")
     s3_access_key = config.get("s3_access_key_id")

@@ -53,21 +53,53 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 5.625c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
           </svg>
         </div>
-        <div class="text-sm">
-          <h4 class="font-bold text-white">Parquet Daily Rolling Backup (Permanent Bucket)</h4>
+        <div class="text-sm space-y-1">
+          <div class="flex items-center justify-between gap-2">
+            <h4 class="font-bold text-white">Parquet Daily Rolling Backup</h4>
+            {% if s3_is_enabled and s3_working %}
+            <span class="inline-flex items-center gap-x-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-400 border border-emerald-500/20">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>Permanent S3 Active
+            </span>
+            {% elif not s3_is_enabled %}
+            <span class="inline-flex items-center gap-x-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-400 border border-amber-500/20">
+              <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>S3 Disabled
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-x-1.5 rounded-md bg-rose-500/10 px-2 py-1 text-[11px] font-semibold text-rose-400 border border-rose-500/20">
+              <span class="h-1.5 w-1.5 rounded-full bg-rose-400"></span>S3 Connection Failed
+            </span>
+            {% endif %}
+          </div>
           <p class="text-slate-300 mt-1">
             Exports operational &amp; transactional data up to yesterday into compressed Apache Parquet files directly into <strong class="text-purple-300">Permanent Files - Bucket</strong> in daily directory structure:
             <code class="block mt-1 font-mono text-[11px] text-purple-200 bg-slate-900/80 p-1.5 rounded">rolling_backups/parquet/YYYY-MM-DD/&lt;table&gt;.parquet</code>
           </p>
+          {% if not s3_is_enabled %}
+          <p class="text-xs text-amber-300/90 pt-1">⚠️ Feature disabled: Permanent S3 Storage must be enabled in S3 Settings.</p>
+          {% elif not s3_working %}
+          <p class="text-xs text-rose-300/90 pt-1">⚠️ Feature disabled: Permanent S3 Bucket connection failed ({{ s3_error_msg }}).</p>
+          {% endif %}
         </div>
       </div>
       <div class="flex justify-end pt-2">
+        {% if s3_is_enabled and s3_working %}
         <form action="/settings/backup/parquet-rolling-backup" method="post">
           <button type="submit"
                   class="inline-flex items-center gap-x-2 rounded-xl bg-purple-600/80 border border-purple-500/50 px-4 py-2 text-xs font-bold text-white shadow-lg hover:bg-purple-500 transition-all">
             ⚡ Run Parquet Rolling Backup Now
           </button>
         </form>
+        {% elif not s3_is_enabled %}
+        <a href="/settings/s3"
+           class="inline-flex items-center gap-x-1.5 rounded-xl bg-slate-800 border border-slate-700 px-4 py-2 text-xs font-semibold text-amber-400 hover:text-white transition-all">
+          Enable Permanent S3 &rarr;
+        </a>
+        {% else %}
+        <a href="/settings/s3"
+           class="inline-flex items-center gap-x-1.5 rounded-xl bg-slate-800 border border-slate-700 px-4 py-2 text-xs font-semibold text-rose-400 hover:text-white transition-all">
+          Fix S3 Connection &rarr;
+        </a>
+        {% endif %}
       </div>
     </div>
   </div>

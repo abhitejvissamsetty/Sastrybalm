@@ -20,11 +20,24 @@ async def backup_dashboard(
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
+    from app.utils.s3_service import get_s3_config, test_s3_connection
+    s3_config = get_s3_config(db)
+    s3_is_enabled = bool(s3_config.get("s3_is_enabled"))
+    s3_working = False
+    s3_error_msg = ""
+    if s3_is_enabled:
+        s3_working, s3_error_msg = test_s3_connection(s3_config, bucket_type="permanent")
+    else:
+        s3_error_msg = "Permanent S3 Bucket is disabled in S3 Settings."
+
     backups = list_existing_backups()
     return templates.TemplateResponse("settings/backup.html", {
         "request": request,
         "current_user": current_user,
         "backups": backups,
+        "s3_is_enabled": s3_is_enabled,
+        "s3_working": s3_working,
+        "s3_error_msg": s3_error_msg,
         **get_flash(request),
     })
 
@@ -81,6 +94,17 @@ async def backup_parquet_rolling(
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
+    from app.utils.s3_service import get_s3_config, test_s3_connection
+    s3_config = get_s3_config(db)
+    if not s3_config.get("s3_is_enabled"):
+        set_flash_error(request, "Parquet Rolling Backup is disabled: Permanent S3 Bucket is not enabled. Please enable S3 in S3 Settings.")
+        return RedirectResponse("/settings/backup", status_code=302)
+
+    s3_ok, s3_msg = test_s3_connection(s3_config, bucket_type="permanent")
+    if not s3_ok:
+        set_flash_error(request, f"Parquet Rolling Backup is disabled: Permanent S3 Bucket connection failed ({s3_msg}).")
+        return RedirectResponse("/settings/backup", status_code=302)
+
     try:
         from app.services.parquet_backup_service import run_daily_parquet_rolling_backup
         res = run_daily_parquet_rolling_backup(db)
@@ -88,7 +112,7 @@ async def backup_parquet_rolling(
             request,
             f"Parquet rolling backup complete for cutoff date '{res['cutoff_date']}'! "
             f"Exported {res['total_tables']} operational tables ({res['total_records']} total records) to "
-            f"directory '{res['directory_structure']}' in {res['target_bucket']}."
+            f"directory '{res['directory_structure']}' in Permanent S3 Bucket '{res['target_bucket']}'."
         )
     except Exception as e:
         set_flash_error(request, f"Parquet rolling backup failed: {str(e)}")

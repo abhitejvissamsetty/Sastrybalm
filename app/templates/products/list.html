@@ -142,9 +142,6 @@
           <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
             <div class="flex items-center justify-end gap-x-4">
               <a href="/catalogue/products/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
-              {% if item.is_stockable %}
-              <a href="/catalogue/products/{{ item.id }}/attach-warehouses" class="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">Attach Warehouses</a>
-              {% endif %}
               {% if current_user.role.value == 'admin' %}
               <form method="post" action="/catalogue/products/{{ item.id }}/delete" class="inline"
                     onsubmit="return confirmSubmit(event, 'Deactivate {{ item.name }}?', 'Deactivate Product', 'danger')">
