@@ -157,9 +157,12 @@ class DashboardTab extends ConsumerWidget {
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),
                                     child: const Text('Logout'),
-                                    onPressed: () {
+                                    onPressed: () async {
                                       Navigator.pop(ctx);
-                                      ref.read(authStateProvider.notifier).logout();
+                                      await ref.read(authStateProvider.notifier).logout();
+                                      if (context.mounted) {
+                                        context.go('/login');
+                                      }
                                     },
                                   ),
                                 ],

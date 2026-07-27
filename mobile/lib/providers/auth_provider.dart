@@ -82,9 +82,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
   Future<void> logout() async {
     await _authService.logout();
     _ref.read(appConfigProvider.notifier).state = null;
-    _ref.invalidate(attendanceProvider);
-    _ref.invalidate(beatsProvider);
-    _ref.invalidate(productsProvider);
     state = const AsyncValue.data(null);
   }
 
