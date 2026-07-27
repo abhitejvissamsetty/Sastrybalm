@@ -9,6 +9,7 @@ import 'screens/home/home_screen.dart';
 import 'screens/home/dashboard_tab.dart';
 import 'screens/beat/beat_plan_screen.dart';
 import 'screens/beat/outlet_detail_screen.dart';
+import 'screens/beat/outlet_create_screen.dart';
 import 'screens/visit/visit_screen.dart';
 import 'screens/orders/order_create_screen.dart';
 import 'screens/orders/order_list_screen.dart';
@@ -58,11 +59,12 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (ctx, _) => const LoginScreen()),
+      GoRoute(path: '/beat', builder: (ctx, _) => const BeatPlanScreen()),
+      GoRoute(path: '/outlet/new', builder: (ctx, _) => const OutletCreateScreen()),
       ShellRoute(
         builder: (ctx, state, child) => HomeScreen(child: child),
         routes: [
           GoRoute(path: '/home', builder: (ctx, _) => const DashboardTab()),
-          GoRoute(path: '/beat', builder: (ctx, _) => const BeatPlanScreen()),
           GoRoute(path: '/history', builder: (ctx, _) => const OrderListScreen()),
           GoRoute(path: '/order/new', builder: (ctx, _) => const OrderCreateScreen()),
           GoRoute(

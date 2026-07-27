@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
@@ -182,25 +182,77 @@ class BeatCreateSchema(BaseModel):
     erp_id: Optional[str] = None
 
 
+def _format_beat_item(b: Beat):
+    pos_names = []
+    user_names = []
+    for pos in getattr(b, "positions", []):
+        if getattr(pos, "is_active", True):
+            p_name = f"{pos.name} ({pos.code})" if getattr(pos, "code", None) else pos.name
+            if p_name not in pos_names:
+                pos_names.append(p_name)
+            for u in getattr(pos, "users", []):
+                if getattr(u, "is_active", True) and u.full_name not in user_names:
+                    user_names.append(u.full_name)
+
+    return {
+        "id": b.id,
+        "name": b.name,
+        "code": b.code,
+        "beat_type": b.beat_type.value if hasattr(b.beat_type, "value") else str(b.beat_type or "GT"),
+        "beat_grade": b.beat_grade.value if b.beat_grade and hasattr(b.beat_grade, "value") else (str(b.beat_grade) if b.beat_grade else None),
+        "territory_id": b.territory_id,
+        "l1_position_name": ", ".join(pos_names) if pos_names else "L1 Territory Field Position",
+        "assigned_user_name": ", ".join(user_names) if user_names else "Unassigned Rep",
+        "active_outlet_count": b.active_outlet_count,
+    }
+
+
+def resolve_user_hierarchy_beats(user: User, db: Session) -> List[Beat]:
+    """
+    Collects beats assigned to:
+    1. Direct positions assigned to the user.
+    2. Any child/subordinate positions under the user's position hierarchy.
+    3. Direct beats assigned to subordinate users in the user's hierarchy.
+    Returns ONLY beats matching the user's position/hierarchy tree.
+    """
+    target_beat_ids = set()
+
+    pos_queue = list(getattr(user, "positions", []))
+    visited_pos = set()
+
+    while pos_queue:
+        pos = pos_queue.pop(0)
+        if not pos or pos.id in visited_pos or not getattr(pos, "is_active", True):
+            continue
+        visited_pos.add(pos.id)
+
+        for b in getattr(pos, "beats", []):
+            if getattr(b, "is_active", True):
+                target_beat_ids.add(b.id)
+
+        for child in getattr(pos, "direct_reports", []):
+            if child and child.id not in visited_pos:
+                pos_queue.append(child)
+
+    if target_beat_ids:
+        return db.query(Beat).filter(Beat.id.in_(target_beat_ids), Beat.is_active == True).order_by(Beat.name).all()
+
+    role_val = getattr(user.role, "value", str(user.role or ""))
+    if role_val == "admin":
+        return db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
+
+    return []
+
+
 @router.get("/beats")
 async def get_beats(
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
-    """List all active beats."""
-    beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
+    """List active beats filtered strictly by user position hierarchy."""
+    beats = resolve_user_hierarchy_beats(current_user, db)
     return {
-        "items": [
-            {
-                "id": b.id,
-                "name": b.name,
-                "code": b.code,
-                "beat_type": b.beat_type.value,
-                "beat_grade": b.beat_grade.value if b.beat_grade else None,
-                "territory_id": b.territory_id,
-            }
-            for b in beats
-        ]
+        "items": [_format_beat_item(b) for b in beats]
     }
 
 
@@ -349,31 +401,9 @@ async def get_my_beats(
     db: Session = Depends(get_db),
 ):
     """List beats assigned to the authenticated user via their positions."""
-    assigned_beat_ids = set()
-    if hasattr(current_user, "positions"):
-        for pos in current_user.positions:
-            if getattr(pos, "is_active", True):
-                for b in pos.beats:
-                    if b.is_active:
-                        assigned_beat_ids.add(b.id)
-
-    if assigned_beat_ids:
-        beats = db.query(Beat).filter(Beat.id.in_(assigned_beat_ids), Beat.is_active == True).order_by(Beat.name).all()
-    else:
-        beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-
+    beats = resolve_user_hierarchy_beats(current_user, db)
     return {
-        "items": [
-            {
-                "id": b.id,
-                "name": b.name,
-                "code": b.code,
-                "beat_type": b.beat_type.value,
-                "beat_grade": b.beat_grade.value if b.beat_grade else None,
-                "territory_id": b.territory_id,
-            }
-            for b in beats
-        ]
+        "items": [_format_beat_item(b) for b in beats]
     }
 
 
@@ -383,38 +413,11 @@ async def get_l1_position_beats(
     db: Session = Depends(get_db),
 ):
     """
-    List beats assigned to L1 positions under the user's position hierarchy.
-    Used by Territory Managers (Geography = Territory).
+    List beats assigned to positions under the user's position hierarchy.
     """
-    l1_beats = []
-    seen_ids = set()
-    if hasattr(current_user, "positions"):
-        for pos in current_user.positions:
-            if getattr(pos, "is_active", True):
-                # Traverse children positions (L1)
-                for child in getattr(pos, "children", []):
-                    if getattr(child, "is_active", True):
-                        for b in child.beats:
-                            if b.is_active and b.id not in seen_ids:
-                                seen_ids.add(b.id)
-                                l1_beats.append(b)
-
-    # Fallback to all assigned or active beats if hierarchy is unassigned
-    if not l1_beats:
-        l1_beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-
+    beats = resolve_user_hierarchy_beats(current_user, db)
     return {
-        "items": [
-            {
-                "id": b.id,
-                "name": b.name,
-                "code": b.code,
-                "beat_type": b.beat_type.value,
-                "beat_grade": b.beat_grade.value if b.beat_grade else None,
-                "territory_id": b.territory_id,
-            }
-            for b in l1_beats
-        ]
+        "items": [_format_beat_item(b) for b in beats]
     }
 
 

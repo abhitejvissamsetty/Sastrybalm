@@ -67,6 +67,9 @@ class Beat {
   final String name;
   final String code;
   final String beatType;
+  final String? l1PositionName;
+  final String? assignedUserName;
+  final int activeOutletCount;
   final List<Outlet> outlets;
 
   Beat({
@@ -74,14 +77,20 @@ class Beat {
     required this.name,
     required this.code,
     required this.beatType,
+    this.l1PositionName,
+    this.assignedUserName,
+    this.activeOutletCount = 0,
     required this.outlets,
   });
 
   factory Beat.fromJson(Map<String, dynamic> json) => Beat(
     id: json['id'],
-    name: json['name'],
-    code: json['code'],
+    name: json['name'] ?? '',
+    code: json['code'] ?? '',
     beatType: json['beat_type'] ?? 'GT',
+    l1PositionName: json['l1_position_name'],
+    assignedUserName: json['assigned_user_name'],
+    activeOutletCount: json['active_outlet_count'] ?? 0,
     outlets: [],
   );
 }

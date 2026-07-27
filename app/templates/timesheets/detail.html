@@ -3,113 +3,345 @@
 {% block title %}Timesheet {{ item.work_date }}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl space-y-6">
+<div class="space-y-6 pb-8">
 
-  <div class="flex items-center gap-x-4">
-    <a href="/operations/timesheets" class="text-slate-400 hover:text-white transition-colors">
-      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-      </svg>
-    </a>
-    <div>
-      <h1 class="text-2xl font-bold text-white">{{ item.work_date }}</h1>
-      <p class="mt-1 text-sm text-slate-400">{{ item.user.full_name if item.user else '—' }}</p>
+  <!-- ── Executive Breadcrumb & Header Bar ──────────────────────────────────────── -->
+  <div class="flex flex-col gap-y-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-xl shadow-2xl">
+    <div class="flex items-center gap-x-4">
+      <a href="/operations/timesheets" class="group flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700 hover:bg-slate-800 hover:text-white transition-all shadow-inner">
+        <svg class="h-5 w-5 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+        </svg>
+      </a>
+      <div>
+        <div class="flex items-center gap-x-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <span>Operations</span>
+          <span>/</span>
+          <a href="/operations/timesheets" class="hover:text-indigo-400 transition-colors">Timesheets</a>
+          <span>/</span>
+          <span class="text-indigo-400">{{ item.work_date }}</span>
+        </div>
+        <h1 class="text-2xl font-extrabold text-white tracking-tight mt-0.5 flex items-center gap-x-3">
+          Shift Audit Summary
+          <span class="text-sm font-normal text-slate-400 font-mono">#TS-{{ item.id }}</span>
+        </h1>
+      </div>
     </div>
-    {% if item.status.value == 'open' %}
-    <span class="inline-flex items-center rounded-full bg-amber-900/50 px-2.5 py-0.5 text-xs font-semibold text-amber-300">Open</span>
-    {% else %}
-    <span class="inline-flex items-center rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">Closed</span>
-    {% endif %}
-  </div>
 
-  <!-- Stats -->
-  <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-      <p class="text-xs text-slate-500 uppercase tracking-wider">Check-in</p>
-      <p class="mt-1 text-lg font-bold text-white">{{ item.checkin_time.strftime('%H:%M') if item.checkin_time else '—' }}</p>
-      {% if item.checkin_address %}<p class="text-xs text-slate-500 mt-0.5 truncate">{{ item.checkin_address }}</p>{% endif %}
-    </div>
-    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-      <p class="text-xs text-slate-500 uppercase tracking-wider">Check-out</p>
-      <p class="mt-1 text-lg font-bold text-white">{{ item.checkout_time.strftime('%H:%M') if item.checkout_time else '—' }}</p>
-    </div>
-    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-      <p class="text-xs text-slate-500 uppercase tracking-wider">Hours</p>
-      <p class="mt-1 text-lg font-bold text-white">{{ item.hours_worked ~ 'h' if item.hours_worked else '—' }}</p>
-    </div>
-    <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-      <p class="text-xs text-slate-500 uppercase tracking-wider">Visits</p>
-      <p class="mt-1 text-lg font-bold text-white">{{ item.visit_count }}</p>
-    </div>
-  </div>
+    <div class="flex items-center gap-x-3">
+      <!-- User Profile Badge -->
+      <div class="flex items-center gap-x-3 rounded-xl border border-slate-800 bg-slate-950/80 px-3.5 py-2">
+        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white text-xs shadow-md">
+          {{ item.user.full_name[:2].upper() if item.user and item.user.full_name else 'SR' }}
+        </div>
+        <div>
+          <p class="text-xs font-bold text-white">{{ item.user.full_name if item.user else '—' }}</p>
+          <p class="text-[11px] font-medium text-slate-400 capitalize">{{ item.user.role.value.replace('_', ' ') if item.user else 'Field Rep' }}</p>
+        </div>
+      </div>
 
-  <!-- Visit Records -->
-  {% if item.visits %}
-  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
-    <div class="px-5 py-4 border-b border-slate-700">
-      <h2 class="text-sm font-semibold text-slate-300">Visit Records</h2>
-    </div>
-    <table class="min-w-full divide-y divide-slate-700">
-      <thead>
-        <tr class="bg-slate-800">
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Time</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Outlet</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Purpose</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Distance</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Order</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-700/50">
-        {% for v in item.visits %}
-        <tr class="hover:bg-slate-800/60">
-          <td class="px-4 py-3 text-sm text-slate-300">{{ v.visit_time.strftime('%H:%M') }}</td>
-          <td class="px-4 py-3 text-sm font-medium text-white">{{ v.outlet.name if v.outlet else '—' }}</td>
-          <td class="px-4 py-3 text-sm text-slate-400 hidden sm:table-cell">{{ v.purpose or '—' }}</td>
-          <td class="px-4 py-3 text-sm hidden md:table-cell">
-            {% if v.distance_from_outlet is not none %}
-            <span class="{% if v.distance_from_outlet > 200 %}text-red-400{% else %}text-emerald-400{% endif %}">
-              {{ v.distance_from_outlet|int }}m
-            </span>
-            {% else %}
-            <span class="text-slate-600">—</span>
-            {% endif %}
-          </td>
-          <td class="px-4 py-3 text-sm hidden md:table-cell">
-            {% if v.order %}
-            <a href="/operations/orders/{{ v.order.id }}" class="font-mono text-indigo-400 hover:text-indigo-300 text-xs">{{ v.order.order_number }}</a>
-            {% else %}
-            <span class="text-slate-600">—</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="rounded-xl border border-slate-700/50 border-dashed p-8 text-center">
-    <p class="text-sm text-slate-500">No visits recorded for this day.</p>
-  </div>
-  {% endif %}
-
-  {% if item.notes %}
-  <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-    <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Notes</p>
-    <p class="text-sm text-slate-300">{{ item.notes }}</p>
-  </div>
-  {% endif %}
-
-  {% if item.checkin_lat and item.checkin_lng %}
-  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
-    <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
-      <h2 class="text-sm font-semibold text-slate-300">GPS Track</h2>
-      <span class="text-xs text-slate-500">Check-in
-        {% if item.checkout_lat and item.checkout_lng %}→ Check-out{% endif %}
+      <!-- Status Pill -->
+      {% if item.status.value == 'open' %}
+      <span class="inline-flex items-center gap-x-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1.5 text-xs font-bold text-amber-300 shadow-sm">
+        <span class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
+        SHIFT IN PROGRESS
       </span>
+      {% else %}
+      <span class="inline-flex items-center gap-x-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-bold text-emerald-400 shadow-sm">
+        <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+        SHIFT COMPLETED
+      </span>
+      {% endif %}
     </div>
-    <div id="ts-map" style="height:320px"></div>
   </div>
-  {% endif %}
+
+  <!-- ── Metric Cards Grid ────────────────────────────────────────────────────────── -->
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <!-- Check-In Card -->
+    <div class="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-5 backdrop-blur-md transition-all hover:border-slate-700 hover:bg-slate-900/80">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Check-In Time</span>
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l3 3m0 0-3 3m3-3H2.25" />
+          </svg>
+        </div>
+      </div>
+      <div class="mt-3">
+        <p class="text-2xl font-black text-white tracking-tight">
+          {{ item.checkin_time.strftime('%I:%M %p') if item.checkin_time else '—' }}
+        </p>
+        {% if item.checkin_address %}
+        <p class="mt-1 text-xs text-slate-400 truncate flex items-center gap-x-1" title="{{ item.checkin_address }}">
+          <svg class="h-3 w-3 flex-shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+          </svg>
+          {{ item.checkin_address }}
+        </p>
+        {% else %}
+        <p class="mt-1 text-xs text-slate-500">GPS Verified Location</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Check-Out Card -->
+    <div class="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-5 backdrop-blur-md transition-all hover:border-slate-700 hover:bg-slate-900/80">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Check-Out Time</span>
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+          </svg>
+        </div>
+      </div>
+      <div class="mt-3">
+        <p class="text-2xl font-black text-white tracking-tight">
+          {{ item.checkout_time.strftime('%I:%M %p') if item.checkout_time else 'Active' }}
+        </p>
+        {% if item.checkout_address %}
+        <p class="mt-1 text-xs text-slate-400 truncate flex items-center gap-x-1" title="{{ item.checkout_address }}">
+          <svg class="h-3 w-3 flex-shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+          </svg>
+          {{ item.checkout_address }}
+        </p>
+        {% else %}
+        <p class="mt-1 text-xs text-slate-500">{{ 'End workday pending' if item.status.value == 'open' else 'GPS Location Tracked' }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Duration Card -->
+    <div class="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-5 backdrop-blur-md transition-all hover:border-slate-700 hover:bg-slate-900/80">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Shift Duration</span>
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+        </div>
+      </div>
+      <div class="mt-3">
+        <p class="text-2xl font-black text-white tracking-tight">
+          {{ item.hours_worked ~ ' hrs' if item.hours_worked else '—' }}
+        </p>
+        <div class="mt-2 flex items-center gap-x-2">
+          <div class="h-1.5 flex-1 rounded-full bg-slate-800 overflow-hidden">
+            {% set pct = ((item.hours_worked or 0) / 8.0 * 100)|int %}
+            <div class="h-full bg-emerald-400 rounded-full" style="width: {{ pct if pct <= 100 else 100 }}%"></div>
+          </div>
+          <span class="text-[10px] font-bold text-slate-400">{{ pct }}% Shift</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visits Summary Card -->
+    <div class="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-5 backdrop-blur-md transition-all hover:border-slate-700 hover:bg-slate-900/80">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Outlet Visits</span>
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36rem" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21V8.25L12 2.25l8.25 6V21" />
+          </svg>
+        </div>
+      </div>
+      <div class="mt-3">
+        <p class="text-2xl font-black text-white tracking-tight">
+          {{ item.visit_count }}
+        </p>
+        <p class="mt-1 text-xs text-slate-400 flex items-center gap-x-1">
+          <span class="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400"></span>
+          {{ 'Beat Outlets Covered' if item.visit_count > 0 else 'No Outlet Visits Yet' }}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main Content Grid (Left: Timeline & Visits | Right: Interactive GPS Track) ── -->
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+    
+    <!-- Left Column (7 Cols) -->
+    <div class="lg:col-span-7 space-y-6">
+
+      <!-- Shift Notes if Present -->
+      {% if item.notes %}
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-md">
+        <div class="flex items-center gap-x-2 text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+          <svg class="h-4 w-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+          </svg>
+          Shift Check-Out Notes
+        </div>
+        <p class="text-sm text-slate-200 leading-relaxed font-medium bg-slate-950/60 rounded-xl p-3.5 border border-slate-800/80">
+          "{{ item.notes }}"
+        </p>
+      </div>
+      {% endif %}
+
+      <!-- Visit Records Table / Timeline -->
+      <div class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-xl shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-800 px-5 py-4 bg-slate-950/50">
+          <div class="flex items-center gap-x-2.5">
+            <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36" />
+              </svg>
+            </div>
+            <h2 class="text-base font-bold text-white tracking-tight">Recorded Outlet Visits</h2>
+          </div>
+          <span class="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-xs font-bold text-slate-300">
+            {{ item.visits|length }} Recorded
+          </span>
+        </div>
+
+        {% if item.visits %}
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-800/80">
+            <thead>
+              <tr class="bg-slate-950/40 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <th class="px-5 py-3 text-left">Time</th>
+                <th class="px-5 py-3 text-left">Outlet Name</th>
+                <th class="px-5 py-3 text-left">Purpose</th>
+                <th class="px-5 py-3 text-center">GPS Verify</th>
+                <th class="px-5 py-3 text-right">Order Ref</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50 text-sm">
+              {% for v in item.visits %}
+              <tr class="group hover:bg-slate-800/40 transition-colors">
+                <td class="whitespace-nowrap px-5 py-3.5 font-mono text-xs font-bold text-slate-300">
+                  {{ v.visit_time.strftime('%I:%M %p') }}
+                </td>
+                <td class="px-5 py-3.5">
+                  <p class="font-bold text-white group-hover:text-indigo-400 transition-colors">
+                    {{ v.outlet.name if v.outlet else '—' }}
+                  </p>
+                  {% if v.outlet and v.outlet.code %}
+                  <p class="text-[11px] font-mono text-slate-500">{{ v.outlet.code }}</p>
+                  {% endif %}
+                </td>
+                <td class="px-5 py-3.5 text-xs text-slate-400">
+                  <span class="inline-flex items-center rounded-md bg-slate-800/80 border border-slate-700/60 px-2 py-0.5 font-medium text-slate-300">
+                    {{ v.purpose or 'Regular Check' }}
+                  </span>
+                </td>
+                <td class="whitespace-nowrap px-5 py-3.5 text-center">
+                  {% if v.distance_from_outlet is not none %}
+                    {% if v.distance_from_outlet <= 200 %}
+                    <span class="inline-flex items-center gap-x-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-bold text-emerald-400">
+                      <svg class="h-3 w-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                      </svg>
+                      {{ v.distance_from_outlet|int }}m
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-x-1 rounded-full bg-red-500/10 border border-red-500/30 px-2.5 py-0.5 text-xs font-bold text-red-400" title="Outside geofence (>200m)">
+                      <svg class="h-3 w-3 text-red-400" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                      </svg>
+                      {{ v.distance_from_outlet|int }}m
+                    </span>
+                    {% endif %}
+                  {% else %}
+                  <span class="text-xs text-slate-500">—</span>
+                  {% endif %}
+                </td>
+                <td class="whitespace-nowrap px-5 py-3.5 text-right">
+                  {% if v.order %}
+                  <a href="/operations/orders/{{ v.order.id }}" class="inline-flex items-center gap-x-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 px-2.5 py-1 text-xs font-mono font-bold text-indigo-400 hover:bg-indigo-500/20 transition-all">
+                    #{{ v.order.order_number }}
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                  </a>
+                  {% else %}
+                  <span class="text-xs text-slate-500 font-mono">No Order</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="p-10 text-center">
+          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800/80 border border-slate-700 text-slate-400">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+            </svg>
+          </div>
+          <p class="mt-3 text-sm font-bold text-slate-300">No Outlet Visits Recorded</p>
+          <p class="mt-1 text-xs text-slate-400 max-w-sm mx-auto">No outlet visits were logged for this workday shift. Future visit check-ins will automatically populate here.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Right Column (5 Cols) - Interactive High-Tech Map -->
+    <div class="lg:col-span-5">
+      <div class="sticky top-6 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-xl shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-800 px-5 py-4 bg-slate-950/60">
+          <div class="flex items-center gap-x-2.5">
+            <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.816a1.688 1.688 0 0 0-1.006 0L3.622 5.75A1.125 1.125 0 0 0 3 6.756v12.42c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-base font-bold text-white tracking-tight">GPS Track & Route Map</h2>
+              <p class="text-[11px] text-slate-400">Live Geolocation Path & Geofence Logs</p>
+            </div>
+          </div>
+          <span class="rounded-lg bg-slate-800/80 border border-slate-700 px-2.5 py-1 text-[11px] font-mono font-bold text-slate-300">
+            Check-In → Check-Out
+          </span>
+        </div>
+
+        {% if item.checkin_lat and item.checkin_lng %}
+        <div class="relative">
+          <div id="ts-map" class="w-full z-10" style="height: 480px;"></div>
+
+          <!-- Map Legend Overlay -->
+          <div class="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/85 p-3 backdrop-blur-md shadow-lg text-xs">
+            <div class="flex items-center gap-x-4">
+              <div class="flex items-center gap-x-1.5">
+                <span class="h-2.5 w-2.5 rounded-full bg-indigo-500 ring-2 ring-indigo-400/40"></span>
+                <span class="font-medium text-slate-300">Check-In</span>
+              </div>
+              <div class="flex items-center gap-x-1.5">
+                <span class="h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-amber-400/40"></span>
+                <span class="font-medium text-slate-300">Check-Out</span>
+              </div>
+              <div class="flex items-center gap-x-1.5">
+                <span class="h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-emerald-400/40"></span>
+                <span class="font-medium text-slate-300">Visit</span>
+              </div>
+            </div>
+            <button onclick="fitMapBounds()" class="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-bold text-indigo-300 hover:bg-slate-700 transition-colors">
+              Reset View ⟲
+            </button>
+          </div>
+        </div>
+        {% else %}
+        <div class="p-12 text-center">
+          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800/80 border border-slate-700 text-slate-500">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+            </svg>
+          </div>
+          <p class="mt-3 text-sm font-bold text-slate-300">No GPS Coordinates Recorded</p>
+          <p class="mt-1 text-xs text-slate-400">GPS location was disabled or unavailable during check-in for this shift.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
 
 </div>
 {% endblock %}
@@ -117,6 +349,9 @@
 {% block scripts %}
 {% if item.checkin_lat and item.checkin_lng %}
 <script>
+let map;
+let allBounds = [];
+
 (function() {
   const checkinLat  = {{ item.checkin_lat }};
   const checkinLng  = {{ item.checkin_lng }};
@@ -128,41 +363,76 @@
   const hasCheckout = false;
   {% endif %}
 
-  const map = L.map("ts-map", { zoomControl: true }).setView([checkinLat, checkinLng], 14);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap contributors", maxZoom: 19,
+  allBounds.push([checkinLat, checkinLng]);
+
+  map = L.map("ts-map", { zoomControl: true }).setView([checkinLat, checkinLng], 15);
+  
+  // Sleek Dark Matter / CartoDB Voyager Tile Layer
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    attribution: "© OpenStreetMap © CARTO",
+    maxZoom: 19,
+    subdomains: 'abcd'
   }).addTo(map);
 
-  function pinIcon(color) {
+  function pinIcon(color, pulse = false) {
     return L.divIcon({
       className: "",
-      html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2.5px solid rgba(255,255,255,0.9);box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>`,
-      iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -10],
+      html: `<div style="position:relative;width:18px;height:18px;border-radius:50%;background:${color};border:3px solid #09090B;box-shadow:0 0 12px ${color}80">
+              ${pulse ? `<div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid ${color};animation:ping 1.8s infinite;opacity:0.7"></div>` : ''}
+            </div>`,
+      iconSize: [18, 18], iconAnchor: [9, 9], popupAnchor: [0, -12],
     });
   }
 
-  L.marker([checkinLat, checkinLng], { icon: pinIcon("#6366f1") })
-    .bindPopup(`<b>Check-in</b><br>{{ item.checkin_time.strftime('%H:%M') if item.checkin_time else '' }}<br>{{ item.checkin_address or '' }}`)
+  // Check-In Marker
+  L.marker([checkinLat, checkinLng], { icon: pinIcon("#6366f1", true) })
+    .bindPopup(`<div style="font-family:Inter,sans-serif;color:#0f172a;padding:2px">
+                  <div style="font-weight:800;font-size:13px;color:#4338ca">Check-In Location</div>
+                  <div style="font-size:11px;color:#64748b;margin-top:2px">{{ item.checkin_time.strftime('%I:%M %p') if item.checkin_time else '' }}</div>
+                  <div style="font-size:11px;color:#334155;margin-top:4px">{{ item.checkin_address or 'Coordinates Verified' }}</div>
+                </div>`)
     .addTo(map);
 
   {% for v in item.visits %}
   {% if v.gps_lat and v.gps_lng %}
+  allBounds.push([{{ v.gps_lat }}, {{ v.gps_lng }}]);
   L.marker([{{ v.gps_lat }}, {{ v.gps_lng }}], {
     icon: pinIcon({{ '"#10b981"' if v.distance_from_outlet is none or v.distance_from_outlet <= 200 else '"#ef4444"' }})
-  }).bindPopup(`<b>Visit</b> — {{ v.outlet.name if v.outlet else '—' }}<br>{{ v.visit_time.strftime('%H:%M') }}<br>{{ v.purpose or '' }}`).addTo(map);
+  }).bindPopup(`<div style="font-family:Inter,sans-serif;color:#0f172a;padding:2px">
+                  <div style="font-weight:800;font-size:13px;color:#0f172a">{{ v.outlet.name if v.outlet else 'Outlet Visit' }}</div>
+                  <div style="font-size:11px;color:#64748b;margin-top:2px">Time: {{ v.visit_time.strftime('%I:%M %p') }}</div>
+                  <div style="font-size:11px;color:#334155;margin-top:2px">Purpose: {{ v.purpose or 'Regular Check' }}</div>
+                </div>`).addTo(map);
   {% endif %}
   {% endfor %}
 
   if (hasCheckout) {
-    L.marker([checkoutLat, checkoutLng], { icon: pinIcon("#f59e0b") })
-      .bindPopup(`<b>Check-out</b><br>{{ item.checkout_time.strftime('%H:%M') if item.checkout_time else '' }}`)
+    allBounds.push([checkoutLat, checkoutLng]);
+    L.marker([checkoutLat, checkoutLng], { icon: pinIcon("#f59e0b", false) })
+      .bindPopup(`<div style="font-family:Inter,sans-serif;color:#0f172a;padding:2px">
+                    <div style="font-weight:800;font-size:13px;color:#b45309">Check-Out Location</div>
+                    <div style="font-size:11px;color:#64748b;margin-top:2px">{{ item.checkout_time.strftime('%I:%M %p') if item.checkout_time else '' }}</div>
+                  </div>`)
       .addTo(map);
+
     L.polyline([[checkinLat, checkinLng], [checkoutLat, checkoutLng]], {
-      color: "#6366f1", weight: 2, dashArray: "5 6", opacity: 0.6,
+      color: "#6366f1", weight: 3, dashArray: "6 8", opacity: 0.85,
     }).addTo(map);
-    map.fitBounds([[checkinLat, checkinLng], [checkoutLat, checkoutLng]], { padding: [30, 30] });
   }
+
+  fitMapBounds();
 })();
+
+function fitMapBounds() {
+  if (map && allBounds.length > 0) {
+    if (allBounds.length === 1) {
+      map.setView(allBounds[0], 15);
+    } else {
+      map.fitBounds(allBounds, { padding: [40, 40] });
+    }
+  }
+}
 </script>
 {% endif %}
 {% endblock %}
+

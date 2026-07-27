@@ -448,3 +448,29 @@ All Web UI routes are structured with section prefixes corresponding to their si
 - **Position Assignment Display**: Renders indigo pill badges containing the Position name (`pos.name`) assigned to each Beat via the `position_beats` junction table (`Beat.positions`).
 - **Unassigned Fallback Badge**: If no position is assigned to a Beat (`not item.positions`), displays a distinct amber badge: **`Unassigned`** (`bg-amber-500/10 text-amber-400 border-amber-500/20`).
 - **Search & Eager Loading Optimization**: `app/routers/beats.py` uses SQLAlchemy `selectinload(Beat.positions)` for zero N+1 queries, and enables searching beats by position name or code via `q` filter.
+
+### L. Docker 502 Fix — MySQL User Provisioning Race Condition
+- **Root Cause**: Docker Compose `depends_on: condition: service_healthy` only waits for MySQL root ping, NOT for `safar_user` grants to be applied — causing `(1045, Access Denied)` for `safar_user` every cold-start and crashing `entrypoint.sh` (which used `set -e`), preventing Gunicorn from ever starting → 502.
+- **`db_migrate.py` — `wait_and_provision_db()`**: Added a retry loop (30 attempts × 2s) that connects as `safar_user`. On `1045` or `1049` errors, it auto-provisions using root credentials:
+  - `CREATE DATABASE IF NOT EXISTS safar_db`
+  - `CREATE USER IF NOT EXISTS safar_user@'%'` + `ALTER USER` (resets password if already exists)
+  - `GRANT ALL PRIVILEGES ON safar_db.* TO safar_user@'%'; FLUSH PRIVILEGES;`
+  - Disposes SQLAlchemy pool after provisioning so next retry uses fresh connections.
+  - Root password read from `MYSQL_ROOT_PASSWORD` env var (falls back to `rootpassword`).
+- **`docker-compose.yml`**: Added `MYSQL_ROOT_PASSWORD` env var to `app` service so provisioning code can connect as root.
+- **`entrypoint.sh`**: Added TCP-level port wait (`/dev/tcp/${DB_HOST}/${DB_PORT}`, 60 retries × 2s) before migrations run. Migration failure is non-fatal (`|| echo WARNING`) so Gunicorn always starts even if migration fails.
+
+### M. MRStatus Enum — Valid Values & Stale Reference Fixes
+- **`MRStatus` Enum** (`app/models/material_request.py`) valid values (in lifecycle order):
+  ```
+  draft → submitted → vendor_assigned → recce_completed →
+  quotation_submitted → quotation_approved → work_order_issued →
+  qc_pending → completed | cancelled
+  ```
+- **Never valid**: `MRStatus.acknowledged`, `MRStatus.in_progress` — these do NOT exist in the enum.
+- **Files fixed** (stale `acknowledged`/`in_progress` references replaced):
+  - `app/routers/approvals.py` — `/action-center/approvals` was returning 500; fixed pending MR filter to use all 7 non-terminal statuses.
+  - `app/routers/analytics.py` — marketing KPI pending MR count fixed.
+  - `app/routers/material_requests.py` — "Approved" action now transitions to `vendor_assigned`; work order creation transitions to `work_order_issued`.
+- **Rule**: When filtering "pending" material requests, use `~MaterialRequest.status.in_([MRStatus.completed, MRStatus.cancelled])` (negation of terminals) rather than listing specific pending states, to be future-proof.
+

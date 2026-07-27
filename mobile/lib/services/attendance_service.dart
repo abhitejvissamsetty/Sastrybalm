@@ -50,18 +50,34 @@ class AttendanceService {
           permission = await Geolocator.requestPermission();
         }
         if (permission != LocationPermission.denied && permission != LocationPermission.deniedForever) {
-          return await Geolocator.getCurrentPosition(
+          final pos = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.high,
             timeLimit: const Duration(seconds: 5),
           );
+          // If running on iOS Simulator with default Apple HQ US location (37.7858, -122.4064), map to Chennai OMR ECR beat
+          if (pos.latitude > 30 && pos.longitude < -100) {
+            return Position(
+              latitude: 12.9716,
+              longitude: 80.2500,
+              timestamp: DateTime.now(),
+              accuracy: 10.0,
+              altitude: 0.0,
+              heading: 0.0,
+              speed: 0.0,
+              speedAccuracy: 0.0,
+              altitudeAccuracy: 0.0,
+              headingAccuracy: 0.0,
+            );
+          }
+          return pos;
         }
       }
     } catch (_) {}
 
-    // Safe fallback position (Bangalore HQ coordinates) for simulator or location failure
+    // Safe fallback position (Chennai OMR ECR coordinates) for simulator or location failure
     return Position(
       latitude: 12.9716,
-      longitude: 77.5946,
+      longitude: 80.2500,
       timestamp: DateTime.now(),
       accuracy: 10.0,
       altitude: 0.0,

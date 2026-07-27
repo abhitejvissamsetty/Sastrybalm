@@ -29,9 +29,50 @@ The Safar Mobile App is built with **Flutter 3.x**, **Riverpod 2.x**, **GoRouter
   - **Edit Outlet**: Submits changes via `POST /outlets/{id}/edit-request` for Approval Flow.
   - **Submit Outlet Outcomes**: Secondary Orders (`order_type="secondary"`), Payments, Asset Capitalizations, Material Requests, and Asset Maintenance Logs.
   - **Map View**: View Outlets associated with Beat in Map View.
-- **Apply for Leave**: Submit Leave Applications (`POST /leaves`, `GET /leaves/my-leaves`).
+- **Apply for Leave**: Submit Leave Applications (`POST /leaves`, `GET /leaves/my-leaves`). Hidden for Vendor Admin and Vendor Technician roles across all app screens.
 - **Journey Plan**: View personal route and scheduled visits (`GET /journey-plan`).
 - **EIS (Employee Information System)**: Personal stats (Secondary Orders, Payments, Assets, MR Statuses, Attendance Days, Working Hours, Productivity KPIs).
+
+### 6. Start Retailing, Quick Actions Structure & Beat Route View
+- **Role-Based Access Rules**:
+  - **Start Retailing**: Available for both L1 Users (Field Reps) and L2/L3/L4 Users (Territory Managers, Regional Managers, Admins).
+  - **Card Design System & Shift State Color Inversion**:
+  - **Workday Hero Card (Dynamic Color Inversion on Shift Check-In)**:
+    - **Before Starting Shift (`isCheckedIn == false`)**: Rendered in **Light White (`#FFFFFF`)** with `#E4E4E7` border, black title (*Ready to Start Your Shift?*), grey subtitle, and **Black Pill Button (`Begin Workday`)**.
+    - **After Starting Shift (`isCheckedIn == true` / Shift In Progress)**: Colors dynamically **INVERT into Dark Zinc (`#09090B`)** with `#27272A` border, white title (*Shift In Progress*), green status dot, and **White Pill Button (`End Workday`)**.
+  - **White Background / Black Text Cards (Always `isDark: false`)**:
+    - **Create Primary Card**: Full-width **White Card (`#FFFFFF`)** with `#E4E4E7` border, black title, grey description, and dark button (*Create Primary Order Now*).
+    - **Apply Leave Card**: Full-width **White Card (`#FFFFFF`)** with `#E4E4E7` border, black title, and grey subtitle.
+  - **Dynamic Inversion Action Tiles**:
+    - **Start Retailing** & **Joint Working**:
+      - **Before Starting Shift (`isCheckedIn == false`)**: Rendered in **Light White (`#FFFFFF`)** with `#E4E4E7` borders, dark icons `#09090B`, and dark text.
+      - **After Starting Shift (`isCheckedIn == true`)**: Colors dynamically **INVERT to Dark Zinc (`#09090B`)** with `#27272A` borders, white text, and white icons on `#18181B` containers.
+- **Quick Actions Layout Hierarchy**:
+    - Row 1 (Side-by-side): `Start Retailing` | `Joint Working`
+    - Row 2 (Full Width Card): `Create Primary`
+    - Row 3 (Full Width Card): `Apply Leave` (hidden for `vendor_admin` & `vendor_technician`)
+  - **L1 Quick Actions Structure**:
+    - 2-Column Grid: `Start Retailing` | `Apply Leave` (No `Create Primary` or `Joint Working`)
+  - **App Drawer (Modal Bottom Sheet)**:
+  - Tapping **Start Retailing** slides up an interactive App Drawer (`isScrollControlled: true`, `enableDrag: true`).
+  - Dismissible via out-focusing (backdrop tap) or throwing down swipe.
+  - Includes a top **Search Bar** to filter available beats dynamically by beat name, beat code, L1 position name, or assigned user.
+  - **Dynamic API Filter-Based Hierarchy Resolution (No Hardcoding)**: `resolve_user_hierarchy_beats` evaluates position hierarchy relationships dynamically via SQL/ORM (`user_positions` → `positions` → `direct_reports` → `position_beats`). No beat names, codes, or IDs are hardcoded for inclusion or exclusion in any way; beats outside the authenticated user's position tree (such as `LAALPAHAD` under Odisha) or unassigned beats are naturally excluded by dynamic database query filtering.
+  - Displays full-width beat cards with:
+    - Beat Name & Beat Code badge.
+    - **Info under Beat Title**:
+      - `Position: [L1 Position Name / Code]` (`l1PositionName`)
+      - `Assigned User: [User Full Name]` (`assignedUserName`)
+    - Active Outlets count badge & selection chevron arrow.
+- **Beat Page (Outlets View - `/beat`)**:
+  - Placed **outside `ShellRoute`** in `app.dart` so it renders full-screen **without the bottom footer menu**.
+  - Shows all active outlets in full-width cards displaying:
+    - Outlet Name & Outlet Code / ID tag (`OUT-xxxx`).
+    - **Phone Number** (`outlet.mobile`, with phone icon `Icons.phone_rounded`).
+    - Owner Name, Address, Channel badge, and distance.
+  - **Dual Action Controls**:
+    - 🔍 **Search FAB**: Toggles inline search bar to search outlets by name, code, phone, or owner.
+    - 📍 **New Outlet FAB**: Navigates to a dedicated full-screen page (`/outlet/new`, `OutletCreateScreen`) to register a new customer shop with complete form validation, beat assignment, and GPS tag capture.
 
 ### 2. Territory Managers (Geography = Territory)
 - **Log In & Shift**: Start Day, End Day, Log Out.

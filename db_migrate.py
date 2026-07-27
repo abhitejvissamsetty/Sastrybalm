@@ -237,6 +237,10 @@ def run_migrations():
 
         # Material Requests & Vendors
         add_column_safely(conn, "material_requests", "vendor_id", "INT NULL")
+        add_column_safely(conn, "material_requests", "approx_dimensions", "VARCHAR(255) NULL")
+        add_column_safely(conn, "material_requests", "client_notes", "TEXT NULL")
+        add_column_safely(conn, "material_requests", "material_specifications", "TEXT NULL")
+        add_column_safely(conn, "material_requests", "request_type", "VARCHAR(50) NOT NULL DEFAULT 'procurement'")
 
         # Work Orders
         add_column_safely(conn, "work_orders", "material_request_id", "INT NULL")
@@ -335,6 +339,7 @@ def run_migrations():
         add_column_safely(conn, "timesheets", "approved_at", "DATETIME NULL")
         add_column_safely(conn, "timesheets", "rejection_reason", "TEXT NULL")
         add_column_safely(conn, "timesheets", "activity_type", "VARCHAR(100) NULL")
+        add_column_safely(conn, "timesheets", "hours_worked", "DECIMAL(5,2) NULL")
         try:
             conn.execute(text("ALTER TABLE timesheets ADD CONSTRAINT fk_timesheet_attendance FOREIGN KEY (attendance_id) REFERENCES attendance(id) ON DELETE SET NULL"))
         except Exception: pass
@@ -353,6 +358,13 @@ def run_migrations():
         for tbl in archival_tables:
             add_column_safely(conn, tbl, "is_archived", "BOOLEAN NOT NULL DEFAULT 0")
             add_column_safely(conn, tbl, "archived_at", "DATETIME NULL")
+
+        # Asset Capitalizations - QC and procurement fields
+        add_column_safely(conn, "asset_capitalizations", "qc_verified", "VARCHAR(50) NOT NULL DEFAULT 'pending'")
+        add_column_safely(conn, "asset_capitalizations", "qc_notes", "TEXT NULL")
+        add_column_safely(conn, "asset_capitalizations", "procurement_item_id", "INT NULL")
+        add_column_safely(conn, "asset_capitalizations", "sync_retries", "INT NOT NULL DEFAULT 0")
+        add_column_safely(conn, "asset_capitalizations", "vendor_employee_id", "INT NULL")
 
         # Warehouses
         add_column_safely(conn, "warehouses", "contact_person", "VARCHAR(255) NULL")

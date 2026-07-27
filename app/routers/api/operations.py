@@ -18,7 +18,7 @@ from app.models.beat import Beat
 from app.models.company import CompanyProfile
 from app.models.expense import Expense, ExpenseCategory, ExpenseStatus
 from app.models.material_request import MaterialRequest, MRStatus
-from app.models.order import Order, OrderItem, OrderStatus, FlowType, SyncStatus
+from app.models.order import Order, OrderItem, OrderStatus, FlowType, SyncStatus, OrderType
 from app.services.sync import sync_order_to_connect, sync_order_to_zap
 from app.models.outlet import Outlet, OutletStatus
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
@@ -1178,14 +1178,17 @@ async def get_subordinate_beats(
     if not sub_user:
         raise HTTPException(status_code=404, detail="Subordinate user not found.")
 
-    pos_ids = [p.id for p in sub_user.positions]
-    if pos_ids:
-        beats = db.query(Beat).filter(
-            Beat.is_active == True,
-            Beat.position_id.in_(pos_ids),
-        ).order_by(Beat.name).all()
+    beat_ids = set()
+    for pos in getattr(sub_user, "positions", []):
+        if getattr(pos, "is_active", True):
+            for b in getattr(pos, "beats", []):
+                if getattr(b, "is_active", True):
+                    beat_ids.add(b.id)
+
+    if beat_ids:
+        beats = db.query(Beat).filter(Beat.id.in_(beat_ids), Beat.is_active == True).order_by(Beat.name).all()
     else:
-        beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
+        beats = []
 
     return {
         "items": [
