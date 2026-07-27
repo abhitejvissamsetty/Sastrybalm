@@ -7,7 +7,7 @@
 
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-x-4">
-      <a href="/orders" class="text-slate-400 hover:text-white transition-colors">
+      <a href="/operations/orders" class="text-slate-400 hover:text-white transition-colors">
         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
         </svg>
@@ -36,7 +36,7 @@
     {% if current_user.role.value in ['admin', 'territory_manager'] %}
     <div class="flex items-center gap-x-2">
       {% if item.status.value not in ['cancelled', 'delivered'] %}
-      <form method="post" action="/orders/{{ item.id }}/status" class="flex items-center gap-x-2">
+      <form method="post" action="/operations/orders/{{ item.id }}/status" class="flex items-center gap-x-2">
         <select name="new_status"
                 class="rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
           {% for s in OrderStatus %}
@@ -50,7 +50,7 @@
           Update
         </button>
       </form>
-      <form method="post" action="/orders/{{ item.id }}/status"
+      <form method="post" action="/operations/orders/{{ item.id }}/status"
             onsubmit="return confirmSubmit(event, 'Cancel this order? This action cannot be undone.', 'Cancel Order', 'danger')">
         <input type="hidden" name="new_status" value="cancelled">
         <button type="submit"
@@ -65,7 +65,7 @@
       {% endif %}
       {% endif %}
       {% if current_user.role.value in ['admin', 'territory_manager'] and item.flow_type.value == 'connect' and item.status.value in ['submitted', 'confirmed'] %}
-      <form method="post" action="/orders/{{ item.id }}/sync-connect" class="inline">
+      <form method="post" action="/operations/orders/{{ item.id }}/sync-connect" class="inline">
         <button type="submit"
                 class="inline-flex items-center gap-x-1.5 rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-600 transition-colors">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -102,7 +102,7 @@
       {% endif %}
 
       {% if current_user.role.value in ['admin', 'territory_manager'] %}
-      <form method="post" action="/orders/{{ item.id }}/allocate-channel-partner" class="mt-2 flex items-center gap-2">
+      <form method="post" action="/operations/orders/{{ item.id }}/allocate-channel-partner" class="mt-2 flex items-center gap-2">
         <select name="channel_partner_id" class="w-full text-xs rounded bg-slate-900 border border-slate-700 text-white px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500">
           <option value="">-- Select Channel Partner --</option>
           {% for cp in available_channel_partners %}
@@ -194,7 +194,7 @@
     </div>
 
     <!-- Record Payment Form -->
-    <form id="record-payment-form" action="/orders/{{ item.id }}/record-payment" method="post" class="hidden space-y-4 bg-slate-900/80 p-5 rounded-xl border border-slate-700">
+    <form id="record-payment-form" action="/operations/orders/{{ item.id }}/record-payment" method="post" class="hidden space-y-4 bg-slate-900/80 p-5 rounded-xl border border-slate-700">
       <h3 class="text-sm font-bold text-white">Record New Collection</h3>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>

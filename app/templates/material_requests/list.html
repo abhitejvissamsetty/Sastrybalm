@@ -35,7 +35,7 @@
       Filter
     </button>
     {% if status or user_id %}
-    <a href="/material-requests"
+    <a href="/operations/material-requests"
        class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">
       Clear
     </a>
@@ -80,7 +80,7 @@
             {{ item.submitted_at.strftime('%Y-%m-%d') if item.submitted_at else '—' }}
           </td>
           <td class="px-4 py-3 text-right text-sm">
-            <a href="/material-requests/{{ item.id }}"
+            <a href="/operations/material-requests/{{ item.id }}"
                class="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">Detail</a>
           </td>
         </tr>
@@ -94,7 +94,7 @@
       </tbody>
     </table>
     {% set qs = "status=" ~ status ~ "&user_id=" ~ user_id %}
-    {{ paginate(pagination, "/material-requests?" ~ qs) }}
+    {{ paginate(pagination, "/operations/material-requests?" ~ qs) }}
   </div>
 
 </div>

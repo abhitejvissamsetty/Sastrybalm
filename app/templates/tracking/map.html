@@ -174,7 +174,7 @@ async function loadData() {
       ${c.address ? popupRow("Address", c.address) : ""}
       ${c.hours ? popupRow("Hours", c.hours + "h") : ""}
       <div style="margin-top:6px">
-        <a href="/timesheets/${c.id}" style="color:#818cf8;font-size:12px">View Timesheet →</a>
+        <a href="/operations/timesheets/${c.id}" style="color:#818cf8;font-size:12px">View Timesheet →</a>
       </div>`;
 
     L.marker([c.lat, c.lng], { icon: makeIcon("#6366f1", 14) })
@@ -226,7 +226,7 @@ async function loadData() {
       ${o.code ? popupRow("Code", o.code) : ""}
       ${o.channel ? popupRow("Channel", o.channel) : ""}
       <div style="margin-top:6px">
-        <a href="/outlets/${o.id}" style="color:#818cf8;font-size:12px">View Outlet →</a>
+        <a href="/master-data/outlets/${o.id}" style="color:#818cf8;font-size:12px">View Outlet →</a>
       </div>`;
 
     L.circleMarker([o.lat, o.lng], {

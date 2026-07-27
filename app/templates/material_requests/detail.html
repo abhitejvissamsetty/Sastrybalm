@@ -7,7 +7,7 @@
 
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-x-4">
-      <a href="/material-requests" class="text-slate-400 hover:text-white transition-colors">
+      <a href="/operations/material-requests" class="text-slate-400 hover:text-white transition-colors">
         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
         </svg>
@@ -25,15 +25,15 @@
 
     {% if current_user.role.value in ['admin', 'territory_manager'] %}
     <div class="flex items-center gap-x-2">
-      <form method="post" action="/material-requests/{{ item.id }}/status" class="inline">
+      <form method="post" action="/operations/material-requests/{{ item.id }}/status" class="inline">
         <input type="hidden" name="new_status" value="Approved">
         <button type="submit" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500">Approve Request</button>
       </form>
-      <form method="post" action="/material-requests/{{ item.id }}/status" class="inline">
+      <form method="post" action="/operations/material-requests/{{ item.id }}/status" class="inline">
         <input type="hidden" name="new_status" value="Held">
         <button type="submit" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500">Hold</button>
       </form>
-      <form method="post" action="/material-requests/{{ item.id }}/status" class="inline">
+      <form method="post" action="/operations/material-requests/{{ item.id }}/status" class="inline">
         <input type="hidden" name="new_status" value="Rejected">
         <button type="submit" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500">Reject</button>
       </form>
@@ -69,7 +69,7 @@
 
       {% if current_user.role.value in ['admin', 'territory_manager'] %}
         {% if can_map_vendor %}
-        <form method="post" action="/material-requests/{{ item.id }}/assign-vendor" class="space-y-2 pt-2 border-t border-indigo-900/60">
+        <form method="post" action="/operations/material-requests/{{ item.id }}/assign-vendor" class="space-y-2 pt-2 border-t border-indigo-900/60">
           <label class="block text-[10px] font-semibold text-slate-300 uppercase">Assign / Reassign Vendor</label>
           <div class="flex items-center gap-1.5">
             <select name="vendor_id" required class="w-full text-xs rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500">
@@ -106,7 +106,7 @@
     </div>
 
     <!-- Submit Quote Form -->
-    <form id="quote-form" action="/material-requests/{{ item.id }}/quote" method="post" enctype="multipart/form-data" class="hidden space-y-4 bg-slate-900 p-5 rounded-xl border border-slate-700">
+    <form id="quote-form" action="/operations/material-requests/{{ item.id }}/quote" method="post" enctype="multipart/form-data" class="hidden space-y-4 bg-slate-900 p-5 rounded-xl border border-slate-700">
       <h4 class="text-sm font-bold text-white">Submit Quotation Bid</h4>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -161,13 +161,13 @@
 
         {% if current_user.role.value in ['admin', 'territory_manager'] and q.status.value == 'Pending' %}
         <div class="flex items-center justify-end gap-x-2 pt-2 border-t border-slate-800">
-          <form method="post" action="/material-requests/{{ item.id }}/quote/{{ q.id }}/review" class="inline">
+          <form method="post" action="/operations/material-requests/{{ item.id }}/quote/{{ q.id }}/review" class="inline">
             <input type="hidden" name="decision" value="approved">
             <button type="submit" class="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500">
               Approve Quote &amp; Issue Work Order
             </button>
           </form>
-          <form method="post" action="/material-requests/{{ item.id }}/quote/{{ q.id }}/review" class="inline">
+          <form method="post" action="/operations/material-requests/{{ item.id }}/quote/{{ q.id }}/review" class="inline">
             <input type="hidden" name="decision" value="rejected">
             <button type="submit" class="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-500">
               Reject Quote
@@ -204,7 +204,7 @@
           {% endif %}
 
           {% if wo.status.value == 'Issued' and current_user.role.value in ['admin', 'territory_manager', 'qc_manager'] %}
-          <form method="post" action="/material-requests/work-orders/{{ wo.id }}/qc" enctype="multipart/form-data" class="space-y-3 pt-3 border-t border-slate-800 bg-slate-900/80 p-3 rounded-lg">
+          <form method="post" action="/operations/material-requests/work-orders/{{ wo.id }}/qc" enctype="multipart/form-data" class="space-y-3 pt-3 border-t border-slate-800 bg-slate-900/80 p-3 rounded-lg">
             <div class="flex items-center justify-between">
               <span class="text-xs font-bold text-white">QC Manager Photo Verification &amp; Approval</span>
               <span class="text-[10px] text-amber-400 font-medium">Camera / Upload Photo Required</span>

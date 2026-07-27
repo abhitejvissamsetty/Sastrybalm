@@ -6,7 +6,7 @@
 <div class="max-w-4xl space-y-6">
 
   <div class="flex items-center gap-x-4">
-    <a href="/outlets" class="text-slate-400 hover:text-white transition-colors">
+    <a href="/master-data/outlets" class="text-slate-400 hover:text-white transition-colors">
       <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
       </svg>
@@ -27,12 +27,12 @@
     </div>
     <div class="flex items-center gap-x-2">
       {% if current_user and current_user.role and current_user.role.value == 'admin' %}
-      <a href="/outlets/{{ item.id }}/history"
+      <a href="/master-data/outlets/{{ item.id }}/history"
          class="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-300 hover:bg-indigo-500/20 transition-colors">
         Version History
       </a>
       {% endif %}
-      <a href="/outlets/{{ item.id }}/edit"
+      <a href="/master-data/outlets/{{ item.id }}/edit"
          class="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors">
         Edit
       </a>
@@ -84,7 +84,7 @@
   <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
     <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
       <h2 class="text-sm font-semibold text-slate-300">Recent Orders</h2>
-      <a href="/orders?outlet_id={{ item.id }}" class="text-xs text-indigo-400 hover:text-indigo-300">View all →</a>
+      <a href="/operations/orders?outlet_id={{ item.id }}" class="text-xs text-indigo-400 hover:text-indigo-300">View all →</a>
     </div>
     <table class="min-w-full divide-y divide-slate-700">
       <thead>
@@ -100,7 +100,7 @@
         {% for o in recent_orders %}
         <tr class="hover:bg-slate-800/60">
           <td class="px-4 py-3 text-sm">
-            <a href="/orders/{{ o.id }}" class="font-mono text-indigo-400 hover:text-indigo-300">{{ o.order_number }}</a>
+            <a href="/operations/orders/{{ o.id }}" class="font-mono text-indigo-400 hover:text-indigo-300">{{ o.order_number }}</a>
           </td>
           <td class="px-4 py-3 text-sm text-slate-300">{{ o.order_date }}</td>
           <td class="px-4 py-3 text-sm text-slate-400 hidden sm:table-cell">{{ o.user.full_name if o.user else '—' }}</td>

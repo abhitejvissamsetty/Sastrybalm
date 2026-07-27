@@ -119,60 +119,99 @@ app.include_router(approvals.router)
 app.include_router(flags.router)
 app.include_router(analytics.action_center_alerts_router)
 
-# Legacy URL compatibility redirects
-@app.get("/attendance", include_in_schema=False)
-async def legacy_attendance(): return RedirectResponse("/tracking/attendance", status_code=307)
+# Legacy URL compatibility redirects with sub-path wildcard support
+@app.api_route("/attendance{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_attendance(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/tracking/attendance{rest}{qs}", status_code=307)
 
-@app.get("/orders", include_in_schema=False)
-async def legacy_orders(): return RedirectResponse("/operations/orders", status_code=307)
+@app.api_route("/orders{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_orders(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/operations/orders{rest}{qs}", status_code=307)
 
-@app.get("/expenses", include_in_schema=False)
-async def legacy_expenses(): return RedirectResponse("/operations/expenses", status_code=307)
+@app.api_route("/expenses{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_expenses(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/operations/expenses{rest}{qs}", status_code=307)
 
-@app.get("/timesheets", include_in_schema=False)
-async def legacy_timesheets(): return RedirectResponse("/operations/timesheets", status_code=307)
+@app.api_route("/timesheets{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_timesheets(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    if rest.startswith("/visits"):
+        rest = rest.replace("/visits/all", "").replace("/visits", "")
+        return RedirectResponse(f"/tracking/visits{rest}{qs}", status_code=307)
+    return RedirectResponse(f"/operations/timesheets{rest}{qs}", status_code=307)
 
-@app.get("/material-requests", include_in_schema=False)
-async def legacy_mrs(): return RedirectResponse("/operations/material-requests", status_code=307)
+@app.api_route("/material-requests{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_mrs(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/operations/material-requests{rest}{qs}", status_code=307)
 
-@app.get("/asset-capitalizations", include_in_schema=False)
-async def legacy_ac(): return RedirectResponse("/operations/marketing-assets", status_code=307)
+@app.api_route("/asset-capitalizations{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_ac(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/operations/marketing-assets{rest}{qs}", status_code=307)
 
-@app.get("/approvals", include_in_schema=False)
-async def legacy_approvals(): return RedirectResponse("/action-center/approvals", status_code=307)
+@app.api_route("/approvals{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_approvals(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/action-center/approvals{rest}{qs}", status_code=307)
 
-@app.get("/flags", include_in_schema=False)
-async def legacy_flags(): return RedirectResponse("/action-center/flags", status_code=307)
+@app.api_route("/flags{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_flags(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/action-center/flags{rest}{qs}", status_code=307)
 
-@app.get("/products", include_in_schema=False)
-async def legacy_products(): return RedirectResponse("/catalogue/products", status_code=307)
+@app.api_route("/products{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_products(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/catalogue/products{rest}{qs}", status_code=307)
 
-@app.get("/inventory", include_in_schema=False)
-async def legacy_inventory(): return RedirectResponse("/catalogue/inventory", status_code=307)
+@app.api_route("/inventory{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_inventory(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/catalogue/inventory{rest}{qs}", status_code=307)
 
-@app.get("/warehouses", include_in_schema=False)
-async def legacy_warehouses(): return RedirectResponse("/catalogue/warehouses", status_code=307)
+@app.api_route("/warehouses{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_warehouses(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/catalogue/warehouses{rest}{qs}", status_code=307)
 
-@app.get("/geography", include_in_schema=False)
-async def legacy_geography(): return RedirectResponse("/master-data/geography", status_code=307)
+@app.api_route("/geography{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_geography(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/master-data/geography{rest}{qs}", status_code=307)
 
-@app.get("/users", include_in_schema=False)
-async def legacy_users(): return RedirectResponse("/master-data/users", status_code=307)
+@app.api_route("/users{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_users(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/master-data/users{rest}{qs}", status_code=307)
 
-@app.get("/positions", include_in_schema=False)
-async def legacy_positions(): return RedirectResponse("/master-data/positions", status_code=307)
+@app.api_route("/positions{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_positions(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/master-data/positions{rest}{qs}", status_code=307)
 
-@app.get("/beats", include_in_schema=False)
-async def legacy_beats(): return RedirectResponse("/master-data/beats", status_code=307)
+@app.api_route("/beats{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_beats(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/master-data/beats{rest}{qs}", status_code=307)
 
-@app.get("/outlets", include_in_schema=False)
-async def legacy_outlets(): return RedirectResponse("/master-data/outlets", status_code=307)
+@app.api_route("/outlets{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_outlets(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/master-data/outlets{rest}{qs}", status_code=307)
 
-@app.get("/channel-partners", include_in_schema=False)
-async def legacy_cps(): return RedirectResponse("/master-data/channel-partners", status_code=307)
+@app.api_route("/channel-partners{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_cps(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/master-data/channel-partners{rest}{qs}", status_code=307)
 
-@app.get("/vendors", include_in_schema=False)
-async def legacy_vendors(): return RedirectResponse("/master-data/vendors", status_code=307)
+@app.api_route("/vendors{rest:path}", methods=["GET", "POST"], include_in_schema=False)
+async def legacy_vendors(request: Request, rest: str = ""):
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(f"/master-data/vendors{rest}{qs}", status_code=307)
 app.include_router(api_auth.router)
 app.include_router(api_master.router)
 app.include_router(api_operations.router)

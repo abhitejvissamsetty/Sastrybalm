@@ -12,7 +12,7 @@
       <p class="mt-2 text-sm text-slate-400 font-medium">Manage and monitor field coverage across GT and MT channels</p>
     </div>
     {% if current_user.role.value in ['admin', 'territory_manager'] %}
-    <a href="/beats/new"
+    <a href="/master-data/beats/new"
        class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
       <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -47,7 +47,7 @@
       </button>
       
       {% if q or beat_type %}
-      <a href="/beats" class="text-sm font-medium text-slate-400 hover:text-white transition-colors px-2">Clear</a>
+      <a href="/master-data/beats" class="text-sm font-medium text-slate-400 hover:text-white transition-colors px-2">Clear</a>
       {% endif %}
     </form>
   </div>
@@ -118,16 +118,16 @@
           <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
             <div class="flex items-center justify-end gap-x-4">
               {% if item.is_active %}
-                <a href="/beats/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
+                <a href="/master-data/beats/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
                 {% if current_user.role.value in ['admin', 'territory_manager'] %}
-                <form method="post" action="/beats/{{ item.id }}/delete" class="inline"
+                <form method="post" action="/master-data/beats/{{ item.id }}/delete" class="inline"
                       onsubmit="return confirmSubmit(event, 'Deactivate beat {{ item.name }}?', 'Deactivate Beat', 'danger')">
                   <button type="submit" class="text-slate-500 hover:text-red-400 transition-colors">Deactivate</button>
                 </form>
                 {% endif %}
               {% else %}
                 {% if current_user.role.value in ['admin', 'territory_manager'] %}
-                <form method="post" action="/beats/{{ item.id }}/activate" class="inline">
+                <form method="post" action="/master-data/beats/{{ item.id }}/activate" class="inline">
                   <button type="submit" class="text-emerald-400 hover:text-emerald-300 transition-colors">Activate</button>
                 </form>
                 {% endif %}
@@ -147,7 +147,7 @@
                </div>
                <p class="text-slate-400 font-medium">No beats found matching your filters.</p>
                {% if current_user.role.value in ['admin', 'territory_manager'] %}
-               <a href="/beats/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Add the first one &rarr;</a>
+               <a href="/master-data/beats/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Add the first one &rarr;</a>
                {% endif %}
             </div>
           </td>
@@ -158,7 +158,7 @@
     {% if pagination.pages > 1 %}
     <div class="bg-slate-900/50 px-6 py-4 border-t border-white/5">
       {% set qs = "q=" ~ q ~ "&beat_type=" ~ beat_type %}
-      {{ paginate(pagination, "/beats?" ~ qs) }}
+      {{ paginate(pagination, "/master-data/beats?" ~ qs) }}
     </div>
     {% endif %}
   </div>

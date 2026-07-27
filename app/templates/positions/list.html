@@ -12,7 +12,7 @@
       <p class="mt-1 text-sm text-slate-400">Sales hierarchy and reporting structure</p>
     </div>
     {% if current_user and current_user.role and current_user.role.value in ['admin', 'territory_manager'] %}
-    <a href="/positions/new"
+    <a href="/master-data/positions/new"
        class="inline-flex items-center gap-x-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -35,19 +35,19 @@
     </select>
     <button type="submit" class="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-600 transition-colors">Filter</button>
     {% if q or level %}
-    <a href="/positions?tab={{ tab }}" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
+    <a href="/master-data/positions?tab={{ tab }}" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
     {% endif %}
   </form>
 
   <!-- Bucket Tabs -->
   <div class="border-b border-slate-700">
     <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-      <a href="/positions?q={{ q }}&level={{ level }}&tab=active" 
+      <a href="/master-data/positions?q={{ q }}&level={{ level }}&tab=active" 
          class="border-b-2 py-4 px-1 text-sm font-semibold transition-all {% if tab == 'active' %}border-indigo-500 text-indigo-400{% else %}border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600{% endif %}">
         Active
         <span class="ml-2 rounded-full px-2 py-0.5 text-xs font-bold {% if tab == 'active' %}bg-indigo-900/50 text-indigo-300{% else %}bg-slate-800 text-slate-400{% endif %}">{{ active_count }}</span>
       </a>
-      <a href="/positions?q={{ q }}&level={{ level }}&tab=inactive" 
+      <a href="/master-data/positions?q={{ q }}&level={{ level }}&tab=inactive" 
          class="border-b-2 py-4 px-1 text-sm font-semibold transition-all {% if tab == 'inactive' %}border-indigo-500 text-indigo-400{% else %}border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600{% endif %}">
         Inactive / Deactivated
         <span class="ml-2 rounded-full px-2 py-0.5 text-xs font-bold {% if tab == 'inactive' %}bg-indigo-900/50 text-indigo-300{% else %}bg-slate-800 text-slate-400{% endif %}">{{ inactive_count }}</span>
@@ -111,20 +111,20 @@
             <div class="flex items-center justify-end gap-x-3">
               {% if item.is_active %}
               {% if current_user.role.value == 'admin' or item.level.value == 'L1' %}
-              <a href="/positions/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
+              <a href="/master-data/positions/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
               {% endif %}
               {% if item.level.value == 'L1' %}
-              <a href="/positions/{{ item.id }}/attach-beats" class="text-emerald-400 hover:text-emerald-300 transition-colors">Attach Beats</a>
+              <a href="/master-data/positions/{{ item.id }}/attach-beats" class="text-emerald-400 hover:text-emerald-300 transition-colors">Attach Beats</a>
               {% endif %}
               {% if current_user.role.value == 'admin' %}
-              <form method="post" action="/positions/{{ item.id }}/delete" class="inline"
+              <form method="post" action="/master-data/positions/{{ item.id }}/delete" class="inline"
                     onsubmit="return confirmSubmit(event, 'Deactivate position {{ item.name }}?', 'Deactivate Position', 'danger')">
                 <button type="submit" class="text-red-400 hover:text-red-300 transition-colors">Deactivate</button>
               </form>
               {% endif %}
               {% else %}
               {% if current_user.role.value == 'admin' %}
-              <form method="post" action="/positions/{{ item.id }}/activate" class="inline">
+              <form method="post" action="/master-data/positions/{{ item.id }}/activate" class="inline">
                 <button type="submit" class="text-emerald-400 hover:text-emerald-300 transition-colors">Activate</button>
               </form>
               {% endif %}
@@ -138,7 +138,7 @@
           <td colspan="6" class="px-4 py-12 text-center text-sm text-slate-500">
             No positions found.
             {% if current_user and current_user.role and current_user.role.value in ['admin', 'territory_manager'] %}
-            <a href="/positions/new" class="text-indigo-400 hover:underline ml-1">Add the first one.</a>
+            <a href="/master-data/positions/new" class="text-indigo-400 hover:underline ml-1">Add the first one.</a>
             {% endif %}
           </td>
         </tr>
@@ -146,7 +146,7 @@
       </tbody>
     </table>
     {% set qs = "q=" ~ q ~ "&level=" ~ level ~ "&tab=" ~ tab %}
-    {{ paginate(pagination, "/positions?" ~ qs) }}
+    {{ paginate(pagination, "/master-data/positions?" ~ qs) }}
   </div>
 
 </div>

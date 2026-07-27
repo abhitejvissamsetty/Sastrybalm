@@ -13,7 +13,7 @@
     </div>
     {% if current_user.role.value in ['admin', 'field_rep', 'vendor'] %}
     <div class="flex gap-x-3">
-      <a href="/asset-capitalizations/new"
+      <a href="/operations/marketing-assets/new"
          class="inline-flex items-center gap-x-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors duration-100">
         <svg class="-ml-0.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -89,7 +89,7 @@
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-slate-400">{{ item.created_at.strftime('%Y-%m-%d') }}</td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
-              <a href="/asset-capitalizations/{{ item.id }}" class="text-indigo-400 hover:text-indigo-300">View</a>
+              <a href="/operations/marketing-assets/{{ item.id }}" class="text-indigo-400 hover:text-indigo-300">View</a>
             </td>
           </tr>
           {% else %}

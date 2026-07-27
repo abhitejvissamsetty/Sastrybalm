@@ -65,7 +65,7 @@
           <td class="px-4 py-3 text-sm text-slate-300 hidden sm:table-cell">{{ item.outlet.name if item.outlet else '—' }}</td>
           <td class="px-4 py-3 text-sm hidden md:table-cell">
             {% if item.order %}
-            <a href="/orders/{{ item.order.id }}" class="font-mono text-indigo-400 hover:text-indigo-300">{{ item.order.order_number }}</a>
+            <a href="/operations/orders/{{ item.order.id }}" class="font-mono text-indigo-400 hover:text-indigo-300">{{ item.order.order_number }}</a>
             {% else %}
             <span class="text-slate-600">—</span>
             {% endif %}

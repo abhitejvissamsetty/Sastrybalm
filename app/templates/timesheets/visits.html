@@ -11,7 +11,7 @@
       <h1 class="text-2xl font-bold text-white">Visit Records</h1>
       <p class="mt-1 text-sm text-slate-400">All outlet visits, joint working logs, and field check-ins</p>
     </div>
-    <a href="/timesheets"
+    <a href="/operations/timesheets"
        class="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors">
       Attendance
     </a>
@@ -35,7 +35,7 @@
 
     <button type="submit" class="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-600 transition-colors">Filter</button>
     {% if user_id or is_joint %}
-    <a href="/timesheets/visits/all" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
+    <a href="/tracking/visits" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
     {% endif %}
   </form>
 
@@ -82,7 +82,7 @@
           </td>
           <td class="px-4 py-3 text-sm hidden lg:table-cell">
             {% if item.order %}
-            <a href="/orders/{{ item.order.id }}" class="font-mono text-indigo-400 hover:text-indigo-300 text-xs">{{ item.order.order_number }}</a>
+            <a href="/operations/orders/{{ item.order.id }}" class="font-mono text-indigo-400 hover:text-indigo-300 text-xs">{{ item.order.order_number }}</a>
             {% else %}
             <span class="text-slate-600">—</span>
             {% endif %}
@@ -96,7 +96,7 @@
       </tbody>
     </table>
     {% set qs = "user_id=" ~ user_id ~ "&is_joint=" ~ is_joint %}
-    {{ paginate(pagination, "/timesheets/visits/all?" ~ qs) }}
+    {{ paginate(pagination, "/tracking/visits?" ~ qs) }}
   </div>
 
 </div>

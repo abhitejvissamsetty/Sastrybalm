@@ -14,7 +14,7 @@
       </p>
     </div>
     <div class="mt-4 flex md:ml-4 md:mt-0">
-      <a href="/users" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+      <a href="/master-data/users" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
         &larr; Back to Users & Reps
       </a>
     </div>
@@ -90,7 +90,7 @@
         {% if user_obj.role.value == 'field_rep' %}(Filtered to Field Rep L1 positions){% endif %}
       </p>
 
-      <form action="/users/{{ user_obj.id }}/position-view" method="post" class="space-y-4">
+      <form action="/master-data/users/{{ user_obj.id }}/position-view" method="post" class="space-y-4">
         <div class="max-h-60 overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 p-4 space-y-2.5">
           {% for pos in all_positions %}
           <label class="flex items-center space-x-3 text-sm text-slate-300 hover:text-white cursor-pointer p-1.5 hover:bg-slate-900 rounded-lg transition-colors">

@@ -13,7 +13,7 @@
       <p class="mt-1 text-sm text-slate-400">Zones, Regions and Territories</p>
     </div>
     {% if current_user.role.value == 'admin' %}
-    <a href="/geography/new"
+    <a href="/master-data/geography/new"
        class="inline-flex items-center gap-x-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -39,7 +39,7 @@
       Filter
     </button>
     {% if q or level %}
-    <a href="/geography"
+    <a href="/master-data/geography"
        class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">
       Clear
     </a>
@@ -84,14 +84,14 @@
           {% if current_user.role.value == 'admin' %}
           <td class="px-4 py-3 text-right text-sm">
             {% if item.is_active %}
-            <a href="/geography/{{ item.id }}/edit"
+            <a href="/master-data/geography/{{ item.id }}/edit"
                class="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">Edit</a>
-            <form method="post" action="/geography/{{ item.id }}/delete" class="inline ml-3"
+            <form method="post" action="/master-data/geography/{{ item.id }}/delete" class="inline ml-3"
                   onsubmit="return confirmSubmit(event, 'Deactivate geography node {{ item.name }}?', 'Deactivate Geography', 'danger')">
               <button type="submit" class="text-red-400 hover:text-red-300 font-medium transition-colors">Deactivate</button>
             </form>
             {% else %}
-            <form method="post" action="/geography/{{ item.id }}/activate" class="inline">
+            <form method="post" action="/master-data/geography/{{ item.id }}/activate" class="inline">
               <button type="submit" class="text-emerald-400 hover:text-emerald-300 font-medium transition-colors">Activate</button>
             </form>
             {% endif %}
@@ -103,7 +103,7 @@
           <td colspan="7" class="px-4 py-12 text-center text-sm text-slate-500">
             No geographies found.
             {% if current_user.role.value in ['admin', 'territory_manager'] %}
-            <a href="/geography/new" class="text-indigo-400 hover:underline ml-1">Add the first one.</a>
+            <a href="/master-data/geography/new" class="text-indigo-400 hover:underline ml-1">Add the first one.</a>
             {% endif %}
           </td>
         </tr>
@@ -112,7 +112,7 @@
     </table>
 
     {% set qs = "q=" ~ q ~ "&level=" ~ level %}
-    {{ paginate(pagination, "/geography?" ~ qs) }}
+    {{ paginate(pagination, "/master-data/geography?" ~ qs) }}
   </div>
 
 </div>

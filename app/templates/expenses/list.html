@@ -11,7 +11,7 @@
       <h1 class="text-3xl font-bold text-white tracking-tight">Expenses</h1>
       <p class="mt-2 text-sm text-slate-400 font-medium">Monitor and process field expenditure claims and reimbursements</p>
     </div>
-    <a href="/expenses/new"
+    <a href="/operations/expenses/new"
        class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
       <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -43,7 +43,7 @@
       </button>
       
       {% if status or category %}
-      <a href="/expenses" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear Filters</a>
+      <a href="/operations/expenses" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear Filters</a>
       {% endif %}
     </form>
   </div>
@@ -100,10 +100,10 @@
           <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
             <div class="flex items-center justify-end gap-x-3">
               {% if item.status.value == 'submitted' %}
-              <form method="post" action="/expenses/{{ item.id }}/approve" class="inline">
+              <form method="post" action="/operations/expenses/{{ item.id }}/approve" class="inline">
                 <button type="submit" class="text-emerald-400 hover:text-emerald-300 transition-colors">Approve</button>
               </form>
-              <form method="post" action="/expenses/{{ item.id }}/reject" class="inline">
+              <form method="post" action="/operations/expenses/{{ item.id }}/reject" class="inline">
                 <button type="submit" class="text-rose-400 hover:text-rose-300 transition-colors">Reject</button>
               </form>
               {% else %}
@@ -123,7 +123,7 @@
                  </svg>
                </div>
                <p class="text-slate-400 font-medium">No expense claims found.</p>
-               <a href="/expenses/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Log New Expense &rarr;</a>
+               <a href="/operations/expenses/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Log New Expense &rarr;</a>
              </div>
           </td>
         </tr>
@@ -133,7 +133,7 @@
     {% if pagination.pages > 1 %}
     <div class="bg-slate-900/50 px-6 py-4 border-t border-white/5">
       {% set qs = "status=" ~ status ~ "&category=" ~ category %}
-      {{ paginate(pagination, "/expenses?" ~ qs) }}
+      {{ paginate(pagination, "/operations/expenses?" ~ qs) }}
     </div>
     {% endif %}
   </div>

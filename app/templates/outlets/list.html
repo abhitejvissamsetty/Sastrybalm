@@ -13,18 +13,18 @@
     </div>
     <div class="flex items-center gap-x-3">
       {% if current_user.role.value in ['admin', 'territory_manager'] %}
-      <form method="post" action="/outlets/import" enctype="multipart/form-data" class="flex items-center gap-x-2">
+      <form method="post" action="/master-data/outlets/import" enctype="multipart/form-data" class="flex items-center gap-x-2">
         <label class="premium-btn cursor-pointer rounded-xl border border-white/5 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white transition-all">
           Import
           <input type="file" name="file" accept=".csv" class="hidden" onchange="this.form.submit()">
         </label>
       </form>
-      <a href="/outlets/export"
+      <a href="/master-data/outlets/export"
          class="premium-btn rounded-xl border border-white/5 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white transition-all">
         Export
       </a>
       {% endif %}
-      <a href="/outlets/new"
+      <a href="/master-data/outlets/new"
          class="premium-btn inline-flex items-center gap-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 transition-all">
         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -81,7 +81,7 @@
       </button>
       
       {% if q or status or beat_id or territory_id %}
-      <a href="/outlets" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
+      <a href="/master-data/outlets" class="text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
       {% endif %}
     </form>
   </div>
@@ -139,14 +139,14 @@
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
             <div class="flex items-center justify-end gap-x-4">
-              <a href="/outlets/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
+              <a href="/master-data/outlets/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 transition-colors">Edit</a>
               {% if current_user.role.value in ['admin', 'territory_manager'] %}
                 {% if item.status.value == 'active' %}
-                  <form method="post" action="/outlets/{{ item.id }}/toggle" class="inline" onsubmit="return confirmSubmit(event, 'Disable outlet {{ item.name }}?', 'Disable Outlet', 'danger')">
+                  <form method="post" action="/master-data/outlets/{{ item.id }}/toggle" class="inline" onsubmit="return confirmSubmit(event, 'Disable outlet {{ item.name }}?', 'Disable Outlet', 'danger')">
                     <button type="submit" class="text-red-400 hover:text-red-300 transition-colors">Disable</button>
                   </form>
                 {% else %}
-                  <form method="post" action="/outlets/{{ item.id }}/toggle" class="inline" onsubmit="return confirmSubmit(event, 'Activate outlet {{ item.name }}?', 'Activate Outlet', 'info')">
+                  <form method="post" action="/master-data/outlets/{{ item.id }}/toggle" class="inline" onsubmit="return confirmSubmit(event, 'Activate outlet {{ item.name }}?', 'Activate Outlet', 'info')">
                     <button type="submit" class="text-emerald-400 hover:text-emerald-300 transition-colors">Activate</button>
                   </form>
                 {% endif %}
@@ -164,7 +164,7 @@
                  </svg>
                </div>
                <p class="text-slate-400 font-medium">No outlets discovered yet.</p>
-               <a href="/outlets/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Add New Outlet &rarr;</a>
+               <a href="/master-data/outlets/new" class="mt-4 text-indigo-400 hover:text-indigo-300 font-semibold text-sm">Add New Outlet &rarr;</a>
              </div>
           </td>
         </tr>
@@ -173,7 +173,7 @@
     </table>
     <div class="bg-slate-900/50 px-6 py-4 border-t border-white/5">
       {% set qs = "q=" ~ q ~ "&status=" ~ status ~ "&beat_id=" ~ beat_id %}
-      {{ paginate(pagination, "/outlets?" ~ qs) }}
+      {{ paginate(pagination, "/master-data/outlets?" ~ qs) }}
     </div>
   </div>
 

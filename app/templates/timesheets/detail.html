@@ -6,7 +6,7 @@
 <div class="max-w-3xl space-y-6">
 
   <div class="flex items-center gap-x-4">
-    <a href="/timesheets" class="text-slate-400 hover:text-white transition-colors">
+    <a href="/operations/timesheets" class="text-slate-400 hover:text-white transition-colors">
       <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
       </svg>
@@ -76,7 +76,7 @@
           </td>
           <td class="px-4 py-3 text-sm hidden md:table-cell">
             {% if v.order %}
-            <a href="/orders/{{ v.order.id }}" class="font-mono text-indigo-400 hover:text-indigo-300 text-xs">{{ v.order.order_number }}</a>
+            <a href="/operations/orders/{{ v.order.id }}" class="font-mono text-indigo-400 hover:text-indigo-300 text-xs">{{ v.order.order_number }}</a>
             {% else %}
             <span class="text-slate-600">—</span>
             {% endif %}
