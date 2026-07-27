@@ -20,13 +20,17 @@ from app.utils.backup_service import restore_sql_backup
 
 def is_system_onboarded(db: Session) -> bool:
     """Check if the system has completed onboarding (active admin with encrypted password AND mandatory verified S3 storage)."""
-    admin = db.query(User).filter(User.role == UserRole.admin, User.is_active == True).first()
-    if not (admin and admin.hashed_password and admin.hashed_password.strip() != "" and admin.hashed_password != "PENDING_ONBOARDING"):
+    try:
+        admin = db.query(User).filter(User.role == UserRole.admin, User.is_active == True).first()
+        if not (admin and admin.hashed_password and admin.hashed_password.strip() != "" and admin.hashed_password != "PENDING_ONBOARDING"):
+            return False
+        
+        from app.services.startup_validation import validate_s3_configuration
+        s3_res = validate_s3_configuration(db)
+        return bool(s3_res and s3_res.get("configured"))
+    except Exception as e:
+        logger.warning(f"is_system_onboarded check exception: {e}")
         return False
-    
-    from app.services.startup_validation import validate_s3_configuration
-    s3_res = validate_s3_configuration(db)
-    return bool(s3_res and s3_res.get("configured"))
 
 
 def complete_system_onboarding(

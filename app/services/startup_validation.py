@@ -32,13 +32,17 @@ def validate_s3_configuration(db: Session) -> dict:
     from app.models.company import SystemConfiguration
 
     settings = {}
-    sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
-    if sys_config:
-        settings["s3_endpoint"] = sys_config.s3_endpoint_url
-        settings["s3_bucket"] = sys_config.s3_bucket_name
-        settings["s3_access_key"] = sys_config.s3_access_key_id
-        settings["s3_secret_key"] = sys_config.s3_secret_access_key
-        settings["s3_region"] = sys_config.s3_region_name
+    try:
+        sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
+        if sys_config:
+            settings["s3_endpoint"] = sys_config.s3_endpoint_url
+            settings["s3_bucket"] = sys_config.s3_bucket_name
+            settings["s3_access_key"] = sys_config.s3_access_key_id
+            settings["s3_secret_key"] = sys_config.s3_secret_access_key
+            settings["s3_region"] = sys_config.s3_region_name
+    except Exception as e:
+        logger.warning(f"Startup check WARNING: Could not query SystemConfiguration table: {e}")
+        return {"configured": False, "status": "Not initialized", "settings": settings}
 
     bucket = settings.get("s3_bucket")
     access_key = settings.get("s3_access_key")

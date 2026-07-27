@@ -15,7 +15,7 @@ Sastrybalm ERP is a comprehensive FMCG Sales & Distribution Management System bu
 
 The system orchestrates:
 - **Mandatory S3 Storage & Onboarding Trigger**: If S3/MinIO bucket storage is not configured or fails connectivity checks, `is_system_onboarded(db)` returns `False`, forcing redirection to `/onboarding`. Features an interactive **"⚡ Test S3 / MinIO Connection"** AJAX action button (`POST /onboarding/test-s3`) to verify bucket credentials and endpoint reachability with live feedback banners before completing setup.
-- **Server Startup Validation & S3/MinIO Storage**: Server restart (`lifespan`) validation of active Admin account and S3 bucket connection, asset storage, daily backups, and time-bound pre-signed URLs.
+- **Server Startup Validation & Process Concurrency Lock**: Features non-blocking file locking (`fcntl.flock`) in FastAPI `lifespan` (`app/main.py`) to prevent multi-worker Gunicorn deadlocks on `ALTER TABLE` transactions, and safe exception handling when querying uninitialized database tables.
 - **Geography & Regional Warehouse Architecture**: Multi-tier hierarchy (`Zone` → `Region` → `Territory`) with region-level warehouse mapping and unified scoping (`get_user_allowed_geography_ids` & `get_user_allowed_warehouse_ids`).
 - **Position Hierarchy**: 4-level organizational hierarchy (`L1` to `L4`) with automatic reporting parent warehouse inheritance resolution.
 - **Beat & Outlet Management**: Beat territory selection scoped to L1 child territories under position/region hierarchy. Outlet scoping, non-admin approval workflows (`outlet_edit_approval`), Admin direct edit `OutletVersion` snapshots, version history, and Git-tree style version reverts.
@@ -206,4 +206,30 @@ PYTHONPATH=. ./venv/bin/python db_migrate.py
 ### Verify Python Syntax
 ```bash
 python3 -m py_compile app/main.py app/services/startup_validation.py app/adapters/s3_storage.py app/utils/geography_scope.py app/routers/vendors.py app/routers/outlets.py app/routers/inventory.py app/routers/warehouses.py app/routers/beats.py app/routers/approvals.py app/routers/analytics.py
+```
+
+---
+
+## 🐳 11. Docker Containerization, Immutable Image Packaging & Deployment
+
+### Image Architecture & Dependency Encapsulation
+- **Multi-Stage Dockerfile (`Dockerfile`)**: Pre-compiles and installs all mandatory dependencies from `requirements.txt` (`boto3`, `botocore`, `gunicorn`, `cryptography`, `fastapi`, `pymysql`, `sqlalchemy`) into `/usr/local`.
+- **Zero-Installation Target Deployment**: When built locally or via CI/CD, the Docker image encapsulates all Python packages into an immutable container artifact. Target servers loading the container image via Docker Hub/Registry or `docker load < sastrybalm-app.tar.gz` run instantly without downloading or installing any dependencies from scratch.
+- **Docker Compose Architecture (`docker-compose.yml`)**:
+  - `db`: MySQL 8.0 instance on port 3308 (internal 3306).
+  - `app`: FastAPI web application running Gunicorn with 4 Uvicorn workers on port 8090.
+  - `nginx`: Reverse proxy on port 8080.
+  - `adminer`: Web-based database management GUI on port 8081.
+
+### Production Docker Commands
+```bash
+# Build immutable production container image
+docker compose build
+
+# Export image package for offline target server deployment
+docker save sastrybalm-app:latest | gzip > sastrybalm-app.tar.gz
+
+# Load and launch on target environment
+docker load < sastrybalm-app.tar.gz
+docker compose up -d
 ```
