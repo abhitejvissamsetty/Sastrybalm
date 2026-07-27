@@ -54,7 +54,7 @@ async def login(
         return RedirectResponse("/login", status_code=302)
 
     # Block field reps from web dashboard — mobile app only
-    if user.system_role == UserRole.field_rep:
+    if user.role == UserRole.field_rep:
         request.session["_flash_error"] = "Field Representatives are not permitted to access the web dashboard. Please use the mobile app."
         return RedirectResponse("/login", status_code=302)
 
@@ -105,7 +105,7 @@ async def verify_otp(
         })
 
     # Block field reps from web dashboard — mobile app only
-    if user.system_role == UserRole.field_rep:
+    if user.role == UserRole.field_rep:
         return templates.TemplateResponse("auth/login.html", {
             "request": request,
             "error": "Field Representatives are not permitted to access the web dashboard. Please use the mobile app.",
