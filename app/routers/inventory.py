@@ -40,8 +40,7 @@ from app.utils.pagination import paginate
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
-templates = Jinja2Templates(directory="app/templates")
+
 
 
 from app.utils.geography_scope import get_user_allowed_warehouse_ids

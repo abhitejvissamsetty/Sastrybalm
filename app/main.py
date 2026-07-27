@@ -116,6 +116,7 @@ app.include_router(asset_capitalizations.router)
 app.include_router(vendors.router)
 app.include_router(attendance.router)
 app.include_router(approvals.router)
+app.include_router(flags.router)
 app.include_router(analytics.action_center_alerts_router)
 
 # Legacy URL compatibility redirects
