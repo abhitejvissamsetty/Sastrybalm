@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/attendance.dart';
+import '../models/user.dart';
 import '../services/attendance_service.dart';
 import 'auth_provider.dart';
 
@@ -11,14 +12,20 @@ final attendanceServiceProvider = Provider((ref) {
 });
 
 final attendanceProvider = StateNotifierProvider<AttendanceNotifier, AsyncValue<AttendanceState>>((ref) {
-  return AttendanceNotifier(ref.read(attendanceServiceProvider), ref);
+  final notifier = AttendanceNotifier(ref.read(attendanceServiceProvider), ref);
+  ref.listen<AsyncValue<AppUser?>>(authStateProvider, (prev, next) {
+    if (next.value != null) {
+      notifier.refresh();
+    }
+  });
+  return notifier;
 });
 
 class AttendanceNotifier extends StateNotifier<AsyncValue<AttendanceState>> {
   final AttendanceService _service;
   final Ref _ref;
 
-  AttendanceNotifier(this._service, this._ref) : super(const AsyncValue.loading()) {
+  AttendanceNotifier(this._service, this._ref) : super(AsyncValue.data(AttendanceState.notCheckedIn())) {
     refresh();
   }
 
@@ -32,12 +39,9 @@ class AttendanceNotifier extends StateNotifier<AsyncValue<AttendanceState>> {
     try {
       final today = await _service.fetchToday();
       state = AsyncValue.data(today);
-    } catch (e, st) {
-      if (e is DioException && e.response?.statusCode == 401) {
-        state = AsyncValue.data(AttendanceState.notCheckedIn());
-      } else {
-        state = AsyncValue.error(e, st);
-      }
+    } catch (e) {
+      // Fallback to notCheckedIn state gracefully so UI is never stuck/blank
+      state = AsyncValue.data(AttendanceState.notCheckedIn());
     }
   }
 

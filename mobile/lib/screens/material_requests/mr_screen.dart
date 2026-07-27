@@ -20,6 +20,9 @@ class MrScreen extends ConsumerStatefulWidget {
 class _MrScreenState extends ConsumerState<MrScreen> {
   final _descCtrl = TextEditingController();
   final _categoryCtrl = TextEditingController();
+  final _dimsCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+  final _specsCtrl = TextEditingController();
   bool _submitting = false;
 
   Future<void> _submitRequest() async {
@@ -46,6 +49,9 @@ class _MrScreenState extends ConsumerState<MrScreen> {
         outletId: outlet.id,
         description: desc,
         category: _categoryCtrl.text.trim().isNotEmpty ? _categoryCtrl.text.trim() : null,
+        approxDimensions: _dimsCtrl.text.trim().isNotEmpty ? _dimsCtrl.text.trim() : null,
+        clientNotes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+        materialSpecifications: _specsCtrl.text.trim().isNotEmpty ? _specsCtrl.text.trim() : null,
       );
 
       if (mounted) {
@@ -54,7 +60,7 @@ class _MrScreenState extends ConsumerState<MrScreen> {
           builder: (ctx) => AlertDialog(
             title: const Text('Request Submitted'),
             content: Text(
-              'Material request submitted to CMMS.\n\nMR Code: ${response['mr_number'] ?? '#${response['id']}'}\nStatus: ${response['status'] ?? 'submitted'}',
+              'Procurement Material Request submitted to CMMS.\n\nMR Code: ${response['mr_number'] ?? '#${response['id']}'}\nStatus: ${response['status'] ?? 'submitted'}',
             ),
             actions: [
               TextButton(
@@ -84,7 +90,7 @@ class _MrScreenState extends ConsumerState<MrScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CMMS Material Request'),
+        title: const Text('Procurement Material Request'),
       ),
       body: _submitting
           ? const Center(child: CircularProgressIndicator())
@@ -122,17 +128,42 @@ class _MrScreenState extends ConsumerState<MrScreen> {
                     TextField(
                       controller: _categoryCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'CMMS Item Code / Category (Optional)',
-                        hintText: 'e.g. DISPLAY_STAND_LARGE',
+                        labelText: 'Category / Material Type',
+                        hintText: 'e.g. OUTDOOR_GLOW_SIGNBOARD',
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _dimsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Approximate Dimensions',
+                        hintText: 'e.g. 10ft (W) x 4ft (H)',
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _specsCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Material Specifications',
+                        hintText: 'e.g. Acrylic LED backlit with MS frame',
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _notesCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Client Notes & Installation Site Info',
+                        hintText: 'e.g. Needs wall mounting near storefront entrance',
+                      ),
+                    ),
+                    const SizedBox(height: 14),
                     TextField(
                       controller: _descCtrl,
-                      maxLines: 4,
+                      maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Requested Materials & Description',
-                        hintText: 'e.g. Requesting countertop display stand.',
+                        labelText: 'Description / Remarks',
+                        hintText: 'e.g. Storefront branding request for premium GT outlet.',
                       ),
                     ),
                     const SizedBox(height: 24),

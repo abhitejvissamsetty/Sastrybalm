@@ -146,6 +146,11 @@ class ExpenseService {
     );
     return response.data;
   }
+
+  Future<List<dynamic>> getMyExpenses() async {
+    final response = await _client.dio.get('/expenses/my-expenses');
+    return response.data['items'] as List;
+  }
 }
 
 class MaterialRequestService {
@@ -156,6 +161,9 @@ class MaterialRequestService {
     required int outletId,
     required String description,
     String? category,
+    String? approxDimensions,
+    String? clientNotes,
+    String? materialSpecifications,
   }) async {
     final response = await _client.dio.post(
       '/material-requests',
@@ -163,6 +171,9 @@ class MaterialRequestService {
         'outlet_id': outletId,
         'description': description,
         if (category != null) 'category': category,
+        if (approxDimensions != null) 'approx_dimensions': approxDimensions,
+        if (clientNotes != null) 'client_notes': clientNotes,
+        if (materialSpecifications != null) 'material_specifications': materialSpecifications,
       },
     );
     return response.data;
@@ -198,4 +209,48 @@ class AssetCapitalizationService {
     return response.data as Map<String, dynamic>;
   }
 }
+
+class LeaveService {
+  final ApiClient _client;
+  LeaveService(this._client);
+
+  Future<Map<String, dynamic>> applyLeave({
+    required String leaveType,
+    required String startDate,
+    required String endDate,
+    String? reason,
+  }) async {
+    final response = await _client.dio.post(
+      '/leaves',
+      data: {
+        'leave_type': leaveType,
+        'start_date': startDate,
+        'end_date': endDate,
+        if (reason != null) 'reason': reason,
+      },
+    );
+    return response.data;
+  }
+
+  Future<List<dynamic>> getMyLeaves() async {
+    final response = await _client.dio.get('/leaves/my-leaves');
+    return response.data['items'] as List;
+  }
+}
+
+class AnalyticsService {
+  final ApiClient _client;
+  AnalyticsService(this._client);
+
+  Future<Map<String, dynamic>> getEis() async {
+    final response = await _client.dio.get('/analytics/eis');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getMis() async {
+    final response = await _client.dio.get('/analytics/mis');
+    return response.data as Map<String, dynamic>;
+  }
+}
+
 

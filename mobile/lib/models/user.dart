@@ -36,6 +36,11 @@ class AppUser {
     canAccessRestrictedModules: json['can_access_restricted_modules'] == true || json['can_access_restricted_modules'] == 1,
   );
 
+  bool get isL2OrAbove =>
+      role == 'territory_manager' ||
+      role == 'admin' ||
+      canAccessRestrictedModules;
+
   String get initials {
     final parts = fullName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();

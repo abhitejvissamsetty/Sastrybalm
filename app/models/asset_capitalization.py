@@ -52,7 +52,11 @@ class AssetCapitalization(Base):
     sync_status = Column(Enum(ACSyncStatus), nullable=False, default=ACSyncStatus.not_applicable)
     cmms_ref = Column(String(100), nullable=True)
     sync_error = Column(Text, nullable=True)
-    sync_retries = Column(Integer, nullable=False, default=0)
+    # Procurement link & QC validation
+    procurement_item_id = Column(Integer, ForeignKey("procurement_items.id", ondelete="SET NULL"), nullable=True)
+    qc_verified = Column(Enum(ACStatus), nullable=False, default=ACStatus.pending)
+    qc_notes = Column(Text, nullable=True)
+
     notes = Column(Text, nullable=True)
     image_url = Column(Text, nullable=True)
     deployed_at = Column(DateTime, nullable=True)
@@ -64,6 +68,7 @@ class AssetCapitalization(Base):
     company_profile = relationship("CompanyProfile", foreign_keys=[company_profile_id])
     vendor = relationship("Vendor", foreign_keys=[vendor_id])
     vendor_employee = relationship("VendorEmployee", foreign_keys=[vendor_employee_id])
+    procurement_item = relationship("ProcurementItem", foreign_keys=[procurement_item_id])
 
     def status_badge_cls(self) -> str:
         return {
@@ -79,3 +84,18 @@ class AssetCapitalization(Base):
             ACSyncStatus.synced: "bg-emerald-900/50 text-emerald-300",
             ACSyncStatus.failed: "bg-red-900/50 text-red-300",
         }.get(self.sync_status, "bg-slate-700 text-slate-300")
+
+
+class AssetMaintenanceLog(Base):
+    __tablename__ = "asset_maintenance_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    asset_id = Column(Integer, ForeignKey("asset_capitalizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    notes = Column(Text, nullable=False)
+    photo_url = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    asset = relationship("AssetCapitalization", backref="maintenance_logs")
+    created_by = relationship("User", foreign_keys=[created_by_id])
+

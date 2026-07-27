@@ -50,5 +50,19 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Safar Mobile requires access to location for field sales attendance and outlet check-ins.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Safar Mobile requires location access for route planning and attendance tracking.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Safar Mobile requires location access for route planning and attendance tracking.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is required for capturing mandatory outlet store verification photos, recce site documentation, asset installation proof, and expense receipts.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Photo library access is required for choosing outlet photos, expense receipts, and QC documentation.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Photo library access is required for saving captured photos to photo library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access is required for site inspection recordings.</string>
 </dict>
 </plist>

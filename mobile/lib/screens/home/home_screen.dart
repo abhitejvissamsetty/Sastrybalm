@@ -11,8 +11,9 @@ class HomeScreen extends ConsumerWidget {
   int _calculateSelectedIndex(BuildContext context) {
     final String location = GoRouterState.of(context).matchedLocation;
     if (location.startsWith('/home')) return 0;
-    if (location.startsWith('/beat') || location.startsWith('/outlet')) return 1;
-    if (location.startsWith('/history')) return 2;
+    if (location.startsWith('/expense')) return 1;
+    if (location.startsWith('/timesheet')) return 2;
+    if (location.startsWith('/analytics')) return 3;
     return 0;
   }
 
@@ -22,10 +23,13 @@ class HomeScreen extends ConsumerWidget {
         context.go('/home');
         break;
       case 1:
-        context.go('/beat');
+        context.push('/expense');
         break;
       case 2:
-        context.go('/history');
+        context.push('/timesheet');
+        break;
+      case 3:
+        context.push('/analytics/eis-mis');
         break;
     }
   }
@@ -33,14 +37,13 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedIndex = _calculateSelectedIndex(context);
-    final pendingSyncs = ref.watch(syncProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA), // Zinc 50
       body: child,
       bottomNavigationBar: SafeArea(
         child: Container(
-          margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           height: 64,
           decoration: BoxDecoration(
             color: Colors.white,
@@ -64,26 +67,33 @@ class HomeScreen extends ConsumerWidget {
                 context,
                 index: 0,
                 selectedIndex: selectedIndex,
-                icon: Icons.grid_view_outlined,
-                activeIcon: Icons.grid_view_rounded,
-                label: 'Dashboard',
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home_rounded,
+                label: 'Home',
               ),
               _buildTabItem(
                 context,
                 index: 1,
                 selectedIndex: selectedIndex,
-                icon: Icons.map_outlined,
-                activeIcon: Icons.map_rounded,
-                label: 'Beat Plan',
+                icon: Icons.receipt_long_outlined,
+                activeIcon: Icons.receipt_long_rounded,
+                label: 'Expenses',
               ),
               _buildTabItem(
                 context,
                 index: 2,
                 selectedIndex: selectedIndex,
-                icon: Icons.receipt_long_outlined,
-                activeIcon: Icons.receipt_long_rounded,
-                label: 'Orders',
-                badgeCount: pendingSyncs,
+                icon: Icons.access_time_outlined,
+                activeIcon: Icons.access_time_filled_rounded,
+                label: 'Timesheets',
+              ),
+              _buildTabItem(
+                context,
+                index: 3,
+                selectedIndex: selectedIndex,
+                icon: Icons.bar_chart_outlined,
+                activeIcon: Icons.bar_chart_rounded,
+                label: 'Analytics',
               ),
             ],
           ),
@@ -118,7 +128,7 @@ class HomeScreen extends ConsumerWidget {
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: BoxDecoration(
                 color: isSelected ? activeBg : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
@@ -164,7 +174,7 @@ class HomeScreen extends ConsumerWidget {
               label,
               style: TextStyle(
                 color: isSelected ? activeColor : inactiveColor,
-                fontSize: 10.5,
+                fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 letterSpacing: -0.2,
               ),

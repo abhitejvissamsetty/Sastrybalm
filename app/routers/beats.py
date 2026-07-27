@@ -30,13 +30,18 @@ async def beat_list(
     beat_type: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(Beat)
+    from sqlalchemy.orm import selectinload
+    from app.models.position import Position
+
+    query = db.query(Beat).options(selectinload(Beat.positions))
     allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
     if allowed_geo_ids is not None:
         query = query.filter(Beat.territory_id.in_(allowed_geo_ids))
 
     if q:
-        query = query.filter(Beat.name.ilike(f"%{q}%") | Beat.code.ilike(f"%{q}%"))
+        query = query.outerjoin(Beat.positions).filter(
+            Beat.name.ilike(f"%{q}%") | Beat.code.ilike(f"%{q}%") | Position.name.ilike(f"%{q}%") | Position.code.ilike(f"%{q}%")
+        ).distinct()
     if beat_type:
         query = query.filter(Beat.beat_type == beat_type)
     query = query.order_by(Beat.name)

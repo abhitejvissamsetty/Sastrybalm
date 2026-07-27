@@ -16,6 +16,7 @@ from app.models import expense          # references User
 from app.models import attendance       # references User
 from app.models import timesheet        # references User, Outlet, Order, Attendance
 from app.models import material_request # references User, Outlet, CompanyProfile
+from app.models import recce            # references MaterialRequest, Vendor, User
 from app.models import procurement      # references MaterialRequest, Vendor, User
 from app.models import asset_capitalization  # references User, Outlet, CompanyProfile, Vendor
 from app.models import alert            # no FK deps
@@ -26,3 +27,4 @@ from app.models import beat_channel_partner
 from app.models import inventory
 from app.models import webhook
 from app.models import beat_type
+from app.models import leave

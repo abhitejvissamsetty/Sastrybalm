@@ -18,6 +18,13 @@ import 'screens/payments/payment_submit_screen.dart';
 import 'screens/expenses/expense_screen.dart';
 import 'screens/material_requests/mr_screen.dart';
 import 'screens/asset_capitalization/asset_cap_screen.dart';
+import 'screens/leave/leave_apply_screen.dart';
+import 'screens/analytics/eis_mis_screen.dart';
+import 'screens/joint_working/joint_working_screen.dart';
+import 'screens/timesheet/timesheet_screen.dart';
+import 'screens/procurement/qc_manager_screen.dart';
+import 'screens/procurement/vendor_admin_screen.dart';
+import 'screens/procurement/vendor_tech_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -76,6 +83,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/material-request', builder: (ctx, _) => const MrScreen()),
           GoRoute(path: '/asset-cap', builder: (ctx, _) => const AssetCapitalizationScreen()),
           GoRoute(path: '/visit', builder: (ctx, _) => const VisitScreen()),
+          GoRoute(path: '/leave/apply', builder: (ctx, _) => const LeaveApplyScreen()),
+          GoRoute(path: '/analytics/eis-mis', builder: (ctx, _) => const EisMisScreen()),
+          GoRoute(path: '/timesheet', builder: (ctx, _) => const TimesheetScreen()),
+          GoRoute(path: '/joint-working', builder: (ctx, _) => const JointWorkingScreen()),
+          GoRoute(path: '/procurement/qc', builder: (ctx, _) => const QcManagerScreen()),
+          GoRoute(path: '/procurement/vendor-admin', builder: (ctx, _) => const VendorAdminScreen()),
+          GoRoute(path: '/procurement/vendor-tech', builder: (ctx, _) => const VendorTechScreen()),
         ],
       ),
     ],

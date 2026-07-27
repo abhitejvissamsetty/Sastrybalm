@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
@@ -33,6 +34,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         setState(() {
           _otpSent = true;
           _sentTarget = res['email'] ?? loginInput;
+          _otpCtrl.clear();
         });
         _showSnackBar('OTP code sent successfully to ${res['email'] ?? loginInput}', const Color(0xFF16A34A));
       }
@@ -59,7 +61,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _verifyOtp() async {
     final otpCode = _otpCtrl.text.trim();
     if (otpCode.isEmpty || otpCode.length < 6) {
-      _showSnackBar('Please enter the 6-digit OTP code sent to your email', const Color(0xFFDC2626));
+      _showSnackBar('Please enter the complete 6-digit OTP code', const Color(0xFFDC2626));
       return;
     }
 
@@ -107,7 +109,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -213,7 +214,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           style: const TextStyle(color: Color(0xFF09090B), fontSize: 14),
                           decoration: InputDecoration(
                             labelText: 'Email or Username / Mobile',
-                            hintText: 'e.g. rep1@safar.com',
+                            hintText: 'e.g. rep1@sastrybalm.com',
                             prefixIcon: const Icon(Icons.person_outline_rounded, size: 20, color: Color(0xFF71717A)),
                             filled: true,
                             fillColor: Colors.white,
@@ -262,36 +263,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                         ),
                       ] else ...[
-                        TextField(
+                        // ── Professional 6-Boxed OTP Component ────────────────
+                        SixBoxOtpInput(
                           controller: _otpCtrl,
-                          keyboardType: TextInputType.number,
-                          maxLength: 6,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 8,
-                            color: Color(0xFF09090B),
-                          ),
-                          decoration: InputDecoration(
-                            labelText: '6-Digit OTP Code',
-                            hintText: '123456',
-                            counterText: '',
-                            prefixIcon: const Icon(Icons.shield_outlined, size: 20, color: Color(0xFF71717A)),
-                            filled: true,
-                            fillColor: Colors.white,
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Color(0xFFE4E4E7), width: 1.0),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Color(0xFF09090B), width: 1.5),
-                            ),
-                          ),
-                          onSubmitted: (_) => _verifyOtp(),
+                          onChanged: (code) {
+                            if (code.length == 6 && !_loading) {
+                              _verifyOtp();
+                            }
+                          },
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 20),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -302,11 +283,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   _otpCtrl.clear();
                                 });
                               },
-                              child: const Text('Change Email / Username', style: TextStyle(color: Color(0xFF71717A), fontSize: 12)),
+                              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                              child: const Text(
+                                'Change Email / Username',
+                                style: TextStyle(color: Color(0xFF71717A), fontSize: 13, fontWeight: FontWeight.w500),
+                              ),
                             ),
                             TextButton(
                               onPressed: _loading ? null : _requestOtp,
-                              child: const Text('Resend OTP', style: TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.bold, fontSize: 12)),
+                              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                              child: const Text(
+                                'Resend OTP',
+                                style: TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700, fontSize: 13),
+                              ),
                             ),
                           ],
                         ),
@@ -353,6 +342,152 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// ── Professional 6-Boxed OTP Widget ──────────────────────────────────────────
+class SixBoxOtpInput extends StatefulWidget {
+  final TextEditingController controller;
+  final ValueChanged<String>? onChanged;
+
+  const SixBoxOtpInput({
+    super.key,
+    required this.controller,
+    this.onChanged,
+  });
+
+  @override
+  State<SixBoxOtpInput> createState() => _SixBoxOtpInputState();
+}
+
+class _SixBoxOtpInputState extends State<SixBoxOtpInput> {
+  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  final List<TextEditingController> _boxControllers = List.generate(6, (_) => TextEditingController());
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_updateFromParentController);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_updateFromParentController);
+    for (var f in _focusNodes) {
+      f.dispose();
+    }
+    for (var c in _boxControllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _updateFromParentController() {
+    final code = widget.controller.text;
+    for (int i = 0; i < 6; i++) {
+      final char = i < code.length ? code[i] : '';
+      if (_boxControllers[i].text != char) {
+        _boxControllers[i].text = char;
+      }
+    }
+  }
+
+  void _onBoxChanged(int index, String value) {
+    if (value.length > 1) {
+      // Handle paste of multiple characters
+      final code = value.replaceAll(RegExp(r'\D'), '');
+      for (int i = 0; i < 6; i++) {
+        _boxControllers[i].text = i < code.length ? code[i] : '';
+      }
+      widget.controller.text = code.length > 6 ? code.substring(0, 6) : code;
+      if (code.isNotEmpty) {
+        final nextIdx = code.length < 6 ? code.length : 5;
+        _focusNodes[nextIdx].requestFocus();
+      }
+      if (widget.onChanged != null) widget.onChanged!(widget.controller.text);
+      return;
+    }
+
+    // Build overall code from individual 6 boxes
+    final codeBuffer = StringBuffer();
+    for (int i = 0; i < 6; i++) {
+      codeBuffer.write(_boxControllers[i].text);
+    }
+    widget.controller.text = codeBuffer.toString();
+
+    if (widget.onChanged != null) {
+      widget.onChanged!(widget.controller.text);
+    }
+
+    // Handle focus direction
+    if (value.isNotEmpty && index < 5) {
+      _focusNodes[index + 1].requestFocus();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(6, (index) {
+        final hasFocus = _focusNodes[index].hasFocus;
+        final hasValue = _boxControllers[index].text.isNotEmpty;
+
+        return SizedBox(
+          width: 44,
+          height: 52,
+          child: KeyboardListener(
+            focusNode: FocusNode(),
+            onKeyEvent: (event) {
+              if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.backspace &&
+                  _boxControllers[index].text.isEmpty &&
+                  index > 0) {
+                _focusNodes[index - 1].requestFocus();
+                _boxControllers[index - 1].clear();
+                _onBoxChanged(index - 1, '');
+              }
+            },
+            child: TextField(
+              controller: _boxControllers[index],
+              focusNode: _focusNodes[index],
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              maxLength: 1,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF09090B),
+              ),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                counterText: '',
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                filled: true,
+                fillColor: hasFocus
+                    ? const Color(0xFFF4F4F5)
+                    : (hasValue ? Colors.white : const Color(0xFFFAFAFA)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: hasValue ? const Color(0xFF09090B) : const Color(0xFFE4E4E7),
+                    width: hasValue ? 1.5 : 1.0,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF09090B),
+                    width: 1.8,
+                  ),
+                ),
+              ),
+              onChanged: (val) => _onBoxChanged(index, val),
+            ),
+          ),
+        );
+      }),
     );
   }
 }

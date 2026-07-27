@@ -60,6 +60,7 @@
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Code</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Type</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden md:table-cell">Territory</th>
+          <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden md:table-cell">Position</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] hidden lg:table-cell text-center">Outlets</th>
           <th class="px-6 py-4 text-left text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Status</th>
           {% if current_user.role.value in ['admin', 'territory_manager'] %}
@@ -97,6 +98,21 @@
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400 hidden md:table-cell">
             {{ item.territory.name if item.territory else '—' }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell">
+            {% if item.positions %}
+              <div class="flex flex-wrap gap-1">
+                {% for pos in item.positions %}
+                  <span class="inline-flex items-center rounded-md bg-indigo-500/10 px-2 py-0.5 text-xs font-medium text-indigo-300 border border-indigo-500/20">
+                    {{ pos.name }}
+                  </span>
+                {% endfor %}
+              </div>
+            {% else %}
+              <span class="inline-flex items-center rounded-md bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-400/90 border border-amber-500/20">
+                Unassigned
+              </span>
+            {% endif %}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-300 hidden lg:table-cell text-center font-semibold">
             {{ item.active_outlet_count }}
@@ -138,7 +154,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" class="px-6 py-20 text-center">
+          <td colspan="8" class="px-6 py-20 text-center">
             <div class="flex flex-col items-center">
                <div class="h-12 w-12 rounded-full bg-slate-900 flex items-center justify-center mb-4 border border-white/5">
                  <svg class="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -100,4 +100,16 @@ class MasterService {
     );
     return Outlet.fromJson(response.data);
   }
+
+  Future<List<Beat>> fetchL1Beats() async {
+    final response = await _client.dio.get('/beats/l1-positions');
+    final items = response.data['items'] as List;
+    return items.map((b) => Beat.fromJson(b)).toList();
+  }
+
+  Future<Map<String, dynamic>> requestOutletEdit(int outletId, Map<String, dynamic> data) async {
+    final response = await _client.dio.post('/outlets/$outletId/edit-request', data: data);
+    return response.data;
+  }
 }
+

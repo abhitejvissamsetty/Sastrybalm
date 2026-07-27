@@ -377,9 +377,60 @@ async def get_my_beats(
     }
 
 
+@router.get("/beats/l1-positions")
+async def get_l1_position_beats(
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """
+    List beats assigned to L1 positions under the user's position hierarchy.
+    Used by Territory Managers (Geography = Territory).
+    """
+    l1_beats = []
+    seen_ids = set()
+    if hasattr(current_user, "positions"):
+        for pos in current_user.positions:
+            if getattr(pos, "is_active", True):
+                # Traverse children positions (L1)
+                for child in getattr(pos, "children", []):
+                    if getattr(child, "is_active", True):
+                        for b in child.beats:
+                            if b.is_active and b.id not in seen_ids:
+                                seen_ids.add(b.id)
+                                l1_beats.append(b)
+
+    # Fallback to all assigned or active beats if hierarchy is unassigned
+    if not l1_beats:
+        l1_beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
+
+    return {
+        "items": [
+            {
+                "id": b.id,
+                "name": b.name,
+                "code": b.code,
+                "beat_type": b.beat_type.value,
+                "beat_grade": b.beat_grade.value if b.beat_grade else None,
+                "territory_id": b.territory_id,
+            }
+            for b in l1_beats
+        ]
+    }
+
+
 class OutletLocationUpdateSchema(BaseModel):
     gps_lat: float
     gps_lng: float
+
+
+class OutletEditSchema(BaseModel):
+    name: Optional[str] = None
+    owner_name: Optional[str] = None
+    mobile: Optional[str] = None
+    address: Optional[str] = None
+    photo_url: Optional[str] = None
+    gps_lat: Optional[float] = None
+    gps_lng: Optional[float] = None
 
 
 @router.get("/outlets/{outlet_id}")
@@ -388,10 +439,25 @@ async def get_outlet_detail(
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
-    """Detailed view of a single outlet."""
+    """Detailed view of a single outlet with Mandatory Field Check."""
     o = db.query(Outlet).filter(Outlet.id == outlet_id).first()
     if not o:
         raise HTTPException(status_code=404, detail="Outlet not found.")
+
+    missing_fields = []
+    if not o.photo_url or not str(o.photo_url).strip():
+        missing_fields.append("photo_url")
+    if not o.mobile or not str(o.mobile).strip():
+        missing_fields.append("mobile")
+    if not o.name or not str(o.name).strip():
+        missing_fields.append("name")
+    if not o.address or not str(o.address).strip():
+        missing_fields.append("address")
+    if o.gps_lat is None or o.gps_lng is None:
+        missing_fields.append("gps")
+
+    is_incomplete = len(missing_fields) > 0
+
     return {
         "id": o.id,
         "name": o.name,
@@ -408,8 +474,50 @@ async def get_outlet_detail(
         "territory_id": o.territory_id,
         "gps_lat": o.gps_lat,
         "gps_lng": o.gps_lng,
+        "photo_url": o.photo_url,
         "status": o.status.value,
+        "is_incomplete": is_incomplete,
+        "missing_fields": missing_fields,
     }
+
+
+@router.post("/outlets/{outlet_id}/edit-request")
+async def request_outlet_edit(
+    outlet_id: int,
+    payload: OutletEditSchema,
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """Submit outlet edit changes for Approval Flow."""
+    o = db.query(Outlet).filter(Outlet.id == outlet_id).first()
+    if not o:
+        raise HTTPException(status_code=404, detail="Outlet not found.")
+
+    # Create AutoFlag / Edit Approval Request
+    from app.models.auto_flag import AutoFlag, RiskSeverity, FlagStatus
+    flag = AutoFlag(
+        entity_type="outlet_edit_approval",
+        entity_id=o.id,
+        user_id=current_user.id,
+        flag_reason=f"Outlet Edit Request submitted by {current_user.full_name}",
+        risk_severity=RiskSeverity.low,
+        status=FlagStatus.open,
+    )
+    db.add(flag)
+
+    # Optionally update non-critical pending fields
+    if payload.photo_url:
+        o.photo_url = payload.photo_url
+    if payload.mobile:
+        o.mobile = payload.mobile
+    if payload.address:
+        o.address = payload.address
+    if payload.gps_lat is not None and payload.gps_lng is not None:
+        o.gps_lat = payload.gps_lat
+        o.gps_lng = payload.gps_lng
+
+    db.commit()
+    return {"message": "Outlet edit submitted successfully for approval.", "outlet_id": o.id}
 
 
 @router.patch("/outlets/{outlet_id}/location")

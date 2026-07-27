@@ -11,8 +11,12 @@ from app.models.base import Base
 class MRStatus(str, enum.Enum):
     draft = "draft"
     submitted = "submitted"
-    acknowledged = "acknowledged"
-    in_progress = "in_progress"
+    vendor_assigned = "vendor_assigned"
+    recce_completed = "recce_completed"
+    quotation_submitted = "quotation_submitted"
+    quotation_approved = "quotation_approved"
+    work_order_issued = "work_order_issued"
+    qc_pending = "qc_pending"
     completed = "completed"
     cancelled = "cancelled"
 
@@ -34,13 +38,20 @@ class MaterialRequest(Base):
     company_profile_id = Column(Integer, ForeignKey("company_profiles.id", ondelete="SET NULL"), nullable=True)
     category = Column(String(100), nullable=True)
     description = Column(Text, nullable=False)
-    status = Column(Enum(MRStatus), nullable=False, default=MRStatus.draft)
+
+    # Procurement-specific fields
+    approx_dimensions = Column(String(255), nullable=True)
+    client_notes = Column(Text, nullable=True)
+    material_specifications = Column(Text, nullable=True)
+    request_type = Column(String(50), nullable=False, default="procurement")
+
+    status = Column(Enum(MRStatus), nullable=False, default=MRStatus.submitted)
     sync_status = Column(Enum(MRSyncStatus), nullable=False, default=MRSyncStatus.not_applicable)
     cmms_ref = Column(String(100), nullable=True)
     cmms_response = Column(Text, nullable=True)
     sync_error = Column(Text, nullable=True)
     sync_retries = Column(Integer, nullable=False, default=0)
-    vendor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True, index=True)
     submitted_at = Column(DateTime, nullable=True)
     image_url = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
@@ -50,7 +61,7 @@ class MaterialRequest(Base):
     archived_at = Column(DateTime, nullable=True)
 
     user = relationship("User", foreign_keys=[user_id], back_populates="material_requests")
-    vendor = relationship("User", foreign_keys=[vendor_id])
+    vendor = relationship("Vendor", foreign_keys=[vendor_id])
     outlet = relationship("Outlet", foreign_keys=[outlet_id])
     company_profile = relationship("CompanyProfile", foreign_keys=[company_profile_id])
     history_logs = relationship("MaterialRequestHistoryLog", back_populates="material_request", order_by="MaterialRequestHistoryLog.created_at.desc()")
@@ -59,8 +70,8 @@ class MaterialRequest(Base):
         return {
             MRStatus.draft: "bg-slate-700 text-slate-300",
             MRStatus.submitted: "bg-blue-900/50 text-blue-300",
-            MRStatus.acknowledged: "bg-indigo-900/50 text-indigo-300",
-            MRStatus.in_progress: "bg-amber-900/50 text-amber-300",
+            MRStatus.vendor_assigned: "bg-indigo-900/50 text-indigo-300",
+            MRStatus.recce_completed: "bg-amber-900/50 text-amber-300",
             MRStatus.completed: "bg-emerald-900/50 text-emerald-300",
             MRStatus.cancelled: "bg-red-900/50 text-red-300",
         }.get(self.status, "bg-slate-700 text-slate-300")

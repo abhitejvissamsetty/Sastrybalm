@@ -10,6 +10,9 @@ class Outlet {
   final String? channel;
   final double? gpsLat;
   final double? gpsLng;
+  final String? photoUrl;
+  final bool isIncomplete;
+  final List<String> missingFields;
 
   Outlet({
     required this.id,
@@ -23,12 +26,15 @@ class Outlet {
     this.channel,
     this.gpsLat,
     this.gpsLng,
+    this.photoUrl,
+    this.isIncomplete = false,
+    this.missingFields = const [],
   });
 
   factory Outlet.fromJson(Map<String, dynamic> json) => Outlet(
     id: json['id'],
-    name: json['name'],
-    code: json['code'],
+    name: json['name'] ?? '',
+    code: json['code'] ?? '',
     beatId: json['beat_id'],
     territoryId: json['territory_id'],
     ownerName: json['owner_name'],
@@ -37,6 +43,9 @@ class Outlet {
     channel: json['channel'],
     gpsLat: (json['gps_lat'] as num?)?.toDouble(),
     gpsLng: (json['gps_lng'] as num?)?.toDouble(),
+    photoUrl: json['photo_url'],
+    isIncomplete: json['is_incomplete'] == true,
+    missingFields: json['missing_fields'] != null ? List<String>.from(json['missing_fields']) : [],
   );
 
   bool get hasGps => gpsLat != null && gpsLng != null;

@@ -41,8 +41,8 @@ def _verify_webhook_secret(x_webhook_secret: Optional[str] = Header(default=None
 # ── Status mapping from CMMS terms → MRStatus ─────────────────────────────
 
 CMMS_STATUS_MAP = {
-    "acknowledged": MRStatus.acknowledged,
-    "in_progress": MRStatus.in_progress,
+    "acknowledged": MRStatus.vendor_assigned,
+    "in_progress": MRStatus.recce_completed,
     "completed": MRStatus.completed,
     "deployed": MRStatus.completed,
     "failed": MRStatus.cancelled,

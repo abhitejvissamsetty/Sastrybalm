@@ -442,3 +442,9 @@ All Web UI routes are structured with section prefixes corresponding to their si
   - **User Role Restriction**: Available ONLY for L2/L3/L4 users (`territory_manager` and `admin`). Blocked for L1 (`field_rep`) users with HTTP 403 / validation error.
   - **Direct Channel Partner Target**: Placed directly against a `Channel Partner` (`channel_partner_id`). `outlet_id` and `visit_id` are `None` (no visit or outlet record required).
   - **Payment Flow Bypassed**: Payment collection flow is completely skipped for Primary Orders.
+
+### K. Beats List View Position Column & Unassigned Fallback
+- **Position Column in Beats List View (`/master-data/beats`)**: Added a dedicated `POSITION` column to the Beats & Routes table view (`app/templates/beats/list.html`).
+- **Position Assignment Display**: Renders indigo pill badges containing the Position name (`pos.name`) assigned to each Beat via the `position_beats` junction table (`Beat.positions`).
+- **Unassigned Fallback Badge**: If no position is assigned to a Beat (`not item.positions`), displays a distinct amber badge: **`Unassigned`** (`bg-amber-500/10 text-amber-400 border-amber-500/20`).
+- **Search & Eager Loading Optimization**: `app/routers/beats.py` uses SQLAlchemy `selectinload(Beat.positions)` for zero N+1 queries, and enables searching beats by position name or code via `q` filter.

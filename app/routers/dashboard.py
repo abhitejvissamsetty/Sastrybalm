@@ -112,7 +112,7 @@ async def dashboard(
     # ── 8. Operational Requests Scope (Expenses & Material Requests) ─────────
     exp_q = db.query(func.count(Expense.id)).filter(Expense.status == ExpenseStatus.submitted)
     mr_q = db.query(func.count(MaterialRequest.id)).filter(
-        MaterialRequest.status.in_([MRStatus.submitted, MRStatus.acknowledged, MRStatus.in_progress])
+        ~MaterialRequest.status.in_([MRStatus.completed, MRStatus.cancelled])
     )
     if allowed_geo_ids is not None:
         rep_ids = [u.id for u in db.query(User.id).filter(User.geography_id.in_(allowed_geo_ids)).all()]

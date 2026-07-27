@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/currency_formatter.dart';
 import '../orders/order_create_screen.dart';
+import '../../providers/attendance_provider.dart';
 
 final myOrdersProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
   final service = ref.watch(orderServiceProvider);
@@ -14,8 +15,43 @@ class OrderListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final attendanceAsync = ref.watch(attendanceProvider);
+    final isCheckedIn = attendanceAsync.valueOrNull?.checkedIn ?? false;
     final ordersAsync = ref.watch(myOrdersProvider);
     final theme = Theme.of(context);
+
+    if (!isCheckedIn) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Order History')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_outline_rounded, size: 64, color: Color(0xFF09090B)),
+                const SizedBox(height: 16),
+                Text(
+                  'Workday Not Active',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'You must Begin Workday on the Dashboard before accessing Orders.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => context.go('/home'),
+                  child: const Text('Go to Dashboard'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

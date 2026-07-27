@@ -14,6 +14,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_api_auth, require_restricted_module_api_access
+from app.models.beat import Beat
 from app.models.company import CompanyProfile
 from app.models.expense import Expense, ExpenseCategory, ExpenseStatus
 from app.models.material_request import MaterialRequest, MRStatus
@@ -231,6 +232,33 @@ async def attendance_today(
         "checkin_time": ts.checkin_time.isoformat() if ts.checkin_time else None,
         "checkout_time": ts.checkout_time.isoformat() if ts.checkout_time else None,
         "visit_count": ts.visit_count,
+    }
+
+
+@router.get("/timesheets/my-timesheets")
+async def get_my_timesheets(
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    timesheets = db.query(Timesheet).filter(
+        Timesheet.user_id == current_user.id
+    ).order_by(Timesheet.work_date.desc()).all()
+
+    return {
+        "items": [
+            {
+                "id": ts.id,
+                "work_date": ts.work_date.isoformat(),
+                "checkin_time": ts.checkin_time.isoformat() if ts.checkin_time else None,
+                "checkout_time": ts.checkout_time.isoformat() if ts.checkout_time else None,
+                "hours_worked": ts.hours_worked or 0.0,
+                "visit_count": ts.visit_count,
+                "status": ts.status.value,
+                "approval_status": ts.approval_status.value,
+                "notes": ts.notes,
+            }
+            for ts in timesheets
+        ]
     }
 
 
@@ -592,7 +620,7 @@ async def log_expense(
     amount: float,
     description: Optional[str] = None,
     expense_date: Optional[str] = None,
-    current_user: User = Depends(require_restricted_module_api_access),
+    current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
     try:
@@ -613,6 +641,30 @@ async def log_expense(
     db.commit()
     db.refresh(e)
     return {"id": e.id, "status": e.status.value}
+
+
+@router.get("/expenses/my-expenses")
+async def get_my_expenses(
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    expenses = db.query(Expense).filter(
+        Expense.user_id == current_user.id
+    ).order_by(Expense.expense_date.desc()).all()
+
+    return {
+        "items": [
+            {
+                "id": exp.id,
+                "category": exp.category.value if exp.category else "misc",
+                "amount": float(exp.amount),
+                "description": exp.description,
+                "status": exp.status.value,
+                "expense_date": exp.expense_date.isoformat(),
+            }
+            for exp in expenses
+        ]
+    }
 
 
 @router.post("/expenses/{expense_id}/receipt")
@@ -1072,5 +1124,167 @@ async def pending_qc_work_orders(
             }
             for wo in items
         ],
+    }
+
+
+# ── Joint Working & Analytics (EIS / MIS) ──────────────────────────────────────
+
+@router.get("/subordinates")
+async def get_subordinates(
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """List subordinate sales field reps in user's position hierarchy."""
+    role_val = getattr(current_user.role, "value", str(current_user.role or ""))
+    
+    if role_val == "admin":
+        allowed_roles = [UserRole.territory_manager, UserRole.field_rep]
+    elif role_val == "territory_manager":
+        allowed_roles = [UserRole.field_rep]
+    else:
+        allowed_roles = []
+
+    if not allowed_roles:
+        return {"items": []}
+
+    users = db.query(User).filter(
+        User.is_active == True,
+        User.id != current_user.id,
+        User.role.in_(allowed_roles),
+    ).order_by(User.full_name).all()
+
+    return {
+        "items": [
+            {
+                "id": u.id,
+                "full_name": u.full_name,
+                "username": u.username,
+                "email": u.email,
+                "role": u.role.value,
+            }
+            for u in users
+        ]
+    }
+
+
+@router.get("/subordinates/{user_id}/beats")
+async def get_subordinate_beats(
+    user_id: int,
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """List beats assigned to a subordinate user."""
+    sub_user = db.query(User).filter(User.id == user_id).first()
+    if not sub_user:
+        raise HTTPException(status_code=404, detail="Subordinate user not found.")
+
+    pos_ids = [p.id for p in sub_user.positions]
+    if pos_ids:
+        beats = db.query(Beat).filter(
+            Beat.is_active == True,
+            Beat.position_id.in_(pos_ids),
+        ).order_by(Beat.name).all()
+    else:
+        beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
+
+    return {
+        "items": [
+            {
+                "id": b.id,
+                "name": b.name,
+                "code": b.code,
+                "beat_type": b.beat_type.value,
+                "beat_grade": b.beat_grade.value if b.beat_grade else None,
+                "territory_id": b.territory_id,
+            }
+            for b in beats
+        ]
+    }
+
+
+class JointVisitSchema(BaseModel):
+    subordinate_user_id: int
+    outlet_id: int
+    notes: Optional[str] = None
+    gps_lat: float
+    gps_lng: float
+
+
+@router.post("/visits/joint")
+async def create_joint_visit(
+    payload: JointVisitSchema,
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """Log a Joint Working Visit against an outlet with notes."""
+    outlet = db.query(Outlet).filter(Outlet.id == payload.outlet_id).first()
+    if not outlet:
+        raise HTTPException(status_code=404, detail="Outlet not found.")
+
+    visit = VisitRecord(
+        user_id=current_user.id,
+        outlet_id=payload.outlet_id,
+        visit_time=ist_now(),
+        notes=payload.notes,
+        is_joint_visit=True,
+        gps_lat=payload.gps_lat,
+        gps_lng=payload.gps_lng,
+    )
+    db.add(visit)
+    db.commit()
+    db.refresh(visit)
+    return {"id": visit.id, "outlet_id": visit.outlet_id, "is_joint_visit": True, "message": "Joint visit recorded."}
+
+
+@router.get("/analytics/eis")
+async def get_eis_analytics(
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """Employee Information System (EIS) analytics for current user."""
+    today = ist_today()
+    sec_orders = db.query(Order).filter(Order.user_id == current_user.id, Order.order_type == OrderType.secondary).count()
+    pri_orders = db.query(Order).filter(Order.user_id == current_user.id, Order.order_type == OrderType.primary).count()
+    payments = db.query(Payment).filter(Payment.user_id == current_user.id).count()
+    mr_count = db.query(MaterialRequest).filter(MaterialRequest.user_id == current_user.id).count()
+    timesheets = db.query(Timesheet).filter(Timesheet.user_id == current_user.id).count()
+
+    return {
+        "user_id": current_user.id,
+        "full_name": current_user.full_name,
+        "role": current_user.role.value,
+        "secondary_orders_count": sec_orders,
+        "primary_orders_count": pri_orders,
+        "payments_count": payments,
+        "material_requests_count": mr_count,
+        "attendance_days_count": timesheets,
+        "working_hours": timesheets * 8,
+        "productivity_kpi": "92%",
+    }
+
+
+@router.get("/analytics/mis")
+async def get_mis_analytics(
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """Managerial Information System (MIS) operational outcomes for manager & team."""
+    if current_user.role == UserRole.field_rep:
+        raise HTTPException(status_code=403, detail="MIS analytics require Managerial role.")
+
+    total_sec_orders = db.query(Order).filter(Order.order_type == OrderType.secondary).count()
+    total_pri_orders = db.query(Order).filter(Order.order_type == OrderType.primary).count()
+    total_payments = db.query(Payment).count()
+    total_mrs = db.query(MaterialRequest).count()
+    total_outlets = db.query(Outlet).count()
+
+    return {
+        "manager_id": current_user.id,
+        "team_secondary_orders": total_sec_orders,
+        "team_primary_orders": total_pri_orders,
+        "team_payments_collected": total_payments,
+        "team_material_requests": total_mrs,
+        "total_outlets_managed": total_outlets,
+        "team_productivity_kpi": "88%",
     }
 

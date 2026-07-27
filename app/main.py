@@ -17,6 +17,9 @@ from app.routers.api import auth as api_auth
 from app.routers.api import master as api_master
 from app.routers.api import operations as api_operations
 from app.routers.api import webhooks as api_webhooks
+from app.routers.api import leaves as api_leaves
+from app.routers.api import journey_plan as api_journey_plan
+from app.routers.api import procurement_workflow as api_procurement_workflow
 from app.scheduler import start_scheduler, scheduler
 from app.services.startup_validation import validate_admin_and_s3_config
 
@@ -218,6 +221,9 @@ app.include_router(api_auth.router)
 app.include_router(api_master.router)
 app.include_router(api_operations.router)
 app.include_router(api_webhooks.router)
+app.include_router(api_leaves.router)
+app.include_router(api_journey_plan.router)
+app.include_router(api_procurement_workflow.router)
 
 
 @app.post("/api/auth/login")

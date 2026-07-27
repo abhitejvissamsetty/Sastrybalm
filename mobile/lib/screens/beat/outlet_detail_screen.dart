@@ -199,6 +199,38 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (outlet.isIncomplete) ...[
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Mandatory Check Failed',
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDC2626), fontSize: 14),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Missing: ${outlet.missingFields.join(', ')}. Please update outlet details below to trigger Edit Approval flow.',
+                              style: const TextStyle(color: Color(0xFF7F1D1D), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     Card(
                       elevation: 2,
                       shadowColor: theme.colorScheme.shadow.withOpacity(0.04),
@@ -320,13 +352,6 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
                             icon: Icons.add_shopping_cart_rounded,
                             color: theme.colorScheme.primary,
                             onTap: () => context.push('/order/new'),
-                          ),
-                          _buildActivityButton(
-                            context,
-                            title: 'Collect Payment',
-                            icon: Icons.payments_rounded,
-                            color: Colors.green.shade600,
-                            onTap: () => context.push('/payment/collect'),
                           ),
                           _buildActivityButton(
                             context,
