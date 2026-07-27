@@ -71,3 +71,21 @@ def require_api_roles(*roles: UserRole):
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         return current_user
     return checker
+
+
+def require_restricted_module_web_access(current_user: User = Depends(require_web_auth)) -> User:
+    if not current_user.can_access_restricted_modules:
+        raise HTTPException(
+            status_code=403,
+            detail="Access restricted: Expenses, Timesheets, and Material Requests require Admin or Territory Manager role with assigned Geography >= Region."
+        )
+    return current_user
+
+
+def require_restricted_module_api_access(current_user: User = Depends(require_api_auth)) -> User:
+    if not current_user.can_access_restricted_modules:
+        raise HTTPException(
+            status_code=403,
+            detail="Access restricted: Expenses, Timesheets, and Material Requests require Admin or Territory Manager role with assigned Geography >= Region."
+        )
+    return current_user

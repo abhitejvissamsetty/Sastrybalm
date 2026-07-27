@@ -8,6 +8,7 @@ class AppUser {
   final String? phone;
   final int? companyProfileId;
   final bool isActive;
+  final bool canAccessRestrictedModules;
 
   AppUser({
     required this.id,
@@ -19,6 +20,7 @@ class AppUser {
     this.phone,
     this.companyProfileId,
     required this.isActive,
+    this.canAccessRestrictedModules = false,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
@@ -31,6 +33,7 @@ class AppUser {
     phone: json['phone'],
     companyProfileId: json['company_profile_id'],
     isActive: json['is_active'] ?? true,
+    canAccessRestrictedModules: json['can_access_restricted_modules'] ?? false,
   );
 
   String get initials {

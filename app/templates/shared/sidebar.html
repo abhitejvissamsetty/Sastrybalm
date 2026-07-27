@@ -2,6 +2,7 @@
 {% set mods = current_user.active_modules() if current_user else [] %}
 {% set is_admin = current_user and current_user.role and current_user.role.value == 'admin' %}
 {% set is_tm_or_admin = current_user and current_user.role and current_user.role.value in ['admin', 'territory_manager'] %}
+{% set can_access_restricted = current_user and current_user.can_access_restricted_modules %}
 
 <div class="flex grow flex-col gap-y-5 overflow-y-auto bg-slate-900 px-4 pb-4">
 
@@ -83,7 +84,7 @@
       {% endif %}
 
       <!-- Operations -->
-      {% if 'orders' in mods or 'expenses' in mods or 'timesheets' in mods or 'inventory' in mods %}
+      {% if 'orders' in mods or ('expenses' in mods and can_access_restricted) or ('timesheets' in mods and can_access_restricted) or ('inventory' in mods and can_access_restricted) %}
       <li>
         <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Operations</p>
         <ul class="space-y-0.5">
@@ -99,7 +100,7 @@
             </a>
           </li>
           {% endif %}
-          {% if 'expenses' in mods %}
+          {% if 'expenses' in mods and can_access_restricted %}
           <li>
             <a href="/operations/expenses"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
@@ -111,7 +112,7 @@
             </a>
           </li>
           {% endif %}
-          {% if 'timesheets' in mods %}
+          {% if 'timesheets' in mods and can_access_restricted %}
           <li>
             <a href="/operations/timesheets"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100
@@ -123,7 +124,7 @@
             </a>
           </li>
           {% endif %}
-          {% if 'inventory' in mods or is_admin %}
+          {% if ('inventory' in mods or is_admin) and can_access_restricted %}
           <li>
             <a href="/operations/material-requests"
                class="flex items-center gap-x-3 rounded-lg px-3 py-2 font-medium transition-colors duration-100

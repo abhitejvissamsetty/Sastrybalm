@@ -126,6 +126,23 @@ class User(Base):
             return ", ".join(p.name for p in self.positions)
         return "—"
 
+    @property
+    def can_access_restricted_modules(self) -> bool:
+        """
+        Returns True ONLY IF:
+          1. User is an Admin ('admin')
+          2. OR User is a Territory Manager ('territory_manager') AND assigned geography level >= Region ('zone', 'region', 'country', 'national').
+        For all other users (Field Reps, Vendor Techs, QC Managers, or TMs assigned below Region e.g. Territory level),
+        Expenses, Timesheets, and Material Requests are completely removed and blocked.
+        """
+        role_val = getattr(self.role, "value", str(self.role or ""))
+        if role_val == "admin":
+            return True
+        if role_val == "territory_manager" and self.geography:
+            geo_level = getattr(self.geography.level, "value", str(self.geography.level or "")).lower()
+            return geo_level in ("zone", "region", "country", "national")
+        return False
+
 
 class UserModuleAccess(Base):
     __tablename__ = "user_module_access"

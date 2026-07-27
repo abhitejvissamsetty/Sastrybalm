@@ -44,6 +44,7 @@ async def api_login(payload: LoginRequest, db: Session = Depends(get_db)):
         employee_id=user.employee_id,
         phone=user.phone,
         company_profile_id=user.company_profile_id,
+        can_access_restricted_modules=user.can_access_restricted_modules,
     )
 
 
@@ -95,6 +96,7 @@ async def api_verify_otp(
         employee_id=user.employee_id,
         phone=user.phone,
         company_profile_id=user.company_profile_id,
+        can_access_restricted_modules=user.can_access_restricted_modules,
     )
 
 

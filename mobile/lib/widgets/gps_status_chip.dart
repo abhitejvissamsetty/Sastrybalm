@@ -77,36 +77,37 @@ class _GpsStatusChipState extends State<GpsStatusChip> {
     IconData icon;
 
     if (_checking) {
-      chipColor = Colors.amber.shade700;
+      chipColor = const Color(0xFFFBBF24); // Amber 400
       icon = Icons.location_searching_rounded;
     } else if (_hasGps) {
-      chipColor = Colors.green.shade600;
+      chipColor = const Color(0xFF34D399); // Emerald 400
       icon = Icons.gps_fixed_rounded;
     } else {
-      chipColor = Colors.red.shade600;
+      chipColor = const Color(0xFFF87171); // Rose 400
       icon = Icons.gps_off_rounded;
     }
 
     return GestureDetector(
       onTap: _checkGps,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: chipColor.withOpacity(0.15),
-          border: Border.all(color: chipColor.withOpacity(0.5)),
+          color: Colors.white.withOpacity(0.18),
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: chipColor, size: 14),
-            const SizedBox(width: 4),
+            Icon(icon, color: chipColor, size: 13),
+            const SizedBox(width: 5),
             Text(
               _message,
               style: TextStyle(
-                color: chipColor,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
               ),
             ),
           ],

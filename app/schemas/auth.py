@@ -32,6 +32,7 @@ class TokenResponse(BaseModel):
     employee_id: Optional[str] = None
     phone: Optional[str] = None
     company_profile_id: Optional[int] = None
+    can_access_restricted_modules: bool = False
 
 
 class UserResponse(BaseModel):
@@ -43,5 +44,6 @@ class UserResponse(BaseModel):
     is_active: bool
     employee_id: Optional[str]
     phone: Optional[str]
+    can_access_restricted_modules: bool = False
 
     model_config = {"from_attributes": True}

@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, require_api_auth
+from app.dependencies import get_db, require_api_auth, require_restricted_module_api_access
 from app.models.company import CompanyProfile
 from app.models.expense import Expense, ExpenseCategory, ExpenseStatus
 from app.models.material_request import MaterialRequest, MRStatus
@@ -498,7 +498,7 @@ async def log_expense(
     amount: float,
     description: Optional[str] = None,
     expense_date: Optional[str] = None,
-    current_user: User = Depends(require_api_auth),
+    current_user: User = Depends(require_restricted_module_api_access),
     db: Session = Depends(get_db),
 ):
     try:
@@ -525,7 +525,7 @@ async def log_expense(
 async def upload_receipt_api(
     expense_id: int,
     request: Request,
-    current_user: User = Depends(require_api_auth),
+    current_user: User = Depends(require_restricted_module_api_access),
     db: Session = Depends(get_db),
 ):
     """Mobile API: upload receipt image for an expense."""
@@ -577,7 +577,7 @@ async def submit_material_request(
     description: str,
     category: Optional[str] = None,
     company_profile_id: Optional[int] = None,
-    current_user: User = Depends(require_api_auth),
+    current_user: User = Depends(require_restricted_module_api_access),
     db: Session = Depends(get_db),
 ):
     outlet = db.query(Outlet).filter(Outlet.id == outlet_id).first()
@@ -886,7 +886,7 @@ async def my_payments(
 async def my_expenses(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
-    current_user: User = Depends(require_api_auth),
+    current_user: User = Depends(require_restricted_module_api_access),
     db: Session = Depends(get_db),
 ):
     """List expenses submitted by authenticated user."""
@@ -916,7 +916,7 @@ async def my_expenses(
 async def my_material_requests(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
-    current_user: User = Depends(require_api_auth),
+    current_user: User = Depends(require_restricted_module_api_access),
     db: Session = Depends(get_db),
 ):
     """List material requests submitted by authenticated user."""

@@ -8,7 +8,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, require_web_auth, require_web_roles
+from app.dependencies import (get_db, require_web_auth, require_web_roles,
+                            require_restricted_module_web_access)
 from app.models.material_request import MaterialRequest, MRStatus, MRSyncStatus
 from app.models.product import Product, ProductCategory
 from app.models.procurement import VendorQuotation, WorkOrder, QuotationStatus, WorkOrderStatus, QCStatus
@@ -27,7 +28,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("", response_class=HTMLResponse)
 async def mr_list(
     request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_restricted_module_web_access),
     db: Session = Depends(get_db),
     status: str = Query(default=""),
     user_id: str = Query(default=""),

@@ -34,26 +34,26 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedIndex = _calculateSelectedIndex(context);
     final pendingSyncs = ref.watch(syncProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FC),
       body: child,
       bottomNavigationBar: SafeArea(
         child: Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
           height: 68,
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(24),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
             border: Border.all(
-              color: theme.colorScheme.primary.withOpacity(0.08),
+              color: const Color(0xFFE2E8F0),
               width: 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
@@ -64,8 +64,8 @@ class HomeScreen extends ConsumerWidget {
                 context,
                 index: 0,
                 selectedIndex: selectedIndex,
-                icon: Icons.dashboard_outlined,
-                activeIcon: Icons.dashboard_rounded,
+                icon: Icons.grid_view_outlined,
+                activeIcon: Icons.grid_view_rounded,
                 label: 'Dashboard',
               ),
               _buildTabItem(
@@ -80,8 +80,8 @@ class HomeScreen extends ConsumerWidget {
                 context,
                 index: 2,
                 selectedIndex: selectedIndex,
-                icon: Icons.history_outlined,
-                activeIcon: Icons.history_rounded,
+                icon: Icons.receipt_long_outlined,
+                activeIcon: Icons.receipt_long_rounded,
                 label: 'Orders',
                 badgeCount: pendingSyncs,
               ),
@@ -101,23 +101,25 @@ class HomeScreen extends ConsumerWidget {
     required String label,
     int badgeCount = 0,
   }) {
-    final theme = Theme.of(context);
     final isSelected = index == selectedIndex;
-    final color = isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface.withOpacity(0.5);
+    final activeColor = const Color(0xFF4F46E5);
+    final inactiveColor = const Color(0xFF94A3B8);
 
     return Expanded(
       child: InkWell(
         onTap: () => _onItemTapped(index, context),
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
               decoration: BoxDecoration(
-                color: isSelected ? theme.colorScheme.primary.withOpacity(0.08) : Colors.transparent,
+                color: isSelected ? activeColor.withOpacity(0.12) : Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Stack(
@@ -125,12 +127,12 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   Icon(
                     isSelected ? activeIcon : icon,
-                    color: color,
-                    size: 24,
+                    color: isSelected ? activeColor : inactiveColor,
+                    size: 22,
                   ),
                   if (badgeCount > 0)
                     Positioned(
-                      right: -6,
+                      right: -8,
                       top: -6,
                       child: Container(
                         padding: const EdgeInsets.all(3),
@@ -147,7 +149,7 @@ class HomeScreen extends ConsumerWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 8,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w900,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -156,13 +158,14 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                color: color,
+                color: isSelected ? activeColor : inactiveColor,
                 fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                letterSpacing: -0.2,
               ),
             ),
           ],

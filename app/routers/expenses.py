@@ -8,7 +8,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, require_web_auth, require_web_roles
+from app.dependencies import (get_db, require_web_auth, require_web_roles,
+                            require_restricted_module_web_access)
 from app.models.expense import Expense, ExpenseCategory, ExpenseStatus
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
@@ -24,7 +25,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("", response_class=HTMLResponse)
 async def expense_list(
     request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_restricted_module_web_access),
     db: Session = Depends(get_db),
     status: str = Query(default=""),
     category: str = Query(default=""),
