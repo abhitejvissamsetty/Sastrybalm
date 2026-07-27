@@ -33,10 +33,10 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
   XFile? _selectedReceiptFile;
 
   final List<Map<String, dynamic>> _categories = [
-    {'key': 'travel', 'label': 'Travel', 'icon': Icons.directions_car_rounded, 'color': const Color(0xFF3B82F6)},
-    {'key': 'food', 'label': 'Food', 'icon': Icons.restaurant_rounded, 'color': const Color(0xFFF59E0B)},
-    {'key': 'accommodation', 'label': 'Accommodation', 'icon': Icons.hotel_rounded, 'color': const Color(0xFF10B981)},
-    {'key': 'misc', 'label': 'Miscellaneous', 'icon': Icons.more_horiz_rounded, 'color': const Color(0xFF8B5CF6)},
+    {'key': 'travel', 'label': 'Travel', 'icon': Icons.commute_rounded, 'color': const Color(0xFF3B82F6)},
+    {'key': 'food', 'label': 'Food', 'icon': Icons.local_cafe_rounded, 'color': const Color(0xFFF59E0B)},
+    {'key': 'accommodation', 'label': 'Accommodation', 'icon': Icons.king_bed_rounded, 'color': const Color(0xFF10B981)},
+    {'key': 'misc', 'label': 'Miscellaneous', 'icon': Icons.grid_view_rounded, 'color': const Color(0xFF8B5CF6)},
   ];
 
   @override

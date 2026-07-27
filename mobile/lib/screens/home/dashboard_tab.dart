@@ -430,71 +430,106 @@ class DashboardTab extends ConsumerWidget {
                   const SizedBox(height: 12),
                   userAsync.when(
                     data: (user) {
-                      final canAccessRestricted = user?.canAccessRestrictedModules ?? false;
+                      final isL2Plus = user?.isL2OrAbove ?? false;
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (user?.isL2OrAbove == true) ...[
+                          if (isL2Plus) ...[
+                            // ── Row 1: Start Retailing + Joint Working ──────────
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildActionTile(
+                                    context,
+                                    title: 'Start Retailing',
+                                    subtitle: 'Secondary beat orders',
+                                    icon: Icons.storefront_rounded,
+                                    onTap: () => context.push('/beat'),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildActionTile(
+                                    context,
+                                    title: 'Joint Working',
+                                    subtitle: 'Subordinate visits',
+                                    icon: Icons.people_alt_rounded,
+                                    onTap: () => context.push('/joint-working'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            // ── Row 2: Create Primary (full width) ─────────────
                             _buildActionCard(
                               context,
                               title: 'Create Primary',
                               description: 'Book primary distributor & channel partner order.',
-                              icon: Icons.add_shopping_cart_rounded,
+                              icon: Icons.receipt_long_rounded,
                               buttonLabel: 'Create Primary Order Now',
                               isPrimary: true,
                               onTap: () => context.push('/order/new'),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 12),
+                            // ── Row 3: Apply Leave (full width) ────────────────
+                            _buildFullWidthTile(
+                              context,
+                              title: 'Apply Leave',
+                              subtitle: 'Submit time-off requests for approval',
+                              icon: Icons.event_available_rounded,
+                              onTap: () => context.push('/leave/apply'),
+                            ),
+                          ] else ...[
+                            // ── Non-L2: original grid layout ───────────────────
+                            GridView.count(
+                              crossAxisCount: 2,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                              childAspectRatio: 1.35,
+                              children: [
+                                _buildActionTile(
+                                  context,
+                                  title: 'Start Retailing',
+                                  subtitle: 'Secondary beat orders',
+                                  icon: Icons.storefront_rounded,
+                                  onTap: () => context.push('/beat'),
+                                ),
+                                _buildActionTile(
+                                  context,
+                                  title: 'Apply Leave',
+                                  subtitle: 'Time off requests',
+                                  icon: Icons.event_available_rounded,
+                                  onTap: () => context.push('/leave/apply'),
+                                ),
+                                if (user?.role == 'qc_manager')
+                                  _buildActionTile(
+                                    context,
+                                    title: 'QC Inspection',
+                                    subtitle: 'Batch ID & Inspection',
+                                    icon: Icons.verified_rounded,
+                                    onTap: () => context.push('/procurement/qc'),
+                                  ),
+                                if (user?.role == 'vendor_admin')
+                                  _buildActionTile(
+                                    context,
+                                    title: 'Vendor Admin Portal',
+                                    subtitle: 'Quotations & Work Orders',
+                                    icon: Icons.corporate_fare_rounded,
+                                    onTap: () => context.push('/procurement/vendor-admin'),
+                                  ),
+                                if (user?.role == 'vendor_technician')
+                                  _buildActionTile(
+                                    context,
+                                    title: 'Vendor Tech Portal',
+                                    subtitle: 'Recce & Asset Installs',
+                                    icon: Icons.build_circle_rounded,
+                                    onTap: () => context.push('/procurement/vendor-tech'),
+                                  ),
+                              ],
+                            ),
                           ],
-                          GridView.count(
-                            crossAxisCount: 2,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 1.35,
-                            children: [
-                              _buildActionTile(
-                                context,
-                                title: 'Apply Leave',
-                                subtitle: 'Time off requests',
-                                icon: Icons.event_note_outlined,
-                                onTap: () => context.push('/leave/apply'),
-                              ),
-                              if (canAccessRestricted)
-                                _buildActionTile(
-                                  context,
-                                  title: 'Joint Working',
-                                  subtitle: 'Subordinate visits',
-                                  icon: Icons.group_outlined,
-                                  onTap: () => context.push('/joint-working'),
-                                ),
-                              if (user?.role == 'qc_manager')
-                                _buildActionTile(
-                                  context,
-                                  title: 'QC Inspection',
-                                  subtitle: 'Batch ID & Inspection',
-                                  icon: Icons.fact_check_outlined,
-                                  onTap: () => context.push('/procurement/qc'),
-                                ),
-                              if (user?.role == 'vendor_admin')
-                                _buildActionTile(
-                                  context,
-                                  title: 'Vendor Admin Portal',
-                                  subtitle: 'Quotations & Work Orders',
-                                  icon: Icons.business_outlined,
-                                  onTap: () => context.push('/procurement/vendor-admin'),
-                                ),
-                              if (user?.role == 'vendor_technician')
-                                _buildActionTile(
-                                  context,
-                                  title: 'Vendor Tech Portal',
-                                  subtitle: 'Recce & Asset Installs',
-                                  icon: Icons.handyman_outlined,
-                                  onTap: () => context.push('/procurement/vendor-tech'),
-                                ),
-                            ],
-                          ),
                         ],
                       );
                     },
@@ -886,6 +921,76 @@ class DashboardTab extends ConsumerWidget {
                   ),
                 ],
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullWidthTile(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x04000000),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F4F5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, size: 20, color: const Color(0xFF09090B)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Color(0xFF09090B),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0xFF71717A),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFA1A1AA)),
             ],
           ),
         ),

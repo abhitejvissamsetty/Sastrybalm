@@ -228,8 +228,8 @@ async def mr_update_status(
 
     old_st = item.status.value if item.status else None
     if new_status in ["Approved", "Rejected", "Held", "approved", "rejected", "held"]:
-        st_map = {"approved": MRStatus.acknowledged, "rejected": MRStatus.cancelled, "held": MRStatus.submitted}
-        item.status = st_map.get(new_status.lower(), MRStatus.acknowledged)
+        st_map = {"approved": MRStatus.vendor_assigned, "rejected": MRStatus.cancelled, "held": MRStatus.submitted}
+        item.status = st_map.get(new_status.lower(), MRStatus.vendor_assigned)
         db.commit()
 
         from app.services.channel_partner_notification import (
@@ -247,8 +247,8 @@ async def mr_update_status(
             notes=f"Status updated from '{old_st}' to '{item.status.value}' by {current_user.full_name}"
         )
 
-        # Notify vendor if approved
-        if item.status == MRStatus.acknowledged and item.vendor_id:
+        # Notify vendor if approved and a vendor is assigned
+        if item.status == MRStatus.vendor_assigned and item.vendor_id:
             trigger_vendor_material_request_notification(db, item)
 
         set_flash_success(request, f"Material Request status updated to '{new_status.title()}'.")
@@ -345,7 +345,7 @@ async def quote_review(
         )
         db.add(wo)
         if mr:
-            mr.status = MRStatus.in_progress
+            mr.status = MRStatus.work_order_issued
         db.commit()
 
         record_material_request_history_log(
@@ -354,7 +354,7 @@ async def quote_review(
             action="work_order_created",
             performed_by_id=current_user.id,
             old_status=mr.status.value if mr else None,
-            new_status=MRStatus.in_progress.value,
+            new_status=MRStatus.work_order_issued.value,
             vendor_id=quote.vendor_id,
             notes=f"Quotation of ₹{quote.quote_amount:.2f} approved and Work Order {wo.wo_number} issued to Vendor."
         )

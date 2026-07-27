@@ -77,8 +77,17 @@ async def approvals_hub(
         exp_q = exp_q.join(User, Expense.user_id == User.id).filter(User.geography_id.in_(allowed_geo_ids))
     pending_expenses = exp_q.scalar() or 0
 
-    # Material request approvals
-    mr_q = db.query(func.count(MaterialRequest.id)).filter(MaterialRequest.status.in_([MRStatus.submitted, MRStatus.acknowledged]))
+    # Material request approvals — all non-terminal (non-completed/non-cancelled) statuses
+    _MR_PENDING = [
+        MRStatus.submitted,
+        MRStatus.vendor_assigned,
+        MRStatus.recce_completed,
+        MRStatus.quotation_submitted,
+        MRStatus.quotation_approved,
+        MRStatus.work_order_issued,
+        MRStatus.qc_pending,
+    ]
+    mr_q = db.query(func.count(MaterialRequest.id)).filter(MaterialRequest.status.in_(_MR_PENDING))
     if allowed_geo_ids is not None:
         mr_q = mr_q.join(User, MaterialRequest.user_id == User.id).filter(User.geography_id.in_(allowed_geo_ids))
     pending_mrs = mr_q.scalar() or 0

@@ -259,7 +259,11 @@ async def marketing_page(
     ).scalar() or 0
 
     pending_mrs = db.query(func.count(MaterialRequest.id)).filter(
-        MaterialRequest.status.in_([MRStatus.submitted, MRStatus.acknowledged]),
+        MaterialRequest.status.in_([
+            MRStatus.submitted, MRStatus.vendor_assigned, MRStatus.recce_completed,
+            MRStatus.quotation_submitted, MRStatus.quotation_approved,
+            MRStatus.work_order_issued, MRStatus.qc_pending,
+        ]),
         MaterialRequest.created_at >= since
     ).scalar() or 0
 
