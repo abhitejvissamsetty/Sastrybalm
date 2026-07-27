@@ -56,7 +56,7 @@ async def inventory_list(
     query_str: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    """View inventory balances and warehouse assignments for stockable products."""
+    """View inventory balances and warehouse assignments for stockable products, strictly scoped to allowed user warehouses."""
     allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
 
     query = (
@@ -64,6 +64,22 @@ async def inventory_list(
         .options(joinedload(Product.warehouse_stocks).joinedload(ProductWarehouseStock.warehouse))
         .filter(Product.is_active == True, Product.is_stockable == True)
     )
+
+    if allowed_wh_ids is not None:
+        if allowed_wh_ids:
+            # Filter products to only those attached to allowed user warehouses
+            query = query.filter(
+                Product.id.in_(
+                    db.query(ProductWarehouseStock.product_id).filter(
+                        ProductWarehouseStock.warehouse_id.in_(allowed_wh_ids),
+                        ProductWarehouseStock.is_active == True
+                    )
+                )
+            )
+        else:
+            # If user has no allowed warehouses, return no products
+            query = query.filter(Product.id == -1)
+
     if query_str:
         query = query.filter(
             Product.name.ilike(f"%{query_str}%") | 
@@ -72,6 +88,19 @@ async def inventory_list(
         )
     query = query.order_by(Product.name.asc())
     pagination = paginate(query, page)
+
+    # Attach scoped stocks and total scoped balance for each product in pagination items
+    for prod in pagination.items:
+        if allowed_wh_ids is not None:
+            scoped_stocks = [
+                ws for ws in prod.warehouse_stocks
+                if ws.is_active and ws.warehouse_id in allowed_wh_ids
+            ]
+        else:
+            scoped_stocks = [ws for ws in prod.warehouse_stocks if ws.is_active]
+
+        prod.scoped_warehouse_stocks = scoped_stocks
+        prod.scoped_total_stock = sum(ws.stock_qty for ws in scoped_stocks)
 
     wh_query = db.query(Warehouse).filter(Warehouse.is_active == True)
     if allowed_wh_ids is not None:
@@ -84,6 +113,7 @@ async def inventory_list(
         "pagination": pagination,
         "query_str": query_str,
         "warehouses": warehouses,
+        "allowed_wh_ids": allowed_wh_ids,
         **get_flash(request),
     })
 

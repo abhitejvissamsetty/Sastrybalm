@@ -15,9 +15,11 @@
       <a href="/inventory/movements" class="rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-700 transition-colors">
         Stock Audit Logs
       </a>
+      {% if current_user and current_user.role and current_user.role.value == 'admin' %}
       <a href="/products" class="rounded-xl bg-indigo-600/20 border border-indigo-500/30 px-4 py-2.5 text-sm font-semibold text-indigo-300 hover:bg-indigo-600/30 transition-colors">
         Manage Products Catalogue &rarr;
       </a>
+      {% endif %}
     </div>
   </div>
 
@@ -63,9 +65,10 @@
           </td>
           <td class="px-6 py-4">
             <div class="flex flex-wrap items-center gap-1.5 max-w-md">
-              {% if prod.warehouse_stocks %}
-                {% for ws in prod.warehouse_stocks %}
-                  {% if ws.is_active %}
+              {% set stocks_list = prod.scoped_warehouse_stocks if prod.scoped_warehouse_stocks is defined else prod.warehouse_stocks %}
+              {% if stocks_list %}
+                {% for ws in stocks_list %}
+                  {% if ws.is_active and (allowed_wh_ids is none or ws.warehouse_id in allowed_wh_ids) %}
                   <span class="inline-flex items-center gap-x-1 rounded-lg bg-slate-900 border border-slate-700/80 px-2 py-1 text-[11px] font-medium text-slate-200 shadow-sm">
                     <svg class="h-3 w-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -74,7 +77,7 @@
                   </span>
                   {% endif %}
                 {% endfor %}
-              {% elif prod.warehouse %}
+              {% elif prod.warehouse and (allowed_wh_ids is none or prod.warehouse_id in allowed_wh_ids) %}
                 <span class="inline-flex items-center gap-x-1 rounded-lg bg-slate-900 border border-slate-700/80 px-2 py-1 text-[11px] font-medium text-slate-200">
                   {{ prod.warehouse.name }}: <strong class="text-white font-mono">{{ prod.stock_qty }}</strong>
                 </span>
@@ -85,7 +88,7 @@
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
             <span class="inline-flex items-center rounded-full bg-indigo-950/80 px-3 py-1 text-xs font-bold text-indigo-300 border border-indigo-800/60 shadow-inner">
-              {{ prod.stock_qty }} Total Units
+              {{ prod.scoped_total_stock if prod.scoped_total_stock is defined else prod.stock_qty }} Total Units
             </span>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-xs font-medium space-x-2">
@@ -97,10 +100,12 @@
               </svg>
               Details
             </button>
+            {% if current_user and current_user.role and current_user.role.value == 'admin' %}
             <a href="/products/{{ prod.id }}/attach-warehouses"
                class="inline-flex items-center gap-x-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors">
               + Attach WH
             </a>
+            {% endif %}
             <button onclick="openInwardModal('{{ prod.id }}', '{{ prod.name|escape }}')"
                     class="inline-flex items-center gap-x-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700 hover:bg-slate-700 transition-colors">
               + Inward

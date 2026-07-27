@@ -17,8 +17,50 @@ from app.utils.flash import set_flash_success, set_flash_error, get_flash
 
 logger = logging.getLogger(__name__)
 
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 templates = Jinja2Templates(directory="app/templates")
+
+
+@router.post("/test-s3")
+async def onboarding_test_s3(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """AJAX endpoint to test S3/MinIO credentials before submitting onboarding."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "message": "Invalid JSON payload."}, status_code=400)
+
+    s3_endpoint = (data.get("s3_endpoint") or "").strip()
+    s3_bucket = (data.get("s3_bucket") or "").strip()
+    s3_access_key = (data.get("s3_access_key") or "").strip()
+    s3_secret_key = (data.get("s3_secret_key") or "").strip()
+    s3_region = (data.get("s3_region") or "us-east-1").strip()
+
+    if not s3_bucket:
+        return JSONResponse({"success": False, "message": "Bucket Name is required."}, status_code=400)
+    if not s3_access_key:
+        return JSONResponse({"success": False, "message": "Access Key ID is required."}, status_code=400)
+    if not s3_secret_key:
+        return JSONResponse({"success": False, "message": "Secret Access Key is required."}, status_code=400)
+
+    s3_config = {
+        "s3_endpoint": s3_endpoint,
+        "s3_bucket": s3_bucket,
+        "s3_access_key": s3_access_key,
+        "s3_secret_key": s3_secret_key,
+        "s3_region": s3_region or "us-east-1",
+    }
+
+    from app.adapters.s3_storage import test_s3_connection
+    ok, msg = test_s3_connection(s3_config)
+    if ok:
+        return JSONResponse({"success": True, "message": f"Connection successful! S3/MinIO bucket '{s3_bucket}' is verified and ready."})
+    else:
+        return JSONResponse({"success": False, "message": f"S3 Connection failed: {msg}"}, status_code=400)
 
 
 @router.get("", response_class=HTMLResponse)

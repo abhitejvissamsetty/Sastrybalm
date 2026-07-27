@@ -24,7 +24,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("", response_class=HTMLResponse)
 async def product_list(
     request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     q: str = Query(default=""),
     category_type: str = Query(default=""),

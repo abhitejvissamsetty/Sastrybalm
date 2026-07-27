@@ -32,24 +32,37 @@ def get_s3_client(s3_config: dict):
         endpoint_url=endpoint_url or None,
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
-        config=Config(signature_version="s3v4")
+        config=Config(
+            signature_version="s3v4",
+            connect_timeout=3,
+            read_timeout=5,
+            retries={"max_attempts": 1}
+        )
     )
     return client
 
 
-def test_s3_connection(s3_config: dict) -> Tuple[bool, str]:
-    """Test S3 / MinIO credentials and bucket access."""
+import concurrent.futures
+
+def test_s3_connection(s3_config: dict, timeout_seconds: float = 4.0) -> Tuple[bool, str]:
+    """Test S3 / MinIO credentials and bucket access with strict execution timeout."""
     bucket = s3_config.get("s3_bucket")
     if not bucket:
         return False, "S3 Bucket name is missing"
-    
-    try:
+
+    def _ping():
         client = get_s3_client(s3_config)
-        # Attempt head_bucket or list_objects_v2
         client.head_bucket(Bucket=bucket)
         return True, f"Successfully connected to bucket '{bucket}'"
-    except Exception as e:
-        return False, str(e)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_ping)
+        try:
+            return future.result(timeout=timeout_seconds)
+        except concurrent.futures.TimeoutError:
+            return False, f"Connection timed out after {int(timeout_seconds)} seconds. Please verify S3 Endpoint URL and credentials."
+        except Exception as e:
+            return False, str(e)
 
 
 def upload_file_to_s3(

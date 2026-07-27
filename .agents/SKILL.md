@@ -14,7 +14,7 @@ description: >-
 Sastrybalm ERP is a comprehensive FMCG Sales & Distribution Management System built with **FastAPI**, **SQLAlchemy**, **Jinja2 Templates**, and **MySQL (MAMP)**.
 
 The system orchestrates:
-- **Mandatory S3 Storage & Onboarding Trigger**: If S3/MinIO bucket storage is not configured or fails connectivity checks, `is_system_onboarded(db)` returns `False`, forcing redirection to `/onboarding` to configure S3 endpoint, bucket name, and credentials mandatorily before allowing access to the dashboard.
+- **Mandatory S3 Storage & Onboarding Trigger**: If S3/MinIO bucket storage is not configured or fails connectivity checks, `is_system_onboarded(db)` returns `False`, forcing redirection to `/onboarding`. Features an interactive **"⚡ Test S3 / MinIO Connection"** AJAX action button (`POST /onboarding/test-s3`) to verify bucket credentials and endpoint reachability with live feedback banners before completing setup.
 - **Server Startup Validation & S3/MinIO Storage**: Server restart (`lifespan`) validation of active Admin account and S3 bucket connection, asset storage, daily backups, and time-bound pre-signed URLs.
 - **Geography & Regional Warehouse Architecture**: Multi-tier hierarchy (`Zone` → `Region` → `Territory`) with region-level warehouse mapping and unified scoping (`get_user_allowed_geography_ids` & `get_user_allowed_warehouse_ids`).
 - **Position Hierarchy**: 4-level organizational hierarchy (`L1` to `L4`) with automatic reporting parent warehouse inheritance resolution.
@@ -98,8 +98,9 @@ When an **Outlet** places an Order, Asset Request, or Material Request:
 - **Marketing - Stock**: Promotional marketing items stored in warehouses.
 
 ### Inventory Scoping & Unmapped Warehouse Exclusion
-- Product inventory balance lists, product warehouse breakdown modals (`/product/{id}/warehouse-details`), stock inwarding, and stock adjustments (`app/routers/inventory.py`) are strictly scoped to `get_user_allowed_warehouse_ids`.
-- Unmapped warehouses (e.g. `TN Coimbatore`) are automatically hidden from Territory Managers assigned to `North TN`.
+- **Product List Scoping (`app/routers/inventory.py`)**: Products shown in the Stock Inventory page are strictly filtered to products that are attached to at least one active warehouse in the user's allowed warehouse scope (`get_user_allowed_warehouse_ids`). Products with no attached warehouses in the user's scope (e.g. `FRONTLIT-BOARD`) are completely excluded from view.
+- **Attached Warehouse Badge Scoping (`app/templates/inventory/list.html`)**: Warehouse badges rendered under "Attached Warehouses" and stock totals are strictly filtered so that unauthorized warehouses (e.g. `TN COIMBATORE` for `kkalpanamuthu`) are hidden, and total units display only the stock balance within authorized warehouses.
+- Product inventory breakdown modals (`/product/{id}/warehouse-details`), stock inwarding, and stock adjustments are strictly scoped to allowed user warehouses.
 
 ### Stock Audit Log Filters (`app/templates/inventory/movements.html`)
 - Provides filter bar for searching stock movements by:
@@ -170,7 +171,7 @@ The **Action Center** section in sidebar navigation (`app/templates/shared/sideb
 | Role (`UserRole`) | Scope & Navigation Visibility |
 | :--- | :--- |
 | **`admin`** | **Full Access**: All sections, Master Data (`Users & Reps`, `Positions`, `Geography`, `Beats`, `Outlets`, `Channel Partners`, `Vendors`), Configuration, Action Center. |
-| **`territory_manager`** | **Regional Management Scope**: Assigned to Region (`Geography`). <br>• **Master Data Menu Scoping**: `Users & Reps` and `Positions` are hidden under Master Data in sidebar. Retains `Geography`, `Beats & Routes`, `Outlets` (approval-based edit), `Channel Partners` (CSV button removed), and `Vendors`. <br>• **Action Center Scope**: Access to Approval Hub (if Position > L2 & Geo >= Region), Alerts, Auto-Flags. |
+| **`territory_manager`** | **Regional Management Scope**: Assigned to Region (`Geography`). <br>• **Products Catalogue Restricted**: `/products` page, creation, and edits are strictly restricted to Admins. Hidden under Catalogue in sidebar navigation and inventory header. <br>• **Master Data Menu Scoping**: `Users & Reps` and `Positions` are hidden under Master Data in sidebar. Retains `Geography`, `Beats & Routes`, `Outlets` (approval-based edit), `Channel Partners` (CSV button removed), and `Vendors`. <br>• **Action Center Scope**: Access to Approval Hub (if Position > L2 & Geo >= Region), Alerts, Auto-Flags. |
 | **`field_rep`** | **Field Mobile Execution**: Route visits, order taking, outlet edits (creates approval request), attendance, expenses. |
 
 ---
