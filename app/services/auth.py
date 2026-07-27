@@ -19,15 +19,10 @@ from app.utils.backup_service import restore_sql_backup
 
 
 def is_system_onboarded(db: Session) -> bool:
-    """Check if the system has completed onboarding (active admin with encrypted password AND mandatory verified S3 storage)."""
+    """Check if the system has completed onboarding (active admin with encrypted password)."""
     try:
         admin = db.query(User).filter(User.role == UserRole.admin, User.is_active == True).first()
-        if not (admin and admin.hashed_password and admin.hashed_password.strip() != "" and admin.hashed_password != "PENDING_ONBOARDING"):
-            return False
-        
-        from app.services.startup_validation import validate_s3_configuration
-        s3_res = validate_s3_configuration(db)
-        return bool(s3_res and s3_res.get("configured"))
+        return bool(admin and admin.hashed_password and admin.hashed_password.strip() != "" and admin.hashed_password != "PENDING_ONBOARDING")
     except Exception as e:
         logger.warning(f"is_system_onboarded check exception: {e}")
         return False
@@ -40,45 +35,10 @@ def complete_system_onboarding(
     email: str,
     phone: str,
     password: str,
-    s3_endpoint: str,
-    s3_bucket: str,
-    s3_access_key: str,
-    s3_secret_key: str,
-    s3_region: str = "us-east-1",
     backup_file_path: Optional[str] = None,
 ) -> User:
-    """Perform first-bootup system onboarding: save mandatory S3 config, optionally restore .sql backup, and save Admin password."""
-    from app.models.company import SystemConfiguration
-    from app.adapters.s3_storage import test_s3_connection
-
-    # 1. Save and test mandatory S3 configuration
-    s3_dict = {
-        "s3_endpoint": s3_endpoint.strip(),
-        "s3_bucket": s3_bucket.strip(),
-        "s3_access_key": s3_access_key.strip(),
-        "s3_secret_key": s3_secret_key.strip(),
-        "s3_region": s3_region.strip() if s3_region else "us-east-1",
-    }
-
-    ok, s3_msg = test_s3_connection(s3_dict)
-    if not ok:
-        raise ValueError(f"S3 / MinIO Configuration test failed: {s3_msg}. Please provide valid S3 endpoint and credentials.")
-
-    sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
-    if not sys_config:
-        sys_config = SystemConfiguration(id=1)
-        db.add(sys_config)
-    
-    sys_config.s3_endpoint_url = s3_dict["s3_endpoint"]
-    sys_config.s3_bucket_name = s3_dict["s3_bucket"]
-    sys_config.s3_access_key_id = s3_dict["s3_access_key"]
-    sys_config.s3_secret_access_key = s3_dict["s3_secret_key"]
-    sys_config.s3_region_name = s3_dict["s3_region"]
-    sys_config.s3_is_enabled = True
-
-    db.flush()
-
-    # 2. Restore backup data if provided
+    """Perform first-bootup system onboarding: optionally restore .sql backup and save Admin password."""
+    # 1. Restore backup data if provided
     if backup_file_path and os.path.exists(backup_file_path):
         try:
             restore_sql_backup(backup_file_path)

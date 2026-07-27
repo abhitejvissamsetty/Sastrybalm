@@ -160,6 +160,15 @@ def run_migrations():
         add_column_safely(conn, "system_configuration", "s3_region_name", "VARCHAR(100) NULL DEFAULT 'us-west-004'")
         add_column_safely(conn, "system_configuration", "s3_is_enabled", "BOOLEAN NOT NULL DEFAULT 0")
         add_column_safely(conn, "system_configuration", "s3_public_url_prefix", "VARCHAR(255) NULL")
+
+        # Files Bucket Separate S3 Settings
+        add_column_safely(conn, "system_configuration", "s3_files_is_enabled", "BOOLEAN NOT NULL DEFAULT 0")
+        add_column_safely(conn, "system_configuration", "s3_files_endpoint_url", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "s3_files_bucket_name", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "s3_files_access_key_id", "VARCHAR(255) NULL")
+        add_column_safely(conn, "system_configuration", "s3_files_secret_access_key", "TEXT NULL")
+        add_column_safely(conn, "system_configuration", "s3_files_region_name", "VARCHAR(100) NULL DEFAULT 'us-west-004'")
+        add_column_safely(conn, "system_configuration", "s3_files_public_url_prefix", "VARCHAR(255) NULL")
         add_column_safely(conn, "system_configuration", "whatsapp_api_key", "TEXT NULL")
         add_column_safely(conn, "system_configuration", "whatsapp_phone_number_id", "VARCHAR(255) NULL")
         add_column_safely(conn, "system_configuration", "whatsapp_business_account_id", "VARCHAR(255) NULL")

@@ -23,46 +23,6 @@ router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.post("/test-s3")
-async def onboarding_test_s3(
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """AJAX endpoint to test S3/MinIO credentials before submitting onboarding."""
-    try:
-        data = await request.json()
-    except Exception:
-        return JSONResponse({"success": False, "message": "Invalid JSON payload."}, status_code=400)
-
-    s3_endpoint = (data.get("s3_endpoint") or "").strip()
-    s3_bucket = (data.get("s3_bucket") or "").strip()
-    s3_access_key = (data.get("s3_access_key") or "").strip()
-    s3_secret_key = (data.get("s3_secret_key") or "").strip()
-    s3_region = (data.get("s3_region") or "us-east-1").strip()
-
-    if not s3_bucket:
-        return JSONResponse({"success": False, "message": "Bucket Name is required."}, status_code=400)
-    if not s3_access_key:
-        return JSONResponse({"success": False, "message": "Access Key ID is required."}, status_code=400)
-    if not s3_secret_key:
-        return JSONResponse({"success": False, "message": "Secret Access Key is required."}, status_code=400)
-
-    s3_config = {
-        "s3_endpoint": s3_endpoint,
-        "s3_bucket": s3_bucket,
-        "s3_access_key": s3_access_key,
-        "s3_secret_key": s3_secret_key,
-        "s3_region": s3_region or "us-east-1",
-    }
-
-    from app.adapters.s3_storage import test_s3_connection
-    ok, msg = test_s3_connection(s3_config)
-    if ok:
-        return JSONResponse({"success": True, "message": f"Connection successful! S3/MinIO bucket '{s3_bucket}' is verified and ready."})
-    else:
-        return JSONResponse({"success": False, "message": f"S3 Connection failed: {msg}"}, status_code=400)
-
-
 @router.get("", response_class=HTMLResponse)
 async def onboarding_page(
     request: Request,
@@ -93,11 +53,6 @@ async def onboarding_submit(
     phone: str = Form(...),
     password: str = Form(...),
     confirm_password: str = Form(...),
-    s3_endpoint: str = Form(...),
-    s3_bucket: str = Form(...),
-    s3_access_key: str = Form(...),
-    s3_secret_key: str = Form(...),
-    s3_region: Optional[str] = Form(default="us-east-1"),
     restore_choice: str = Form("none"),
     selected_backup: Optional[str] = Form(default=None),
     backup_file: Optional[UploadFile] = File(default=None),
@@ -107,11 +62,6 @@ async def onboarding_submit(
         "full_name": full_name,
         "email": email,
         "phone": phone,
-        "s3_endpoint": s3_endpoint,
-        "s3_bucket": s3_bucket,
-        "s3_access_key": s3_access_key,
-        "s3_secret_key": s3_secret_key,
-        "s3_region": s3_region,
     }
 
     err = None
@@ -125,12 +75,6 @@ async def onboarding_submit(
         err = "Password must be at least 6 characters long."
     elif password != confirm_password:
         err = "Passwords do not match."
-    elif not s3_bucket or not s3_bucket.strip():
-        err = "S3/MinIO Bucket Name is mandatory."
-    elif not s3_access_key or not s3_access_key.strip():
-        err = "S3/MinIO Access Key ID is mandatory."
-    elif not s3_secret_key or not s3_secret_key.strip():
-        err = "S3/MinIO Secret Access Key is mandatory."
 
     if err:
         return templates.TemplateResponse("auth/onboarding.html", {
@@ -177,11 +121,6 @@ async def onboarding_submit(
             email=email.strip(),
             phone=phone.strip(),
             password=password,
-            s3_endpoint=s3_endpoint.strip(),
-            s3_bucket=s3_bucket.strip(),
-            s3_access_key=s3_access_key.strip(),
-            s3_secret_key=s3_secret_key.strip(),
-            s3_region=s3_region.strip() if s3_region else "us-east-1",
             backup_file_path=target_backup_filepath,
         )
     except ValueError as ve:
@@ -193,5 +132,5 @@ async def onboarding_submit(
         })
 
     request.session["user_id"] = admin_user.id
-    set_flash_success(request, f"System onboarding completed successfully with mandatory S3 storage! Welcome to Sastrybalm SFA Enterprise, {admin_user.full_name}.")
+    set_flash_success(request, f"System onboarding completed successfully! Welcome to Sastrybalm SFA Enterprise, {admin_user.full_name}.")
     return RedirectResponse("/dashboard", status_code=302)

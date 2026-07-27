@@ -117,14 +117,23 @@ class SystemConfiguration(Base):
     # Order Auto-Approval Cutoff Setting
     auto_approval_cutoff_hours = Column(Integer, default=24, nullable=False)
 
-    # Backblaze B2 S3 Object Storage Configuration
+    # Backblaze B2 / AWS S3 Storage — 1. Images Bucket (Photos, Outlets, QC, Avatars)
+    s3_is_enabled = Column(Boolean, default=False, nullable=False)
     s3_endpoint_url = Column(String(255), nullable=True)
     s3_bucket_name = Column(String(255), nullable=True)
     s3_access_key_id = Column(String(255), nullable=True)
     s3_secret_access_key = Column(Text, nullable=True)
     s3_region_name = Column(String(100), default="us-west-004", nullable=True)
-    s3_is_enabled = Column(Boolean, default=False, nullable=False)
     s3_public_url_prefix = Column(String(255), nullable=True)
+
+    # Backblaze B2 / AWS S3 Storage — 2. Files & Documents Bucket (Database Backups, PDFs, Reports)
+    s3_files_is_enabled = Column(Boolean, default=False, nullable=False)
+    s3_files_endpoint_url = Column(String(255), nullable=True)
+    s3_files_bucket_name = Column(String(255), nullable=True)
+    s3_files_access_key_id = Column(String(255), nullable=True)
+    s3_files_secret_access_key = Column(Text, nullable=True)
+    s3_files_region_name = Column(String(100), default="us-west-004", nullable=True)
+    s3_files_public_url_prefix = Column(String(255), nullable=True)
 
     # WhatsApp Business API Configuration
     whatsapp_api_key = Column(Text, nullable=True)

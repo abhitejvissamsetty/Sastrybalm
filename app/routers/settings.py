@@ -583,19 +583,30 @@ async def s3_settings_save(
     request: Request,
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
+    # Images Bucket Fields
+    s3_is_enabled: Optional[bool] = Form(default=False),
     s3_endpoint_url: Optional[str] = Form(default=""),
     s3_bucket_name: Optional[str] = Form(default=""),
     s3_access_key_id: Optional[str] = Form(default=""),
     s3_secret_access_key: Optional[str] = Form(default=""),
     s3_region_name: Optional[str] = Form(default="us-west-004"),
     s3_public_url_prefix: Optional[str] = Form(default=""),
-    s3_is_enabled: Optional[bool] = Form(default=False),
+    # Files Bucket Fields
+    s3_files_is_enabled: Optional[bool] = Form(default=False),
+    s3_files_endpoint_url: Optional[str] = Form(default=""),
+    s3_files_bucket_name: Optional[str] = Form(default=""),
+    s3_files_access_key_id: Optional[str] = Form(default=""),
+    s3_files_secret_access_key: Optional[str] = Form(default=""),
+    s3_files_region_name: Optional[str] = Form(default="us-west-004"),
+    s3_files_public_url_prefix: Optional[str] = Form(default=""),
 ):
     sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
     if not sys_config:
         sys_config = SystemConfiguration(id=1)
         db.add(sys_config)
 
+    # 1. Images Bucket Config
+    sys_config.s3_is_enabled = bool(s3_is_enabled)
     sys_config.s3_endpoint_url = s3_endpoint_url.strip() if s3_endpoint_url else None
     sys_config.s3_bucket_name = s3_bucket_name.strip() if s3_bucket_name else None
     sys_config.s3_access_key_id = s3_access_key_id.strip() if s3_access_key_id else None
@@ -608,23 +619,37 @@ async def s3_settings_save(
 
     sys_config.s3_region_name = s3_region_name.strip() if s3_region_name else "us-west-004"
     sys_config.s3_public_url_prefix = s3_public_url_prefix.strip() if s3_public_url_prefix else None
-    sys_config.s3_is_enabled = bool(s3_is_enabled)
+
+    # 2. Files & Documents Bucket Config
+    sys_config.s3_files_is_enabled = bool(s3_files_is_enabled)
+    sys_config.s3_files_endpoint_url = s3_files_endpoint_url.strip() if s3_files_endpoint_url else None
+    sys_config.s3_files_bucket_name = s3_files_bucket_name.strip() if s3_files_bucket_name else None
+    sys_config.s3_files_access_key_id = s3_files_access_key_id.strip() if s3_files_access_key_id else None
+
+    files_sec = s3_files_secret_access_key.strip() if s3_files_secret_access_key else ""
+    if files_sec and not files_sec.startswith("gAAAAA"):
+        sys_config.s3_files_secret_access_key = encrypt(files_sec)
+    elif files_sec:
+        sys_config.s3_files_secret_access_key = files_sec
+
+    sys_config.s3_files_region_name = s3_files_region_name.strip() if s3_files_region_name else "us-west-004"
+    sys_config.s3_files_public_url_prefix = s3_files_public_url_prefix.strip() if s3_files_public_url_prefix else None
 
     db.commit()
-    status_msg = "enabled & active" if sys_config.s3_is_enabled else "disabled (local disk fallback active)"
-    set_flash_success(request, f"Backblaze B2 S3 storage settings saved! Storage is {status_msg}.")
+    set_flash_success(request, "S3 Object Storage settings saved! Separate configurations updated for Images Bucket and Files Bucket.")
     return RedirectResponse("/settings/s3", status_code=302)
 
 
 @router.post("/s3/test")
 async def s3_settings_test(
     request: Request,
+    bucket_type: str = Form(default="images"),
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     from app.utils.s3_service import get_s3_config, test_s3_connection
     config = get_s3_config(db)
-    success, msg = test_s3_connection(config)
+    success, msg = test_s3_connection(config, bucket_type=bucket_type)
     if success:
         set_flash_success(request, msg)
     else:
