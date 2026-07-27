@@ -281,15 +281,16 @@ from app.database import SessionLocal
 
 @app.exception_handler(403)
 async def forbidden_handler(request: Request, exc):
+    detail = getattr(exc, "detail", "You don't have permission to view this page. Contact your administrator if you believe this is an error.")
     if request.url.path.startswith("/api/"):
-        return JSONResponse({"detail": "Insufficient permissions"}, status_code=403)
+        return JSONResponse({"detail": detail}, status_code=403)
     db = SessionLocal()
     try:
         user = get_current_web_user(request, db)
     finally:
         db.close()
     return _templates.TemplateResponse(
-        "errors/403.html", {"request": request, "current_user": user}, status_code=403
+        "errors/403.html", {"request": request, "current_user": user, "detail": detail}, status_code=403
     )
 
 

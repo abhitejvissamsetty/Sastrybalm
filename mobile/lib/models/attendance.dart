@@ -20,7 +20,8 @@ class AttendanceState {
   factory AttendanceState.notCheckedIn() => AttendanceState(checkedIn: false);
 
   factory AttendanceState.fromJson(Map<String, dynamic> json) {
-    if (json['checked_in'] == false) return AttendanceState.notCheckedIn();
+    final checkedIn = json['checked_in'] == true || json['checked_in'] == 1;
+    if (!checkedIn) return AttendanceState.notCheckedIn();
     return AttendanceState(
       checkedIn: true,
       timesheetId: json['id'],

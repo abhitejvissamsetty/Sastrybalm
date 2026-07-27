@@ -49,6 +49,9 @@ def run_migrations():
         add_column_safely(conn, "material_requests", "image_url", "TEXT NULL")
         add_column_safely(conn, "asset_capitalizations", "image_url", "TEXT NULL")
         add_column_safely(conn, "vendor_quotations", "invoice_photo_url", "TEXT NULL")
+        add_column_safely(conn, "alerts", "user_id", "INT NULL")
+        add_column_safely(conn, "alerts", "geography_id", "INT NULL")
+        add_column_safely(conn, "alerts", "vendor_id", "INT NULL")
             
         # Users
         try:

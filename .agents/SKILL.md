@@ -353,3 +353,72 @@ All Web UI routes are structured with section prefixes corresponding to their si
 - **Master Data (`/master-data/...`)**: `/master-data/geography`, `/master-data/users`, `/master-data/positions`, `/master-data/beats`, `/master-data/outlets`, `/master-data/channel-partners`, `/master-data/vendors`
 - **Configuration (`/settings/...`)**: `/settings/...`
 - **Legacy Path Redirects**: Backward-compatibility 307 redirects are mounted in `app/main.py` for legacy top-level routes (e.g. `/orders` $\rightarrow$ `/operations/orders`).
+
+---
+
+## 📱 15. Mobile SFA API & Executive Architecture
+
+### A. Mobile Authentication & OTP Verification
+- **Authentication Routes (`app/routers/api/auth.py`)**:
+  - `POST /api/v1/auth/token`: Admin password login returning Bearer JWT token.
+  - `POST /api/v1/auth/request-otp`: Field Rep OTP request dispatched via Email/Alerts.
+  - `POST /api/v1/auth/verify-otp`: OTP verification & JWT issuance for Field Reps. Enforces active checkout session lock.
+  - `GET /api/v1/auth/me`: Authenticated user profile lookup (`UserResponse` with `can_access_restricted_modules` flag).
+
+### B. Mobile Master Data & Operations API Endpoints
+- **Master Data (`app/routers/api/master.py`)**:
+  - `GET /api/v1/config`: Mobile sync configuration (`payment_mode`, `denomination_mandatory`, `gps_threshold_metres`, `sync_interval_seconds`).
+  - `GET /api/v1/geography/tree`: Full geography tree for offline mobile caching.
+  - `GET /api/v1/beats`: Active beats list & `GET /api/v1/beats/my` (assigned beats).
+  - `GET /api/v1/outlets`: Paginated outlet list, `GET /api/v1/outlets/{id}`, & `PATCH /api/v1/outlets/{id}/location` (mobile GPS update).
+  - `GET /api/v1/products`: Product catalog for offline caching (with MRP & GST rate).
+- **Operations (`app/routers/api/operations.py`)**:
+  - `POST /api/v1/attendance/checkin` & `/checkout`: Geofenced shift attendance & timesheet tracking.
+  - `GET /api/v1/attendance/history` & `GET /api/v1/visits/my`: History tracking logs.
+  - `POST /api/v1/visits` & `/checkout`: Outlet visit logging with haversine distance verification.
+  - `POST /api/v1/orders` & `/submit`: Create draft order & submit for ERP sync.
+  - `POST /api/v1/payments`: Collect payment (Cash/UPI/Cheque/NEFT) with denomination breakdown.
+  - `GET /api/v1/orders/my`, `GET /api/v1/payments/my`: Rep's history endpoints.
+  - `GET /api/v1/work-orders/pending-qc` & `POST /api/v1/work-orders/{id}/qc-approve`: QC inspection approval with photo upload.
+
+### C. Module Access Restriction Rules
+- **Access Rule**: **Expenses**, **Timesheets**, and **Material Requests** are restricted ONLY to:
+  1. `admin` users.
+  2. `territory_manager` users whose assigned Geography level is `>= Region` (`Zone` or `Region`).
+  3. All other roles (`field_rep`, `vendor_admin`, `vendor_technician`, `qc_manager`, or `territory_manager` assigned to `Territory` level below Region) are strictly blocked with `HTTP 403`.
+- **Model Property (`User.can_access_restricted_modules`)**: Evaluates role and geography level depth safely, handling `DetachedInstanceError` when un-sessioned.
+- **Dependency Guard (`app/dependencies.py`)**: `require_restricted_module_web_access` and `require_restricted_module_api_access` enforce permissions on web and API endpoints. Eager loading `joinedload(User.geography)` prevents lazy loading session detachments.
+- **Mobile UI Dynamic Quick Actions**: `dashboard_tab.dart` dynamically switches Quick Action cards based on `user.canAccessRestrictedModules`.
+
+### D. Complete Legacy Module Purge (`payment_submissions`)
+- Fully purged legacy `payment_submissions` table, models (`payment_submission.py`), template directories (`app/templates/payment_submissions/`), router endpoints (`app/routers/payment_submissions.py`), and foreign key constraints (`payments.submission_id`).
+
+### E. Executive Glassmorphic UI & Error Templates
+- **Mobile Flutter UI**: Executive design system featuring multi-stop gradient workday card (`#3B82F6` → `#4F46E5` → `#7C3AED`), 3D ambient glow spheres, glassmorphic `WORKDAY ACTIVE` / `GpsStatusChip` pill badges, and floating bottom navigation bar (`#4F46E5` active tab highlight).
+- **Web 403 & 404 Glassmorphic Error Pages (`app/templates/errors/403.html`)**: Centered glass card (`bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl`), glowing rose/indigo badge, dynamic exception detail message, and high-contrast text (`text-white` & `text-slate-300`).
+
+### F. Alert & Notification Scoping Rules & Dual-Pane UI
+- **Admin**: Sees **ALL** system alerts (`Alert` table).
+- **Strict Login & OTP Alert Isolation**: Login alerts (titles matching `Login%`, `OTP%`, `%Login%`, or `%OTP%`) are strictly private. They are visible **ONLY to Admin and the specific user themselves** (`Alert.user_id == current_user.id`).
+- **Territory Manager ($\ge$ Region)**: Sees own alerts + operational updates (Orders, Assets, Material Requests, Timesheets, Expenses, Vendor & Channel Partner updates) generated by subordinate L1 reps in their geography/position scope. Other users' private Login/OTP alerts are strictly excluded.
+- **Dual-Pane Interface (`/action-center/alerts`)**: Admin and Territory Managers ($\ge$ Region) receive a 2-pane tabbed view:
+  - **Pane 1 (`tab=personal`)**: *"My Personal Alerts"* addressing the current user directly.
+  - **Pane 2 (`tab=operational`)**: *"Team & Operational Alerts"* displaying team/vendor updates across their allowed geography scope.
+- **All Other Users (Field Reps, Vendor Admins, QC Managers, TMs < Region)**: See **ONLY** their own respective alerts in a single streamlined view (`Alert.user_id == current_user.id`).
+
+### G. Operational Command Dashboard KPI Grid
+- **Purged Non-Operational & Redundant KPIs**: Completely removed **SKUs/Products**, **Receivables**, and **System Health** cards from the main dashboard.
+- **Clubbed Attendance & Workforce KPI**: Combined field workforce and daily attendance into a single high-impact card **`ATTENDANCE / WORKFORCE`** (`{{ checkins_today }} / {{ active_reps }}` e.g., `0/1` showing checked-in reps vs active reps under the user's geography scope).
+- **Vendor & Asset Operational KPI Cards**: Introduced real-time vendor and asset operational metrics:
+  1. `ATTENDANCE / WORKFORCE`: Shift checked-in reps / active field workforce under territory/region scope (`/tracking/attendance`).
+  2. `OUTLETS SCOPE`: Total verified retail points in allowed geography scope (`/master-data/outlets?status=approved`).
+  3. `ORDERS TODAY`: Active sales orders & ₹ volume generated today (`/operations/orders`).
+  4. `MARKETING ASSETS`: Deployed marketing & signage assets (`/operations/marketing-assets`).
+  5. `PENDING OUTLET APPROVALS`: Draft outlets awaiting manager approval (`/master-data/outlets?status=draft`).
+  6. `WORK ORDERS`: Active vendor maintenance work orders (`WorkOrder` count).
+  7. `VENDOR QUOTATIONS`: Pending quotes submitted by vendors awaiting review (`VendorQuotation` count).
+- **Admin-Only Core Infrastructure Panel Scoping**:
+  - Legacy offline sync items (`ZAP Sync`, `CMMS Sync`, `CONNECT Sync`) have been completely purged from the dashboard panel.
+  - The **Core Infrastructure** panel (`API Core`, `Datastore`, `Job Scheduler`) is strictly scoped and visible **ONLY to System Administrators** (`{% if current_user.role.value == 'admin' %}`). Hidden for Territory Managers and Field Reps.
+
+

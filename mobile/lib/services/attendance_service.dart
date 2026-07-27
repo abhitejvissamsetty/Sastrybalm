@@ -42,7 +42,7 @@ class AttendanceService {
 
   /// Get current GPS location with full permission handling
   static Future<Position> getCurrentPosition() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    bool serviceEnabled = (await Geolocator.isLocationServiceEnabled()) == true;
     if (!serviceEnabled) {
       throw Exception('Location services are disabled. Please enable GPS.');
     }

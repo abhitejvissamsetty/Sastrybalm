@@ -26,7 +26,7 @@ class _GpsStatusChipState extends State<GpsStatusChip> {
     });
 
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      bool serviceEnabled = (await Geolocator.isLocationServiceEnabled()) == true;
       if (!serviceEnabled) {
         setState(() {
           _hasGps = false;

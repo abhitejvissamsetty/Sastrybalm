@@ -1,12 +1,12 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, require_web_roles
+from app.dependencies import get_db, require_web_auth, require_web_roles
 from app.models.alert import Alert, AlertSeverity, AlertType
 from app.models.expense import Expense, ExpenseStatus
 from app.models.order import Order, OrderItem, OrderStatus
@@ -324,13 +324,71 @@ async def marketing_data(
 action_center_alerts_router = APIRouter(prefix="/action-center/alerts", tags=["alerts"])
 
 
+def filter_alerts_for_user(query, current_user: User, db: Session):
+    """
+    Alert Scoping Rules:
+    1. Admin gets ALL system alerts.
+    2. Territory Manager (Geography >= Region): Gets own alerts + operational updates
+       (Orders, Assets, Material Requests, Timesheets, Expenses, Vendor/Channel Partner updates)
+       from subordinate L1 users/vendors in their region scope.
+       CRITICAL: Login alerts (title containing 'Login' or 'OTP') of other users are STRICTLY EXCLUDED.
+       Login/OTP alerts are visible ONLY to Admin and the user themselves.
+    3. All other users (Field Reps, Vendor Admins, QC Managers, TMs < Region): Get ONLY their own alerts.
+    """
+    role_val = getattr(current_user.role, "value", str(current_user.role or ""))
+    if role_val == "admin":
+        return query
+
+    if role_val == "territory_manager" and current_user.can_access_restricted_modules:
+        from app.utils.geography_scope import get_user_allowed_geography_ids
+        from app.models.vendor import Vendor
+        from sqlalchemy import or_, and_, not_
+
+        allowed_geo_ids = get_user_allowed_geography_ids(current_user, db) or []
+        subordinate_user_ids = []
+        if allowed_geo_ids:
+            subordinate_user_ids = [
+                u.id for u in db.query(User.id).filter(User.geography_id.in_(allowed_geo_ids)).all()
+            ]
+
+        allowed_vendor_ids = []
+        if allowed_geo_ids:
+            allowed_vendor_ids = [
+                v.id for v in db.query(Vendor.id).filter(Vendor.geography_id.in_(allowed_geo_ids)).all()
+            ]
+
+        conditions = [Alert.user_id == current_user.id]
+        op_conditions = []
+        if subordinate_user_ids:
+            op_conditions.append(Alert.user_id.in_(subordinate_user_ids))
+        if allowed_geo_ids:
+            op_conditions.append(Alert.geography_id.in_(allowed_geo_ids))
+        if allowed_vendor_ids:
+            op_conditions.append(Alert.vendor_id.in_(allowed_vendor_ids))
+
+        if op_conditions:
+            # Login & OTP alerts are visible ONLY to Admin and their own user
+            not_login_alert = not_(or_(
+                Alert.title.like("Login%"),
+                Alert.title.like("OTP%"),
+                Alert.title.like("%Login%"),
+                Alert.title.like("%OTP%"),
+            ))
+            conditions.append(and_(or_(*op_conditions), not_login_alert))
+
+        return query.filter(or_(*conditions))
+
+    return query.filter(Alert.user_id == current_user.id)
+
+
 @action_center_alerts_router.get("/unread-count")
 @router.get("/alerts/unread-count")
 async def alerts_unread_count(
-    current_user: User = Depends(_ADMIN_MANAGER),
+    current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    count = db.query(func.count(Alert.id)).filter(Alert.is_read == False).scalar() or 0
+    query = filter_alerts_for_user(db.query(Alert), current_user, db)
+    count = query.filter(Alert.is_read == False).count() or 0
     return JSONResponse({"count": count})
 
 
@@ -338,26 +396,56 @@ async def alerts_unread_count(
 @router.get("/alerts", response_class=HTMLResponse)
 async def alerts_page(
     request: Request,
-    current_user: User = Depends(_ADMIN_MANAGER),
+    current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
+    tab: str = Query(default="personal"),
     severity: str = Query(default=""),
     show_read: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(Alert)
-    if not show_read:
-        query = query.filter(Alert.is_read == False)
-    if severity:
-        query = query.filter(Alert.severity == severity)
-    query = query.order_by(Alert.created_at.desc())
-    pagination = paginate(query, page)
+    role_val = getattr(current_user.role, "value", str(current_user.role or ""))
+    can_view_operational_pane = (role_val == "admin" or (role_val == "territory_manager" and current_user.can_access_restricted_modules))
 
-    unread_count = db.query(func.count(Alert.id)).filter(Alert.is_read == False).scalar() or 0
+    # Base query for all user-scoped alerts
+    base_query = filter_alerts_for_user(db.query(Alert), current_user, db)
+
+    # 1. Personal alerts query
+    personal_query = db.query(Alert).filter(Alert.user_id == current_user.id)
+    personal_unread = personal_query.filter(Alert.is_read == False).count() or 0
+
+    # 2. Team & Operational alerts query
+    if can_view_operational_pane:
+        operational_query = base_query.filter(Alert.user_id != current_user.id)
+        operational_unread = operational_query.filter(Alert.is_read == False).count() or 0
+    else:
+        tab = "personal"
+        operational_query = db.query(Alert).filter(False)
+        operational_unread = 0
+
+    # Target tab selection
+    selected_query = personal_query if tab == "personal" else operational_query
+
+    if not show_read:
+        selected_query = selected_query.filter(Alert.is_read == False)
+    if severity:
+        selected_query = selected_query.filter(Alert.severity == severity)
+
+    selected_query = selected_query.order_by(Alert.created_at.desc())
+    pagination = paginate(selected_query, page)
+
+    total_unread = personal_unread + operational_unread
 
     return templates.TemplateResponse("analytics/alerts.html", {
-        "request": request, "current_user": current_user,
-        "pagination": pagination, "severity": severity,
-        "show_read": show_read, "unread_count": unread_count,
+        "request": request,
+        "current_user": current_user,
+        "pagination": pagination,
+        "tab": tab,
+        "can_view_operational_pane": can_view_operational_pane,
+        "personal_unread": personal_unread,
+        "operational_unread": operational_unread,
+        "unread_count": total_unread,
+        "severity": severity,
+        "show_read": show_read,
         "AlertSeverity": AlertSeverity,
         **get_flash(request),
     })
@@ -367,10 +455,11 @@ async def alerts_page(
 @router.post("/alerts/{alert_id}/dismiss", response_class=RedirectResponse)
 async def dismiss_alert(
     alert_id: int, request: Request,
-    current_user: User = Depends(_ADMIN_MANAGER),
+    current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    query = filter_alerts_for_user(db.query(Alert), current_user, db)
+    alert = query.filter(Alert.id == alert_id).first()
     if alert:
         alert.is_read = True
         db.commit()
@@ -381,13 +470,22 @@ async def dismiss_alert(
 @router.post("/alerts/dismiss-all", response_class=RedirectResponse)
 async def dismiss_all_alerts(
     request: Request,
-    current_user: User = Depends(_ADMIN_MANAGER),
+    current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
+    tab: str = Form(default="personal"),
 ):
-    db.query(Alert).filter(Alert.is_read == False).update({"is_read": True})
+    role_val = getattr(current_user.role, "value", str(current_user.role or ""))
+    can_view_operational_pane = (role_val == "admin" or (role_val == "territory_manager" and current_user.can_access_restricted_modules))
+
+    if can_view_operational_pane and tab == "operational":
+        base_query = filter_alerts_for_user(db.query(Alert), current_user, db)
+        base_query.filter(Alert.user_id != current_user.id, Alert.is_read == False).update({"is_read": True}, synchronize_session=False)
+    else:
+        db.query(Alert).filter(Alert.user_id == current_user.id, Alert.is_read == False).update({"is_read": True}, synchronize_session=False)
+
     db.commit()
-    set_flash_success(request, "All alerts dismissed.")
-    return RedirectResponse("/action-center/alerts", status_code=302)
+    set_flash_success(request, "Alerts dismissed.")
+    return RedirectResponse(f"/action-center/alerts?tab={tab}", status_code=302)
 
 
 # ── Scheduled Analytics & S3 Data Reports ─────────────────────────────────────

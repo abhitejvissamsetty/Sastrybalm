@@ -32,14 +32,15 @@ class AppUser {
     employeeId: json['employee_id'],
     phone: json['phone'],
     companyProfileId: json['company_profile_id'],
-    isActive: json['is_active'] ?? true,
-    canAccessRestrictedModules: json['can_access_restricted_modules'] ?? false,
+    isActive: json['is_active'] == true || json['is_active'] == 1 || json['is_active'] == null,
+    canAccessRestrictedModules: json['can_access_restricted_modules'] == true || json['can_access_restricted_modules'] == 1,
   );
 
   String get initials {
-    final parts = fullName.trim().split(' ');
+    final parts = fullName.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return fullName.isNotEmpty ? fullName[0].toUpperCase() : '?';
+    if (parts.isNotEmpty) return parts[0][0].toUpperCase();
+    return '?';
   }
 }
 

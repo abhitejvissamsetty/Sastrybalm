@@ -85,15 +85,20 @@ class DashboardTab extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             userAsync.when(
-                              data: (user) => Text(
-                                'Hi, ${user?.fullName.split(' ')[0] ?? 'Sales Rep'}',
-                                style: const TextStyle(
-                                  color: Color(0xFF0F172A),
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 20,
-                                  letterSpacing: -0.6,
-                                ),
-                              ),
+                              data: (user) {
+                                final firstName = user != null && user.fullName.trim().isNotEmpty
+                                    ? user.fullName.trim().split(RegExp(r'\s+'))[0]
+                                    : 'Sales Rep';
+                                return Text(
+                                  'Hi, $firstName',
+                                  style: const TextStyle(
+                                    color: Color(0xFF0F172A),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 20,
+                                    letterSpacing: -0.6,
+                                  ),
+                                );
+                              },
                               loading: () => const Text('Loading...'),
                               error: (_, __) => const Text('Sales Rep'),
                             ),

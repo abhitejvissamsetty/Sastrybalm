@@ -138,9 +138,15 @@ class User(Base):
         role_val = getattr(self.role, "value", str(self.role or ""))
         if role_val == "admin":
             return True
-        if role_val == "territory_manager" and self.geography:
-            geo_level = getattr(self.geography.level, "value", str(self.geography.level or "")).lower()
-            return geo_level in ("zone", "region", "country", "national")
+        if role_val == "territory_manager":
+            if not self.geography_id:
+                return False
+            try:
+                if self.geography:
+                    geo_level = getattr(self.geography.level, "value", str(self.geography.level or "")).lower()
+                    return geo_level in ("zone", "region", "country", "national")
+            except Exception:
+                pass
         return False
 
 

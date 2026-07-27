@@ -131,12 +131,13 @@ def generate_and_send_user_otp(db: Session, login_or_email: str) -> Dict[str, An
     )
     db.add(otp_record)
 
-    # Create an Admin Alert record so OTP is visible in Admin Dashboard logs
+    # Create an Alert record bound to the specific user (visible to user & Admin)
     admin_alert = Alert(
         severity=AlertSeverity.info,
         alert_type=AlertType.custom,
         title=f"Login OTP for {user.full_name or user.username}",
         message=f"OTP verification code for user '{user.username}' ({user_email}): {otp_code} (Valid for 10 minutes)",
+        user_id=user.id,
     )
     db.add(admin_alert)
     db.commit()

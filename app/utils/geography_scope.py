@@ -26,10 +26,11 @@ def get_user_allowed_geography_ids(user: Optional[User], db: Session) -> Optiona
     region_id = user.geography_id
 
     # If geography_id not directly set on user, check user.positions -> Position -> geography_id
-    if not region_id and user.positions:
+    if not region_id and getattr(user, "positions", None):
         for pos in user.positions:
-            if pos.geography_id:
-                pos_geo = db.query(Geography).filter(Geography.id == pos.geography_id).first()
+            pos_geo_id = getattr(pos, "geography_id", None)
+            if pos_geo_id:
+                pos_geo = db.query(Geography).filter(Geography.id == pos_geo_id).first()
                 if pos_geo:
                     if pos_geo.level == GeoLevel.region:
                         region_id = pos_geo.id

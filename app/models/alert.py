@@ -1,6 +1,7 @@
 import enum
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.models.base import Base
@@ -30,7 +31,16 @@ class Alert(Base):
     title = Column(String(200), nullable=False)
     message = Column(Text, nullable=False)
     is_read = Column(Boolean, nullable=False, default=False)
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    geography_id = Column(Integer, ForeignKey("geographies.id", ondelete="SET NULL"), nullable=True, index=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True, index=True)
+
     created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User", foreign_keys=[user_id])
+    geography = relationship("Geography", foreign_keys=[geography_id])
+    vendor = relationship("Vendor", foreign_keys=[vendor_id])
 
     def severity_badge_cls(self) -> str:
         return {
@@ -38,3 +48,4 @@ class Alert(Base):
             AlertSeverity.warning: "bg-amber-900/50 text-amber-300",
             AlertSeverity.critical: "bg-red-900/50 text-red-300",
         }.get(self.severity, "bg-slate-700 text-slate-300")
+

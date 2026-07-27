@@ -54,8 +54,12 @@ class _PaymentCollectScreenState extends ConsumerState<PaymentCollectScreen> {
   }
 
   Future<bool> _isOnline() async {
-    final result = await Connectivity().checkConnectivity();
-    return result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    try {
+      final result = await Connectivity().checkConnectivity();
+      return result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _collectPayment() async {
