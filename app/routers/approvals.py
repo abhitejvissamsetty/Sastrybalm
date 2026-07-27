@@ -25,7 +25,6 @@ _ADMIN_MANAGER = require_web_roles(UserRole.admin, UserRole.territory_manager)
 
 from fastapi import HTTPException
 from app.utils.geography_scope import get_user_allowed_geography_ids
-from app.models.user_position import UserPosition
 from app.models.position import Position, PositionLevel
 from app.models.geography import GeoLevel
 from app.models.auto_flag import AutoFlag, FlagStatus
@@ -39,12 +38,9 @@ def _check_approval_hub_permissions(user: User, db: Session):
     if user.role == UserRole.admin:
         return True
     
-    # Check active position level
-    up = db.query(UserPosition).filter(UserPosition.user_id == user.id, UserPosition.is_active == True).first()
-    pos_level = up.position.level.value if (up and up.position) else None
-    
-    # Check allowed levels (L3, L4, L5)
-    if pos_level not in ["L3", "L4", "L5"]:
+    # Check active positions level
+    pos_levels = [p.level.value for p in user.positions if p.is_active] if user.positions else []
+    if not any(lvl in ["L3", "L4", "L5"] for lvl in pos_levels):
         raise HTTPException(status_code=403, detail="Approval Hub requires Position level > L2 (L3, L4, L5).")
 
     allowed_geo_ids = get_user_allowed_geography_ids(user, db)

@@ -15,29 +15,13 @@ router = APIRouter(prefix="/geography", tags=["geography"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+from app.utils.geography_scope import get_user_allowed_geography_ids
+
+
 def _get_tm_allowed_geo_ids(user: User, db: Session) -> list[int]:
     """Retrieve allowed geography IDs for Territory Manager (their assigned Region + child Territories)."""
-    if not user or user.role != UserRole.territory_manager:
-        return []
-    
-    region_id = user.geography_id
-    if not region_id:
-        from app.models.user_position import UserPosition
-        from app.models.position import Position
-        up = db.query(UserPosition).filter(UserPosition.user_id == user.id, UserPosition.is_active == True).first()
-        if up and up.position and up.position.geography_id:
-            pos_geo = db.query(Geography).filter(Geography.id == up.position.geography_id).first()
-            if pos_geo:
-                if pos_geo.level == GeoLevel.region:
-                    region_id = pos_geo.id
-                elif pos_geo.level == GeoLevel.territory and pos_geo.parent_id:
-                    region_id = pos_geo.parent_id
-
-    if not region_id:
-        return []
-
-    child_ids = [g.id for g in db.query(Geography).filter(Geography.parent_id == region_id, Geography.is_active == True).all()]
-    return [region_id] + child_ids
+    res = get_user_allowed_geography_ids(user, db)
+    return res if res is not None else []
 
 
 @router.get("", response_class=HTMLResponse)

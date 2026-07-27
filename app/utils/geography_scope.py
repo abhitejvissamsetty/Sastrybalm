@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from app.models.user import User, UserRole
 from app.models.geography import Geography, GeoLevel
 from app.models.warehouse import Warehouse
-from app.models.user_position import UserPosition
 from app.models.position import Position
 
 
@@ -26,19 +25,18 @@ def get_user_allowed_geography_ids(user: Optional[User], db: Session) -> Optiona
 
     region_id = user.geography_id
 
-    # If geography_id not directly set on user, check active UserPosition -> Position -> geography_id
-    if not region_id:
-        up = db.query(UserPosition).filter(
-            UserPosition.user_id == user.id,
-            UserPosition.is_active == True
-        ).first()
-        if up and up.position and up.position.geography_id:
-            pos_geo = db.query(Geography).filter(Geography.id == up.position.geography_id).first()
-            if pos_geo:
-                if pos_geo.level == GeoLevel.region:
-                    region_id = pos_geo.id
-                elif pos_geo.level == GeoLevel.territory and pos_geo.parent_id:
-                    region_id = pos_geo.parent_id
+    # If geography_id not directly set on user, check user.positions -> Position -> geography_id
+    if not region_id and user.positions:
+        for pos in user.positions:
+            if pos.geography_id:
+                pos_geo = db.query(Geography).filter(Geography.id == pos.geography_id).first()
+                if pos_geo:
+                    if pos_geo.level == GeoLevel.region:
+                        region_id = pos_geo.id
+                        break
+                    elif pos_geo.level == GeoLevel.territory and pos_geo.parent_id:
+                        region_id = pos_geo.parent_id
+                        break
 
     if not region_id:
         return []
