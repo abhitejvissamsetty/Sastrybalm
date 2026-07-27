@@ -14,7 +14,8 @@ description: >-
 Sastrybalm ERP is a comprehensive FMCG Sales & Distribution Management System built with **FastAPI**, **SQLAlchemy**, **Jinja2 Templates**, and **MySQL (MAMP)**.
 
 The system orchestrates:
-- **Admin Onboarding & Dual-Bucket S3 Storage**: Onboarding handles Administrator account password setup and optional database backup restoration. S3 Object Storage is configured in **Admin Dashboard → System Settings → S3 Storage**, supporting two separate buckets: **Permanent Files - Bucket** (`s3_bucket_name`) for outlet photos, material requests, QC pictures, & avatars, and **Temporary Files - Bucket** (`s3_files_bucket_name`) for database backups, PDF exports, & temporary reports.
+- **Admin Onboarding & Dual-Bucket S3 Storage**: Onboarding handles Administrator account password setup and optional database backup restoration. S3 Object Storage is configured in **Admin Dashboard → System Settings → S3 Storage**, supporting two separate buckets: **Permanent Files - Bucket** (`s3_bucket_name`) for outlet photos, material requests, QC pictures, avatars, and **Parquet Daily Rolling Backups**, and **Temporary Files - Bucket** (`s3_files_bucket_name`) for database backups, PDF exports, & temporary reports.
+- **Parquet Daily Rolling Backup Architecture**: Automated daily background job in `app/scheduler.py` (`01:00 AM IST`) and manual trigger in `/settings/backup`. Exports 12 operational/transactional tables (`orders`, `order_items`, `payments`, `payment_submissions`, `attendance`, `timesheets`, `expenses`, `material_requests`, `material_request_history_logs`, `vendor_quotations`, `work_orders`, `stock_movements`) up to the previous day into Snappy-compressed Apache Parquet format. Organizes objects in **Permanent Files - Bucket** under daily directory structure: `rolling_backups/parquet/YYYY-MM-DD/<table_name>.parquet`.
 - **Server Startup & Entrypoint Migration Architecture**: Database migrations (`db_migrate.py`) run once in `entrypoint.sh` (PID 1) before Gunicorn forks workers — preventing multi-worker `ALTER TABLE` deadlocks. FastAPI `lifespan` only runs startup validation and scheduler init. Safe exception handling in `is_system_onboarded()` and `validate_s3_configuration()` for uninitialized databases.
 - **Geography & Regional Warehouse Architecture**: Multi-tier hierarchy (`Zone` → `Region` → `Territory`) with region-level warehouse mapping and unified scoping (`get_user_allowed_geography_ids` & `get_user_allowed_warehouse_ids`).
 - **Position Hierarchy**: 4-level organizational hierarchy (`L1` to `L4`) with automatic reporting parent warehouse inheritance resolution.
@@ -235,3 +236,87 @@ docker save sastrybalm-app:latest | gzip > sastrybalm-app.tar.gz
 docker load < sastrybalm-app.tar.gz
 docker compose up -d
 ```
+
+---
+
+## 📦 12. Parquet Daily Rolling Backup Architecture
+
+### Data Scope & Export Mechanism
+- **Operational & Transactional Data**: Automatically queries 12 core operational models up to yesterday (`cutoff_date = datetime.utcnow().date() - timedelta(days=1)`):
+  - `Order` (`orders`) & `OrderItem` (`order_items`)
+  - `Payment` (`payments`) & `PaymentSubmission` (`payment_submissions`)
+  - `Attendance` (`attendance`) & `Timesheet` (`timesheets`)
+  - `Expense` (`expenses`)
+  - `MaterialRequest` (`material_requests`) & `MaterialRequestHistoryLog` (`material_request_history_logs`)
+  - `VendorQuotation` (`vendor_quotations`) & `WorkOrder` (`work_orders`)
+  - `StockMovement` (`stock_movements`)
+- **Parquet Format**: Converts rows into Apache Parquet format using `pyarrow` and `pandas` with Snappy compression for optimal data warehousing and analytical query performance.
+- **S3 Bucket Target**: Uploads directly to **Permanent Files - Bucket** (`s3_bucket_name`).
+- **Daily Directory Structure**:
+  ```text
+  rolling_backups/parquet/YYYY-MM-DD/orders.parquet
+  rolling_backups/parquet/YYYY-MM-DD/order_items.parquet
+  rolling_backups/parquet/YYYY-MM-DD/payments.parquet
+  rolling_backups/parquet/YYYY-MM-DD/payment_submissions.parquet
+  rolling_backups/parquet/YYYY-MM-DD/attendance.parquet
+  rolling_backups/parquet/YYYY-MM-DD/timesheets.parquet
+  rolling_backups/parquet/YYYY-MM-DD/expenses.parquet
+  rolling_backups/parquet/YYYY-MM-DD/material_requests.parquet
+  rolling_backups/parquet/YYYY-MM-DD/material_request_history_logs.parquet
+  rolling_backups/parquet/YYYY-MM-DD/vendor_quotations.parquet
+  rolling_backups/parquet/YYYY-MM-DD/work_orders.parquet
+  rolling_backups/parquet/YYYY-MM-DD/stock_movements.parquet
+  ```
+- **Automated Scheduler**: Triggered every night at **01:00 AM IST** via `job_daily_parquet_backup` in `app/scheduler.py`.
+- **Manual Trigger Route**: Admin button **"⚡ Run Parquet Rolling Backup Now"** on [/settings/backup](http://localhost:8090/settings/backup) (`POST /settings/backup/parquet-rolling-backup`).
+
+---
+
+## 🖼️ 13. Dual Bucket Directory Scoping & UI Image Viewer Architecture
+
+### Bucket Classification & Directory Rules
+1. **Permanent Files - Bucket (`s3_bucket_name`)**: Stores all long-term operational images, documents, and transactional Parquet backups under dedicated directory keys:
+   - Outlets Signboard Photos: `outlets/`
+   - Marketing Assets & Proof of Deployment: `assets/`
+   - Material Request Attachments: `material_requests/`
+   - Work Orders QC Verification Photos: `work_orders/qc/`
+   - Vendor Invoices & Proformas: `vendor_invoices/`
+   - User Profile Avatars: `avatars/`
+   - Parquet Daily Rolling Backups: `rolling_backups/parquet/YYYY-MM-DD/`
+
+2. **Temporary Files - Bucket (`s3_files_bucket_name`)**: Stores ephemeral artifacts:
+   - Scheduled Analytics CSV Exports: `analytics/scheduled/`
+   - Full Database Backups (`.sql`): `backups/`
+
+### UI Image Viewing & Lightbox Modal
+- **Global Lightbox Modal (`app/templates/base.html`)**: Includes `global-image-viewer-modal` rendered with glassmorphism backdrop blur and full-screen image display.
+- **JavaScript Helper**: `openImageViewer(url, title)` opens the full-size image instantly when clicked.
+- **Interactive Thumbnails**: Rendered across Outlets list (`outlets/list.html`), Assets list (`asset_capitalizations/list.html`), Material Requests list (`material_requests/list.html`), and Material Request Detail & QC inspection records (`material_requests/detail.html`).
+
+---
+
+## 👥 14. User Onboarding, Geography Allotment & Position Hierarchy Scope Rules
+
+### A. Geography Allotment & Single-Manager Rule
+- **Single Territory Manager Rule**: A Region/Geography (`Geography`) can only be assigned to **ONE** active Territory Manager (`UserRole.territory_manager`).
+- **Form Context Dropdown Filtering (`app/routers/users.py`)**: `_form_context` queries all geographies currently assigned to active Territory Managers and excludes them from the `Managing Region / Zone (Geography Scope)` dropdown when creating a new user (`/users/new`). When editing an existing user (`/users/{id}/edit`), the user's current geography is retained in their edit options.
+- **Backend Validation**: `user_create` and `user_update` reject forms submitting an already-allotted geography with error `"Geography is already assigned to active Territory Manager '<Name>'."`
+
+### B. Managing Geography Level to Position Hierarchy Mapping
+- **Level Scope Mapping**: Position availability dynamically filters based on the level (`level_code`) of the selected Managing Geography:
+  - **Territory** scope $\rightarrow$ **L1** & **L2** positions.
+  - **Region** scope $\rightarrow$ **L3** positions.
+  - **Zone** scope $\rightarrow$ **L4** positions.
+- **Dynamic Frontend Filtering (`app/templates/users/form.html`)**: Options render `data-level="{{ g.level_code }}"` and position items render `data-level="{{ p.level_code }}"`. When a geography is selected or changed, `filterPositions()` instantly shows matching position levels and hides out-of-scope positions.
+- **Server-Side Validation**: `user_create` and `user_update` in `app/routers/users.py` validate position level against managing geography level prior to DB insertion/update.
+
+### D. Permission Matrix Access Restriction & Default Module Scope
+- **Restricted Roles**: Users created or edited with roles `field_rep`, `vendor_admin`, `vendor_technician`, or `qc_manager` **cannot** access or view the Dashboard & Feature Access Permission Matrix in New/Edit forms.
+- **Frontend UI Visibility**: `updateRoleScopedFields()` in `app/templates/users/form.html` automatically hides `#permission-matrix-container` (`classList.add('hidden')`) for these restricted roles. The matrix is only accessible when assigning `admin` or `territory_manager` system roles.
+- **Automated Default Module Provisioning**: `_resolve_user_modules(role, submitted_modules)` in `app/routers/users.py` automatically provisions standard role modules on form submit:
+  - **`field_rep`**: `["orders", "inventory", "expenses", "timesheets", "attendance", "visits", "gps_map"]`
+  - **`vendor_admin` / `vendor_technician`**: `["orders", "inventory", "expenses"]`
+  - **`qc_manager`**: `["orders", "inventory", "material_requests", "approvals"]`
+
+
+

@@ -196,8 +196,10 @@ async def beat_update(
         set_flash_error(request, "Active beat not found or beat is inactive.")
         return RedirectResponse("/beats", status_code=302)
     if db.query(Beat).filter(Beat.code == code.upper(), Beat.id != beat_id).first():
-        territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
-        channel_partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
+        cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
+        if allowed_geo_ids is not None:
+            cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_geo_ids))
+        channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
         attached_ids = [bcp.channel_partner_id for bcp in db.query(BeatChannelPartner).filter(BeatChannelPartner.beat_id == beat_id).all()]
         return templates.TemplateResponse("beats/form.html", {
             "request": request, "current_user": current_user,

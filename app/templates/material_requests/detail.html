@@ -106,7 +106,7 @@
     </div>
 
     <!-- Submit Quote Form -->
-    <form id="quote-form" action="/material-requests/{{ item.id }}/quote" method="post" class="hidden space-y-4 bg-slate-900 p-5 rounded-xl border border-slate-700">
+    <form id="quote-form" action="/material-requests/{{ item.id }}/quote" method="post" enctype="multipart/form-data" class="hidden space-y-4 bg-slate-900 p-5 rounded-xl border border-slate-700">
       <h4 class="text-sm font-bold text-white">Submit Quotation Bid</h4>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -119,6 +119,11 @@
           <input type="number" name="lead_time_days" value="7" required
                  class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none">
         </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1">Vendor Invoice / Proforma Photo (Optional)</label>
+        <input type="file" name="invoice_photo" accept="image/*"
+               class="w-full text-xs text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500">
       </div>
       <div>
         <label class="block text-xs font-medium text-slate-300 mb-1">Quote Specifications &amp; Notes</label>
@@ -136,10 +141,18 @@
       {% for q in quotations %}
       <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-4 space-y-3">
         <div class="flex items-center justify-between">
-          <div>
-            <span class="text-sm font-bold text-white">Vendor: {{ q.vendor.full_name if q.vendor else 'Vendor' }}</span>
-            <span class="ml-2 text-xs font-mono text-emerald-400 font-bold">₹{{ "%.2f"|format(q.quote_amount) }}</span>
-            <span class="ml-2 text-xs text-slate-400">({{ q.lead_time_days }} days lead time)</span>
+          <div class="flex items-center gap-3">
+            {% if q.invoice_photo_url %}
+            <button type="button" onclick="openImageViewer('{{ q.invoice_photo_url }}', 'Vendor Invoice Photo')"
+                    class="h-10 w-10 rounded-lg overflow-hidden border border-slate-700 hover:ring-2 hover:ring-indigo-500 transition-all flex-shrink-0">
+              <img src="{{ q.invoice_photo_url }}" alt="Vendor Invoice" class="h-full w-full object-cover">
+            </button>
+            {% endif %}
+            <div>
+              <span class="text-sm font-bold text-white">Vendor: {{ q.vendor.full_name if q.vendor else 'Vendor' }}</span>
+              <span class="ml-2 text-xs font-mono text-emerald-400 font-bold">₹{{ "%.2f"|format(q.quote_amount) }}</span>
+              <span class="ml-2 text-xs text-slate-400">({{ q.lead_time_days }} days lead time)</span>
+            </div>
           </div>
           <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-slate-800 text-slate-300 border border-slate-700">
             Status: {{ q.status.value }}
@@ -179,7 +192,7 @@
 
           {% if wo.qc_photo_url %}
           <div class="flex items-center gap-3 p-2 bg-slate-900 rounded-lg border border-slate-800">
-            <img src="{{ wo.qc_photo_url }}" alt="QC Inspection Photo" class="h-16 w-16 object-cover rounded-lg border border-slate-700">
+            <img src="{{ wo.qc_photo_url }}" alt="QC Inspection Photo" onclick="openImageViewer('{{ wo.qc_photo_url }}', 'Work Order {{ wo.wo_number }} QC Photo')" class="h-16 w-16 object-cover rounded-lg border border-slate-700 cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all">
             <div>
               <p class="text-xs font-bold text-emerald-400">QC Photo Verified</p>
               <p class="text-[11px] text-slate-400">{{ wo.qc_notes or 'Photo inspection uploaded.' }}</p>

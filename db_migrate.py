@@ -43,7 +43,12 @@ def run_migrations():
         add_column_safely(conn, "outlets", "shop_type", "VARCHAR(50) NULL")
         add_column_safely(conn, "outlets", "external_id", "VARCHAR(100) NULL")
         add_column_safely(conn, "outlets", "channel", "VARCHAR(50) NULL")
+        add_column_safely(conn, "outlets", "photo_url", "TEXT NULL")
         add_column_safely(conn, "outlets", "is_active", "BOOLEAN NOT NULL DEFAULT 1")
+        add_column_safely(conn, "outlet_versions", "photo_url", "TEXT NULL")
+        add_column_safely(conn, "material_requests", "image_url", "TEXT NULL")
+        add_column_safely(conn, "asset_capitalizations", "image_url", "TEXT NULL")
+        add_column_safely(conn, "vendor_quotations", "invoice_photo_url", "TEXT NULL")
             
         # Users
         try:

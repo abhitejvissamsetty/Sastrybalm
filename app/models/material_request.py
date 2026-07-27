@@ -42,6 +42,7 @@ class MaterialRequest(Base):
     sync_retries = Column(Integer, nullable=False, default=0)
     vendor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     submitted_at = Column(DateTime, nullable=True)
+    image_url = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

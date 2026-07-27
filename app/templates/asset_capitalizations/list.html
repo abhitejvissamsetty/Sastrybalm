@@ -59,7 +59,23 @@
           {% for item in pagination.items %}
           <tr class="hover:bg-slate-700/30 transition-colors duration-100">
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-mono text-white">{{ item.ac_number }}</td>
-            <td class="whitespace-nowrap px-3 py-4 text-sm text-white">{{ item.item_name }} (x{{ item.quantity }})</td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-white">
+              <div class="flex items-center gap-3">
+                {% if item.image_url %}
+                <button type="button" onclick="openImageViewer('{{ item.image_url }}', '{{ item.item_name }} Deployment Photo')"
+                        class="h-9 w-9 rounded-lg overflow-hidden border border-slate-700 hover:ring-2 hover:ring-indigo-500 transition-all flex-shrink-0">
+                  <img src="{{ item.image_url }}" alt="{{ item.item_name }}" class="h-full w-full object-cover">
+                </button>
+                {% else %}
+                <div class="h-9 w-9 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600 flex-shrink-0">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                  </svg>
+                </div>
+                {% endif %}
+                <span>{{ item.item_name }} (x{{ item.quantity }})</span>
+              </div>
+            </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-slate-300">{{ item.outlet.name if item.outlet else '—' }}</td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-center">
               <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ item.status_badge_cls() }}">

@@ -57,8 +57,17 @@
       </thead>
       <tbody class="divide-y divide-slate-700/50">
         {% for item in pagination.items %}
-        <tr class="hover:bg-slate-800/60 transition-colors">
-          <td class="px-4 py-3 text-sm font-mono font-medium text-white">{{ item.mr_number }}</td>
+          <td class="px-4 py-3 text-sm font-mono font-medium text-white">
+            <div class="flex items-center gap-2.5">
+              {% if item.image_url %}
+              <button type="button" onclick="openImageViewer('{{ item.image_url }}', '{{ item.mr_number }} Attachment')"
+                      class="h-8 w-8 rounded-lg overflow-hidden border border-slate-700 hover:ring-2 hover:ring-indigo-500 transition-all flex-shrink-0">
+                <img src="{{ item.image_url }}" alt="{{ item.mr_number }}" class="h-full w-full object-cover">
+              </button>
+              {% endif %}
+              <span>{{ item.mr_number }}</span>
+            </div>
+          </td>
           <td class="px-4 py-3 text-sm text-slate-300 hidden sm:table-cell">{{ item.user.full_name if item.user else '—' }}</td>
           <td class="px-4 py-3 text-sm text-slate-300 hidden md:table-cell">{{ item.outlet.name if item.outlet else '—' }}</td>
           <td class="px-4 py-3 text-sm text-slate-400 hidden lg:table-cell">{{ item.category or '—' }}</td>

@@ -48,6 +48,7 @@ class Outlet(Base):
     territory_id = Column(Integer, ForeignKey("geographies.id"), nullable=True)
     gps_lat = Column(Float)
     gps_lng = Column(Float)
+    photo_url = Column(Text, nullable=True)
     erp_id = Column(String(100))
     status = Column(SAEnum(OutletStatus), default=OutletStatus.active, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)

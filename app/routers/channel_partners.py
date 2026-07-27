@@ -19,31 +19,7 @@ router = APIRouter(prefix="/channel-partners", tags=["channel-partners"])
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("", response_class=HTMLResponse)
-async def channel_partner_list(
-    request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
-    db: Session = Depends(get_db),
-    q: str = Query(default=""),
-    page: int = Query(default=1, ge=1),
-):
-    query = db.query(LocalChannelPartner)
-    if q:
-        query = query.filter(
-            LocalChannelPartner.name.ilike(f"%{q}%") |
-            LocalChannelPartner.erp_id.ilike(f"%{q}%") |
-            LocalChannelPartner.mobile.ilike(f"%{q}%")
-        )
-    query = query.order_by(LocalChannelPartner.name.asc())
-    pagination = paginate(query, page)
 
-    return templates.TemplateResponse("channel_partners/list.html", {
-        "request": request,
-        "current_user": current_user,
-        "pagination": pagination,
-        "q": q,
-        **get_flash(request),
-    })
 
 
 import json

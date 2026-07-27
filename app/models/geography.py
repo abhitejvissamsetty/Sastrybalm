@@ -44,3 +44,9 @@ class Geography(Base):
             parts.insert(0, p.name)
             p = p.parent
         return " › ".join(parts)
+
+    @property
+    def level_code(self) -> str:
+        if hasattr(self.level, "value"):
+            return self.level.value
+        return str(self.level or "")

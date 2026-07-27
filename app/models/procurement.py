@@ -34,6 +34,7 @@ class VendorQuotation(Base):
     lead_time_days = Column(Integer, default=7)
     status = Column(SAEnum(QuotationStatus), default=QuotationStatus.pending, nullable=False)
     notes = Column(Text, nullable=True)
+    invoice_photo_url = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     material_request = relationship("MaterialRequest", backref="quotations")

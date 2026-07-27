@@ -30,17 +30,45 @@
   {% endif %}
 
   <!-- Info Alert -->
-  <div class="glass rounded-2xl p-5 border border-indigo-500/20 bg-indigo-950/20 flex items-start gap-4">
-    <div class="p-2 rounded-xl bg-indigo-600/20 text-indigo-400">
-      <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-9 3.75h.008v.008H12v-.008z" />
-      </svg>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="glass rounded-2xl p-5 border border-indigo-500/20 bg-indigo-950/20 flex items-start gap-4">
+      <div class="p-2 rounded-xl bg-indigo-600/20 text-indigo-400 flex-shrink-0">
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-9 3.75h.008v.008H12v-.008z" />
+        </svg>
+      </div>
+      <div class="text-sm">
+        <h4 class="font-bold text-white">Automated SQL Backups &amp; Retention</h4>
+        <p class="text-slate-300 mt-1">
+          Standard MySQL <code class="font-mono text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">.sql</code> backups. Includes master data and transactional records. Automatically retains the <strong>5 most recent backups</strong>. Runs nightly at 00:00 IST.
+        </p>
+      </div>
     </div>
-    <div class="text-sm">
-      <h4 class="font-bold text-white">Automated SQL Backups &amp; 5-File Retention Policy</h4>
-      <p class="text-slate-300 mt-1">
-        Backups are generated directly in standard MySQL executable <code class="font-mono text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">.sql</code> format. Backups include all system master data (Sales Channels, Outlets, Beat Routes, Users, Products, Warehouses) and operational transaction records. The system automatically retains the <strong>5 most recent backups</strong>, purging older files. Automated daily backups run every night at 00:00 IST.
-      </p>
+
+    <!-- Parquet Rolling Backup Card -->
+    <div class="glass rounded-2xl p-5 border border-purple-500/20 bg-purple-950/20 flex flex-col justify-between gap-4">
+      <div class="flex items-start gap-4">
+        <div class="p-2 rounded-xl bg-purple-600/20 text-purple-400 flex-shrink-0">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 5.625c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+          </svg>
+        </div>
+        <div class="text-sm">
+          <h4 class="font-bold text-white">Parquet Daily Rolling Backup (Permanent Bucket)</h4>
+          <p class="text-slate-300 mt-1">
+            Exports operational &amp; transactional data up to yesterday into compressed Apache Parquet files directly into <strong class="text-purple-300">Permanent Files - Bucket</strong> in daily directory structure:
+            <code class="block mt-1 font-mono text-[11px] text-purple-200 bg-slate-900/80 p-1.5 rounded">rolling_backups/parquet/YYYY-MM-DD/&lt;table&gt;.parquet</code>
+          </p>
+        </div>
+      </div>
+      <div class="flex justify-end pt-2">
+        <form action="/settings/backup/parquet-rolling-backup" method="post">
+          <button type="submit"
+                  class="inline-flex items-center gap-x-2 rounded-xl bg-purple-600/80 border border-purple-500/50 px-4 py-2 text-xs font-bold text-white shadow-lg hover:bg-purple-500 transition-all">
+            ⚡ Run Parquet Rolling Backup Now
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 

@@ -143,6 +143,19 @@ def job_daily_backup() -> None:
         logger.error("Automated daily backup failed: %s", e)
 
 
+def job_daily_parquet_backup() -> None:
+    """Automated daily rolling Parquet backup of transactional/operational data to Permanent Files Bucket."""
+    db = SessionLocal()
+    try:
+        from app.services.parquet_backup_service import run_daily_parquet_rolling_backup
+        res = run_daily_parquet_rolling_backup(db)
+        logger.info(f"Automated daily Parquet rolling backup complete: {res.get('total_tables')} tables, {res.get('total_records')} records exported.")
+    except Exception as e:
+        logger.error(f"Automated daily Parquet rolling backup failed: {e}")
+    finally:
+        db.close()
+
+
 def job_auto_approve_orders() -> None:
     """
     Auto-approves submitted orders that have exceeded the auto-approval cutoff time window
@@ -238,6 +251,14 @@ def start_scheduler() -> None:
         job_daily_backup,
         CronTrigger(hour=0, minute=0),
         id="daily_backup",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+    # Automated daily rolling Parquet backup to Permanent Files Bucket at 01:00 AM IST
+    scheduler.add_job(
+        job_daily_parquet_backup,
+        CronTrigger(hour=1, minute=0),
+        id="daily_parquet_backup",
         replace_existing=True,
         misfire_grace_time=3600,
     )

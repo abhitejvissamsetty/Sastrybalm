@@ -73,3 +73,24 @@ async def backup_delete(
     else:
         set_flash_error(request, "Backup file not found.")
     return RedirectResponse("/settings/backup", status_code=302)
+
+
+@router.post("/parquet-rolling-backup")
+async def backup_parquet_rolling(
+    request: Request,
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    try:
+        from app.services.parquet_backup_service import run_daily_parquet_rolling_backup
+        res = run_daily_parquet_rolling_backup(db)
+        set_flash_success(
+            request,
+            f"Parquet rolling backup complete for cutoff date '{res['cutoff_date']}'! "
+            f"Exported {res['total_tables']} operational tables ({res['total_records']} total records) to "
+            f"directory '{res['directory_structure']}' in {res['target_bucket']}."
+        )
+    except Exception as e:
+        set_flash_error(request, f"Parquet rolling backup failed: {str(e)}")
+    return RedirectResponse("/settings/backup", status_code=302)
+

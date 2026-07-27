@@ -54,6 +54,7 @@ class AssetCapitalization(Base):
     sync_error = Column(Text, nullable=True)
     sync_retries = Column(Integer, nullable=False, default=0)
     notes = Column(Text, nullable=True)
+    image_url = Column(Text, nullable=True)
     deployed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -1,39 +1,53 @@
 {% extends "base.html" %}
+{% from "shared/pagination.html" import render as paginate %}
 
 {% block title %}Stock Audit Log{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-  <div class="md:flex md:items-center md:justify-between mb-8">
-    <div class="min-w-0 flex-1">
-      <h2 class="text-2xl font-bold leading-7 text-white sm:truncate sm:text-3xl sm:tracking-tight">
-        Stock Movement Audit Logs
-      </h2>
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-x-3">
+        <h1 class="text-2xl font-bold text-white tracking-tight">Stock Audit Logs</h1>
+        <span class="inline-flex items-center rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-400 border border-indigo-500/20">
+          Chronological Inventory Trail
+        </span>
+      </div>
       <p class="mt-1 text-sm text-slate-400">
-        Detailed chronological trail of stock inward, outward, and manual adjustments.
+        Complete historical ledger of stock inward, outward dispatches, and manual warehouse stock adjustments.
       </p>
     </div>
-    <div class="mt-4 flex md:ml-4 md:mt-0">
-      <a href="/inventory" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
-        &larr; Back to Catalogue
+    <div class="flex items-center gap-x-3">
+      <a href="/inventory"
+         class="inline-flex items-center gap-x-2 rounded-xl border border-white/10 bg-slate-900/80 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-all">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+        </svg>
+        Back to Catalogue
       </a>
     </div>
+  </div>
+
   <!-- Filter Bar -->
-  <div class="glass rounded-2xl p-6 border border-white/5 mb-6">
-    <form method="get" class="grid grid-cols-1 gap-4 sm:grid-cols-5 items-end">
+  <div class="glass rounded-2xl p-5 border border-white/5 shadow-xl">
+    <form method="get" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6 items-end">
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">Warehouse</label>
-        <select name="warehouse_id" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <label class="block text-xs font-semibold text-slate-400 mb-1.5">Warehouse</label>
+        <select name="warehouse_id"
+                class="w-full rounded-xl bg-slate-900/60 border border-white/10 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
           <option value="">All Warehouses</option>
           {% for wh in warehouses %}
-          <option value="{{ wh.id }}" {% if warehouse_id and warehouse_id|int == wh.id %}selected{% endif %}>{{ wh.name }}</option>
+          <option value="{{ wh.id }}" {% if warehouse_id and warehouse_id|int == wh.id %}selected{% endif %}>{{ wh.name }} ({{ wh.code }})</option>
           {% endfor %}
         </select>
       </div>
 
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">Product</label>
-        <select name="product_id" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <label class="block text-xs font-semibold text-slate-400 mb-1.5">Product</label>
+        <select name="product_id"
+                class="w-full rounded-xl bg-slate-900/60 border border-white/10 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
           <option value="">All Products</option>
           {% for p in products %}
           <option value="{{ p.id }}" {% if product_id and product_id|int == p.id %}selected{% endif %}>{{ p.name }}</option>
@@ -42,8 +56,9 @@
       </div>
 
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">Movement Type</label>
-        <select name="movement_type" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <label class="block text-xs font-semibold text-slate-400 mb-1.5">Movement Type</label>
+        <select name="movement_type"
+                class="w-full rounded-xl bg-slate-900/60 border border-white/10 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
           <option value="">All Types</option>
           <option value="INWARD" {% if movement_type == 'INWARD' %}selected{% endif %}>Inward</option>
           <option value="OUTWARD" {% if movement_type == 'OUTWARD' %}selected{% endif %}>Outward</option>
@@ -52,56 +67,120 @@
       </div>
 
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">From Date</label>
-        <input type="date" name="date_from" value="{{ date_from or '' }}" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <label class="block text-xs font-semibold text-slate-400 mb-1.5">From Date</label>
+        <input type="date" name="date_from" value="{{ date_from or '' }}"
+               class="w-full rounded-xl bg-slate-900/60 border border-white/10 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
       </div>
 
       <div>
-        <button type="submit" class="w-full rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors">
-          Filter Audit Logs
+        <label class="block text-xs font-semibold text-slate-400 mb-1.5">To Date</label>
+        <input type="date" name="date_to" value="{{ date_to or '' }}"
+               class="w-full rounded-xl bg-slate-900/60 border border-white/10 text-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all">
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button type="submit"
+                class="flex-1 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition-all shadow-md shadow-indigo-500/20">
+          Filter
         </button>
+        {% if warehouse_id or product_id or movement_type or date_from or date_to %}
+        <a href="/inventory/movements"
+           class="rounded-xl bg-slate-800 border border-white/5 px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-all">
+          Clear
+        </a>
+        {% endif %}
       </div>
     </form>
   </div>
 
-  <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-    <table class="min-w-full divide-y divide-slate-800 text-left text-sm text-slate-300">
-      <thead class="bg-slate-950/50 text-xs uppercase font-semibold text-slate-400">
-        <tr>
-          <th class="py-3.5 px-4">Date & Time</th>
-          <th class="py-3.5 px-4">Warehouse</th>
-          <th class="py-3.5 px-4">Movement Type</th>
-          <th class="py-3.5 px-4">Quantity</th>
-          <th class="py-3.5 px-4">Ref No</th>
-          <th class="py-3.5 px-4">Logged By</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-800/60 font-medium">
-        {% for move in pagination.items %}
-        <tr class="hover:bg-slate-800/40">
-          <td class="py-3.5 px-4 text-slate-400">{{ move.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-          <td class="py-3.5 px-4 text-white font-semibold">{{ move.product.name if move.product else '—' }}</td>
-          <td class="py-3.5 px-4 text-indigo-400 font-semibold">{{ move.warehouse.name if move.warehouse else '—' }}</td>
-          <td class="py-3.5 px-4">
-            {% if move.movement_type == 'INWARD' %}
-            <span class="inline-flex items-center rounded-full bg-emerald-900/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-400 border border-emerald-800/50">INWARD</span>
-            {% elif move.movement_type == 'OUTWARD' %}
-            <span class="inline-flex items-center rounded-full bg-indigo-900/40 px-2.5 py-0.5 text-xs font-semibold text-indigo-400 border border-indigo-800/50">OUTWARD</span>
-            {% else %}
-            <span class="inline-flex items-center rounded-full bg-amber-900/40 px-2.5 py-0.5 text-xs font-semibold text-amber-400 border border-amber-800/50">ADJUSTMENT</span>
-            {% endif %}
-          </td>
-          <td class="py-3.5 px-4 font-semibold text-white">{{ move.quantity }} units</td>
-          <td class="py-3.5 px-4 font-mono text-slate-400">{{ move.reference_no or '—' }}</td>
-          <td class="py-3.5 px-4 text-slate-400">{{ move.created_by.full_name if move.created_by else 'System' }}</td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="6" class="py-8 text-center text-slate-500">No stock movements recorded yet.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <!-- Movements Table -->
+  <div class="overflow-hidden rounded-2xl border border-white/5 bg-slate-900/60 shadow-2xl shadow-black/50 glass">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-white/5 text-left text-sm">
+        <thead>
+          <tr class="bg-slate-900/80 backdrop-blur-md">
+            <th class="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date &amp; Time</th>
+            <th class="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Product</th>
+            <th class="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Warehouse</th>
+            <th class="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Type</th>
+            <th class="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Quantity</th>
+            <th class="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ref No / Notes</th>
+            <th class="px-5 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Logged By</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5 font-medium">
+          {% for move in pagination.items %}
+          <tr class="hover:bg-slate-800/40 transition-colors">
+            <td class="px-5 py-4 whitespace-nowrap text-xs font-mono text-slate-400">
+              {{ move.created_at.strftime('%Y-%m-%d %H:%M') }}
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap">
+              <div class="text-sm font-semibold text-white">{{ move.product.name if move.product else '—' }}</div>
+              {% if move.product and (move.product.sku or move.product.erp_id) %}
+              <div class="text-[10px] font-mono text-slate-500 uppercase">{{ move.product.sku or move.product.erp_id }}</div>
+              {% endif %}
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap text-sm text-indigo-300 font-semibold">
+              {{ move.warehouse.name if move.warehouse else '—' }}
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap text-center">
+              {% if move.movement_type == 'INWARD' %}
+              <span class="inline-flex items-center rounded-full bg-emerald-950/80 px-2.5 py-1 text-[10px] font-bold text-emerald-400 border border-emerald-500/30 shadow-sm">
+                INWARD
+              </span>
+              {% elif move.movement_type == 'OUTWARD' %}
+              <span class="inline-flex items-center rounded-full bg-indigo-950/80 px-2.5 py-1 text-[10px] font-bold text-indigo-400 border border-indigo-500/30 shadow-sm">
+                OUTWARD
+              </span>
+              {% else %}
+              <span class="inline-flex items-center rounded-full bg-amber-950/80 px-2.5 py-1 text-[10px] font-bold text-amber-400 border border-amber-500/30 shadow-sm">
+                ADJUSTMENT
+              </span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap text-right text-sm font-bold text-white font-mono">
+              {% if move.movement_type == 'INWARD' %}
+              <span class="text-emerald-400">+{{ move.quantity }} units</span>
+              {% elif move.movement_type == 'OUTWARD' %}
+              <span class="text-indigo-400">-{{ move.quantity }} units</span>
+              {% else %}
+              <span class="text-amber-400">{{ move.quantity }} units</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-4 text-xs text-slate-300">
+              <div class="font-mono text-slate-300">{{ move.reference_no or '—' }}</div>
+              {% if move.notes %}
+              <div class="text-[11px] text-slate-500 italic mt-0.5">{{ move.notes }}</div>
+              {% endif %}
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap text-xs text-slate-400">
+              {{ move.created_by.full_name if move.created_by else 'System' }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="px-6 py-16 text-center">
+              <div class="flex flex-col items-center">
+                <div class="h-12 w-12 rounded-full bg-slate-900 flex items-center justify-center mb-3 border border-white/5">
+                  <svg class="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+                  </svg>
+                </div>
+                <p class="text-slate-400 font-medium text-sm">No stock movement audit records found matching criteria.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="bg-slate-900/50 px-6 py-4 border-t border-white/5">
+      {% set qs = "warehouse_id=" ~ warehouse_id ~ "&product_id=" ~ product_id ~ "&movement_type=" ~ movement_type ~ "&date_from=" ~ date_from ~ "&date_to=" ~ date_to %}
+      {{ paginate(pagination, "/inventory/movements?" ~ qs) }}
+    </div>
   </div>
+
 </div>
 {% endblock %}

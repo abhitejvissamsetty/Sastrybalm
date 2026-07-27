@@ -30,7 +30,7 @@ def _get_tm_geo_scope(db: Session, user: User) -> list[int]:
     return [region_id] + territory_ids
 
 
-def _form_context(db: Session, user: Optional[User] = None, for_role: str = "") -> dict:
+def _form_context(db: Session, user: Optional[User] = None, for_role: str = "", editing_user: Optional[User] = None) -> dict:
     positions_query = db.query(Position).filter(Position.is_active == True)
     if user and user.role == UserRole.territory_manager:
         positions_query = positions_query.filter(Position.level == "L1")
@@ -41,12 +41,36 @@ def _form_context(db: Session, user: Optional[User] = None, for_role: str = "") 
     if user and user.role == UserRole.territory_manager:
         allowed_geo_ids = _get_tm_geo_scope(db, user)
         geographies_query = geographies_query.filter(Geography.id.in_(allowed_geo_ids))
+    else:
+        # Exclude geographies already assigned to an active Territory Manager
+        assigned_geo_query = db.query(User.geography_id).filter(
+            User.role == UserRole.territory_manager,
+            User.is_active == True,
+            User.geography_id.isnot(None)
+        )
+        if editing_user and editing_user.id:
+            assigned_geo_query = assigned_geo_query.filter(User.id != editing_user.id)
+
+        assigned_geo_ids = [row[0] for row in assigned_geo_query.all() if row[0] is not None]
+        if assigned_geo_ids:
+            geographies_query = geographies_query.filter(Geography.id.notin_(assigned_geo_ids))
 
     geographies = geographies_query.order_by(Geography.name).all()
     vendors = db.query(Vendor).filter(Vendor.status == VendorStatus.active).order_by(Vendor.name).all()
     warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
     company_profiles = db.query(CompanyProfile).filter(CompanyProfile.is_active == True).order_by(CompanyProfile.name).all()
     
+    # Map of position_id -> assigned User full_name for active users
+    from app.models.user import user_positions
+    q_assigned_pos = db.query(user_positions.c.position_id, User.full_name).join(
+        User, User.id == user_positions.c.user_id
+    ).filter(User.is_active == True)
+
+    if editing_user and editing_user.id:
+        q_assigned_pos = q_assigned_pos.filter(User.id != editing_user.id)
+
+    assigned_positions_map = {row[0]: row[1] for row in q_assigned_pos.all()}
+
     # Filter roles available in form dropdown
     available_roles = [UserRole.field_rep] if user and user.role == UserRole.territory_manager else list(UserRole)
 
@@ -56,11 +80,25 @@ def _form_context(db: Session, user: Optional[User] = None, for_role: str = "") 
         "vendors": vendors,
         "warehouses": warehouses,
         "company_profiles": company_profiles,
+        "assigned_positions_map": assigned_positions_map,
         "UserRole": UserRole,
         "available_roles": available_roles,
         "ModuleName": ModuleName,
         "PaymentMode": PaymentMode,
     }
+
+
+def _resolve_user_modules(role_str: str, submitted_modules: list[str]) -> list[str]:
+    if role_str in [UserRole.field_rep.value]:
+        return ["orders", "inventory", "expenses", "timesheets", "attendance", "visits", "gps_map"]
+    elif role_str in [UserRole.vendor_admin.value, UserRole.vendor_technician.value]:
+        return ["orders", "inventory", "expenses"]
+    elif role_str in [UserRole.qc_manager.value]:
+        return ["orders", "inventory", "material_requests", "approvals"]
+    elif submitted_modules:
+        return submitted_modules
+    else:
+        return [m.value for m in ModuleName]
 
 
 @router.get("/role-matrix", response_class=HTMLResponse)
@@ -201,15 +239,52 @@ async def user_create(
     elif not err and db.query(User).filter(User.username == username).first():
         err = f"Username '{username}' already taken."
 
-    # Validate Position assignment rules
+    # Validate Position assignment rules based on Role & Managing Geography scope
     if not err and position_ids:
         pos_objs = db.query(Position).filter(Position.id.in_(position_ids)).all()
+        geo_node = None
+        if geography_id and str(geography_id).isdigit():
+            geo_node = db.query(Geography).filter(Geography.id == int(geography_id)).first()
+        geo_lvl = (geo_node.level.value if hasattr(geo_node.level, "value") else str(geo_node.level)).lower() if geo_node else ""
+
         for p in pos_objs:
             p_lvl = p.level.value if hasattr(p.level, "value") else str(p.level)
-            if p_lvl in ["L2", "L3", "L4"] and role != UserRole.territory_manager.value:
+            if role == UserRole.field_rep.value and p_lvl in ["L2", "L3", "L4"]:
                 err = f"Position '{p.name}' ({p_lvl}) can only be assigned to a Territory Manager. Field Reps can only be assigned L1 positions."
                 break
-        
+            if role == UserRole.territory_manager.value and geo_lvl:
+                if geo_lvl == "territory" and p_lvl not in ["L1", "L2"]:
+                    err = f"Territory managing scope permits L1/L2 positions. Position '{p.name}' ({p_lvl}) is not allowed."
+                    break
+                elif geo_lvl == "region" and p_lvl != "L3":
+                    err = f"Region managing scope permits L3 positions. Position '{p.name}' ({p_lvl}) is not allowed."
+                    break
+                elif geo_lvl == "zone" and p_lvl != "L4":
+                    err = f"Zone managing scope permits L4 positions. Position '{p.name}' ({p_lvl}) is not allowed."
+                    break
+
+        if not err:
+            q_conflict = db.query(user_positions.c.position_id, User.full_name).join(
+                User, User.id == user_positions.c.user_id
+            ).filter(
+                User.is_active == True,
+                user_positions.c.position_id.in_([int(p) for p in position_ids if str(p).isdigit()])
+            ).first()
+            if q_conflict:
+                conf_pos = db.query(Position).filter(Position.id == q_conflict[0]).first()
+                pos_title = conf_pos.name if conf_pos else f"ID {q_conflict[0]}"
+                err = f"Position '{pos_title}' is already assigned to active user '{q_conflict[1]}'."
+
+    # Validate Geography assignment for Territory Manager
+    if not err and role == UserRole.territory_manager.value and geography_id and str(geography_id).isdigit():
+        existing_tm = db.query(User).filter(
+            User.role == UserRole.territory_manager,
+            User.geography_id == int(geography_id),
+            User.is_active == True
+        ).first()
+        if existing_tm:
+            err = f"Geography is already assigned to active Territory Manager '{existing_tm.full_name}'."
+
     if err:
         return templates.TemplateResponse("users/form.html", {
             "request": request, "current_user": current_user,
@@ -243,7 +318,8 @@ async def user_create(
     db.flush()
     
     # Save module access
-    for mod in modules:
+    effective_modules = _resolve_user_modules(role, modules)
+    for mod in effective_modules:
         if mod in [m.value for m in ModuleName]:
             db.add(UserModuleAccess(user_id=user.id, module=ModuleName(mod), is_active=True))
             
@@ -264,7 +340,7 @@ async def user_edit(
         return RedirectResponse("/users", status_code=302)
     return templates.TemplateResponse("users/form.html", {
         "request": request, "current_user": current_user,
-        "item": item, "error": None, **_form_context(db, current_user),
+        "item": item, "error": None, **_form_context(db, current_user, editing_user=item),
     })
 
 
@@ -303,19 +379,58 @@ async def user_update(
     elif db.query(User).filter(User.email == email, User.id != user_id).first():
         err = f"Email '{email}' already registered."
 
-    # Validate Position assignment rules
+    # Validate Position assignment rules based on Role & Managing Geography scope
     if not err and position_ids:
         pos_objs = db.query(Position).filter(Position.id.in_(position_ids)).all()
+        geo_node = None
+        if geography_id and str(geography_id).isdigit():
+            geo_node = db.query(Geography).filter(Geography.id == int(geography_id)).first()
+        geo_lvl = (geo_node.level.value if hasattr(geo_node.level, "value") else str(geo_node.level)).lower() if geo_node else ""
+
         for p in pos_objs:
             p_lvl = p.level.value if hasattr(p.level, "value") else str(p.level)
-            if p_lvl in ["L2", "L3", "L4"] and role != UserRole.territory_manager.value:
+            if role == UserRole.field_rep.value and p_lvl in ["L2", "L3", "L4"]:
                 err = f"Position '{p.name}' ({p_lvl}) can only be assigned to a Territory Manager. Field Reps can only be assigned L1 positions."
                 break
+            if role == UserRole.territory_manager.value and geo_lvl:
+                if geo_lvl == "territory" and p_lvl not in ["L1", "L2"]:
+                    err = f"Territory managing scope permits L1/L2 positions. Position '{p.name}' ({p_lvl}) is not allowed."
+                    break
+                elif geo_lvl == "region" and p_lvl != "L3":
+                    err = f"Region managing scope permits L3 positions. Position '{p.name}' ({p_lvl}) is not allowed."
+                    break
+                elif geo_lvl == "zone" and p_lvl != "L4":
+                    err = f"Zone managing scope permits L4 positions. Position '{p.name}' ({p_lvl}) is not allowed."
+                    break
+
+        if not err:
+            q_conflict = db.query(user_positions.c.position_id, User.full_name).join(
+                User, User.id == user_positions.c.user_id
+            ).filter(
+                User.is_active == True,
+                User.id != user_id,
+                user_positions.c.position_id.in_([int(p) for p in position_ids if str(p).isdigit()])
+            ).first()
+            if q_conflict:
+                conf_pos = db.query(Position).filter(Position.id == q_conflict[0]).first()
+                pos_title = conf_pos.name if conf_pos else f"ID {q_conflict[0]}"
+                err = f"Position '{pos_title}' is already assigned to active user '{q_conflict[1]}'."
+
+    # Validate Geography assignment for Territory Manager
+    if not err and role == UserRole.territory_manager.value and geography_id and str(geography_id).isdigit():
+        existing_tm = db.query(User).filter(
+            User.role == UserRole.territory_manager,
+            User.geography_id == int(geography_id),
+            User.is_active == True,
+            User.id != user_id
+        ).first()
+        if existing_tm:
+            err = f"Geography is already assigned to active Territory Manager '{existing_tm.full_name}'."
 
     if err:
         return templates.TemplateResponse("users/form.html", {
             "request": request, "current_user": current_user,
-            "item": item, "error": err, **_form_context(db, current_user),
+            "item": item, "error": err, **_form_context(db, current_user, editing_user=item),
         })
         
     item.full_name = full_name
@@ -349,7 +464,8 @@ async def user_update(
     # Refresh module access — flush first to clear session state before re-inserting
     db.query(UserModuleAccess).filter(UserModuleAccess.user_id == user_id).delete(synchronize_session='fetch')
     db.flush()
-    for mod in modules:
+    effective_modules = _resolve_user_modules(role, modules)
+    for mod in effective_modules:
         if mod in [m.value for m in ModuleName]:
             db.add(UserModuleAccess(user_id=user_id, module=ModuleName(mod), is_active=True))
 

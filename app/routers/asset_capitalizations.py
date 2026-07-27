@@ -4,7 +4,7 @@ No approval needed — goes direct to CMMS queue.
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -17,7 +17,9 @@ from app.models.company import CompanyProfile
 from app.models.outlet import Outlet, OutletStatus
 from app.models.user import User, UserRole
 from app.models.vendor import Vendor, VendorEmployee
+from app.models.warehouse import Warehouse
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
+from app.utils.geography_scope import get_user_allowed_warehouse_ids
 from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/asset-capitalizations", tags=["asset-capitalizations"])
@@ -61,9 +63,14 @@ async def ac_new(
 ):
     outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
     vendors = db.query(Vendor).filter(Vendor.status == "active").order_by(Vendor.name).all()
+    allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
+    wh_query = db.query(Warehouse).filter(Warehouse.is_active == True)
+    if allowed_wh_ids is not None:
+        wh_query = wh_query.filter(Warehouse.id.in_(allowed_wh_ids))
+    warehouses = wh_query.order_by(Warehouse.name).all()
     return templates.TemplateResponse("asset_capitalizations/form.html", {
         "request": request, "current_user": current_user,
-        "outlets": outlets, "vendors": vendors,
+        "outlets": outlets, "vendors": vendors, "warehouses": warehouses,
         "DeployedByType": DeployedByType, "error": None,
     })
 
@@ -81,8 +88,24 @@ async def ac_create(
     deployed_by: str = Form(default="rep"),
     vendor_id: Optional[str] = Form(default=None),
     notes: Optional[str] = Form(default=None),
+    image: Optional[UploadFile] = File(default=None),
 ):
     ac_num = _ac_number(db)
+
+    image_url = None
+    if image and image.filename:
+        file_bytes = await image.read()
+        if file_bytes:
+            from app.utils.s3_service import upload_image_file
+            image_url = upload_image_file(
+                db=db,
+                file_bytes=file_bytes,
+                original_filename=image.filename,
+                folder_prefix="assets",
+                content_type=image.content_type or "image/jpeg",
+                bucket_type="permanent",
+            )
+
     ac = AssetCapitalization(
         ac_number=ac_num,
         user_id=current_user.id,
@@ -97,6 +120,7 @@ async def ac_create(
         status=ACStatus.pending,
         sync_status=ACSyncStatus.pending,
         notes=notes or None,
+        image_url=image_url,
     )
     db.add(ac)
     db.commit()

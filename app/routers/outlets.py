@@ -28,7 +28,7 @@ import json
 def _snapshot_outlet_version(db: Session, outlet: Outlet, user_id: Optional[int], summary: str) -> OutletVersion:
     from sqlalchemy import func
     max_ver = db.query(func.max(OutletVersion.version_number)).filter(OutletVersion.outlet_id == outlet.id).scalar() or 0
-    ver = OutletVersion(
+    version = OutletVersion(
         outlet_id=outlet.id,
         version_number=max_ver + 1,
         name=outlet.name,
@@ -44,13 +44,14 @@ def _snapshot_outlet_version(db: Session, outlet: Outlet, user_id: Optional[int]
         territory_id=outlet.territory_id,
         gps_lat=outlet.gps_lat,
         gps_lng=outlet.gps_lng,
+        photo_url=outlet.photo_url,
         status=outlet.status.value if outlet.status else None,
         changed_by_id=user_id,
         change_summary=summary,
     )
-    db.add(ver)
+    db.add(version)
     db.commit()
-    return ver
+    return version
 
 
 @router.get("", response_class=HTMLResponse)
@@ -130,6 +131,7 @@ async def outlet_create(
     territory_id: Optional[str] = Form(default=None),
     gps_lat: Optional[str] = Form(default=None),
     gps_lng: Optional[str] = Form(default=None),
+    photo: Optional[UploadFile] = File(default=None),
 ):
     beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
     territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
@@ -172,6 +174,20 @@ async def outlet_create(
             "error": "Beat is mandatory for active outlets.",
         })
 
+    photo_url = None
+    if photo and photo.filename:
+        file_bytes = await photo.read()
+        if file_bytes:
+            from app.utils.s3_service import upload_image_file
+            photo_url = upload_image_file(
+                db=db,
+                file_bytes=file_bytes,
+                original_filename=photo.filename,
+                folder_prefix="outlets",
+                content_type=photo.content_type or "image/jpeg",
+                bucket_type="permanent",
+            )
+
     outlet = Outlet(
         name=name,
         code=code.upper() if code else None,
@@ -187,6 +203,7 @@ async def outlet_create(
         territory_id=int(territory_id) if territory_id else None,
         gps_lat=float(gps_lat) if gps_lat else None,
         gps_lng=float(gps_lng) if gps_lng else None,
+        photo_url=photo_url,
         status=OutletStatus.active,
     )
     db.add(outlet)
@@ -259,6 +276,7 @@ async def outlet_update(
     territory_id: Optional[str] = Form(default=None),
     gps_lat: Optional[str] = Form(default=None),
     gps_lng: Optional[str] = Form(default=None),
+    photo: Optional[UploadFile] = File(default=None),
 ):
     item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
     if not item:
@@ -282,6 +300,20 @@ async def outlet_update(
             "ChannelType": ChannelType, "ShopType": ShopType,
             "error": f"Code '{code.upper()}' already in use.",
         })
+
+    # Upload new photo if provided
+    if photo and photo.filename:
+        file_bytes = await photo.read()
+        if file_bytes:
+            from app.utils.s3_service import upload_image_file
+            item.photo_url = upload_image_file(
+                db=db,
+                file_bytes=file_bytes,
+                original_filename=photo.filename,
+                folder_prefix="outlets",
+                content_type=photo.content_type or "image/jpeg",
+                bucket_type="permanent",
+            )
 
     # Non-admin edit creates approval request
     if current_user.role != UserRole.admin:

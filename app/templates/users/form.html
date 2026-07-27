@@ -98,12 +98,12 @@
       <!-- Scoped Field: Territory Manager (Geography Scope) -->
       <div id="scope-territory-manager" class="hidden rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4 space-y-2">
         <label class="block text-xs font-bold text-indigo-300 uppercase">Managing Region / Zone (Geography Scope) <span class="text-red-400">*</span></label>
-        <select name="geography_id"
+        <select name="geography_id" id="geographySelect" onchange="filterPositions()"
                 class="w-full rounded-xl bg-slate-950 border border-slate-700 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
           <option value="">Select Geography / Region...</option>
           {% for g in geographies %}
-          <option value="{{ g.id }}" {% if item and item.geography_id == g.id %}selected{% endif %}>
-            {{ g.name }} ({{ g.level.value.title() }})
+          <option value="{{ g.id }}" data-level="{{ g.level_code }}" {% if item and item.geography_id == g.id %}selected{% endif %}>
+            {{ g.name }} ({{ g.level_code.title() }})
           </option>
           {% endfor %}
         </select>
@@ -144,11 +144,19 @@
       {% set assigned_p_ids = item.positions | map(attribute='id') | list if item else [] %}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto p-2 border border-slate-800 rounded-xl bg-slate-950">
         {% for p in positions %}
-        <label class="position-item flex items-center justify-between p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition-colors" data-level="{{ p.level.value if p.level.value else p.level }}">
+        {% set assigned_user_name = assigned_positions_map.get(p.id) if assigned_positions_map else None %}
+        <label class="position-item flex items-center justify-between p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:bg-slate-900 transition-colors {% if assigned_user_name %}opacity-40 cursor-not-allowed bg-slate-950/80 pointer-events-none{% else %}cursor-pointer{% endif %}"
+               data-level="{{ p.level_code }}"
+               data-is-assigned="{{ 'true' if assigned_user_name else 'false' }}">
           <div class="flex items-center space-x-3">
-            <input type="checkbox" name="position_ids" value="{{ p.id }}" {% if p.id in assigned_p_ids %}checked{% endif %}
+            <input type="checkbox" name="position_ids" value="{{ p.id }}" {% if p.id in assigned_p_ids %}checked{% endif %} {% if assigned_user_name %}disabled{% endif %}
                    class="position-checkbox h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-600">
-            <span class="text-xs font-medium text-slate-200">{{ p.name }}</span>
+            <div>
+              <span class="text-xs font-medium text-slate-200">{{ p.name }}</span>
+              {% if assigned_user_name %}
+              <div class="text-[10px] text-amber-400 font-semibold">Assigned: {{ assigned_user_name }}</div>
+              {% endif %}
+            </div>
           </div>
           <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ 'bg-indigo-900/50 text-indigo-300' if p.level.value == 'L1' else 'bg-amber-900/50 text-amber-300' }}">
             {{ p.level.value if p.level.value else p.level }}
@@ -161,7 +169,7 @@
     </div>
 
     <!-- User Role Feature Access Matrix -->
-    <div class="glass rounded-2xl border border-indigo-500/20 bg-slate-900/60 p-6 space-y-5">
+    <div id="permission-matrix-container" class="glass rounded-2xl border border-indigo-500/20 bg-slate-900/60 p-6 space-y-5">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 class="text-xs font-bold text-indigo-400 uppercase tracking-widest">Dashboard &amp; Feature Access Permission Matrix</h2>
@@ -280,6 +288,7 @@
     const qcDiv = document.getElementById('scope-qc-manager');
     const vendorSingleDiv = document.getElementById('scope-vendor-single');
     const posContainer = document.getElementById('position-hierarchy-container');
+    const permMatrixContainer = document.getElementById('permission-matrix-container');
 
     if (territoryDiv) territoryDiv.classList.add('hidden');
     if (qcDiv) qcDiv.classList.add('hidden');
@@ -300,6 +309,13 @@
       if (posContainer) posContainer.classList.remove('hidden');
     }
 
+    // Hide permission matrix for Field Rep, Vendor Admin, Vendor Tech, QC Manager
+    if (role === 'field_rep' || role === 'vendor_admin' || role === 'vendor_technician' || role === 'qc_manager') {
+      if (permMatrixContainer) permMatrixContainer.classList.add('hidden');
+    } else {
+      if (permMatrixContainer) permMatrixContainer.classList.remove('hidden');
+    }
+
     // Run position filter (level restriction + search query)
     filterPositions();
   }
@@ -310,26 +326,45 @@
     const roleSelect = document.getElementById('roleSelect');
     const role = roleSelect ? roleSelect.value : '';
 
+    const geoSelect = document.getElementById('geographySelect');
+    const selectedOpt = geoSelect && geoSelect.selectedIndex >= 0 ? geoSelect.options[geoSelect.selectedIndex] : null;
+    const geoLevel = (selectedOpt && selectedOpt.value) ? (selectedOpt.getAttribute('data-level') || '').toLowerCase() : '';
+
     const posItems = document.querySelectorAll('.position-item');
     posItems.forEach(item => {
       const level = item.getAttribute('data-level');
       const text = item.textContent.toLowerCase();
+      const isAssigned = item.getAttribute('data-is-assigned') === 'true';
       const matchesSearch = !query || text.includes(query);
 
-      // Visibility based on search query
-      if (!matchesSearch) {
-        item.classList.add('hidden');
-      } else {
-        item.classList.remove('hidden');
+      let isAllowed = true;
+      if (role === 'territory_manager') {
+        if (geoLevel === 'territory') {
+          isAllowed = (level === 'L1' || level === 'L2');
+        } else if (geoLevel === 'region') {
+          isAllowed = (level === 'L3');
+        } else if (geoLevel === 'zone') {
+          isAllowed = (level === 'L4');
+        }
+      } else if (role === 'field_rep') {
+        isAllowed = (level === 'L1');
       }
 
-      // Interactivity based on role level restriction
       const cb = item.querySelector('.position-checkbox');
-      if (role === 'field_rep' && (level === 'L2' || level === 'L3' || level === 'L4')) {
-        item.classList.add('opacity-40', 'pointer-events-none');
-        if (cb) cb.checked = false;
+      if (!matchesSearch || !isAllowed) {
+        item.classList.add('hidden');
+        if (!isAllowed && cb) {
+          cb.checked = false;
+        }
       } else {
-        item.classList.remove('opacity-40', 'pointer-events-none');
+        item.classList.remove('hidden');
+        if (isAssigned) {
+          item.classList.add('opacity-40', 'pointer-events-none', 'cursor-not-allowed');
+          if (cb) cb.disabled = true;
+        } else {
+          item.classList.remove('opacity-40', 'pointer-events-none', 'cursor-not-allowed');
+          if (cb) cb.disabled = false;
+        }
       }
     });
   }

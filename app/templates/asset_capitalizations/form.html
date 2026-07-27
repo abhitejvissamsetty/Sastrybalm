@@ -21,7 +21,7 @@
   <div class="rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">{{ error }}</div>
   {% endif %}
 
-  <form method="post" class="space-y-6">
+  <form method="post" enctype="multipart/form-data" class="space-y-6">
 
     <!-- Outlet Info -->
     <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-5">
@@ -65,9 +65,13 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1.5">Warehouse</label>
-          <input type="text" name="warehouse_name"
-                 class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                 placeholder="CMMS warehouse name">
+          <select name="warehouse_name"
+                  class="w-full rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Select Warehouse…</option>
+            {% for w in warehouses %}
+            <option value="{{ w.name }}">{{ w.name }} ({{ w.code }})</option>
+            {% endfor %}
+          </select>
         </div>
       </div>
     </div>
@@ -96,6 +100,12 @@
             {% endfor %}
           </select>
         </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1.5">Asset Photo / Deployment Proof Image</label>
+        <input type="file" name="image" accept="image/*"
+               class="w-full rounded-lg bg-slate-900 border border-slate-700 text-slate-300 px-3 py-1.5 text-sm file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer">
       </div>
 
       <div>

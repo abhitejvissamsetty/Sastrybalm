@@ -368,7 +368,7 @@ async def inventory_stock_adjust(
 @router.get("/movements", response_class=HTMLResponse)
 async def inventory_movements(
     request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
     warehouse_id: Optional[str] = Query(default=""),
     product_id: Optional[str] = Query(default=""),

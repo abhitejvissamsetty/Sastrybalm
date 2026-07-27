@@ -30,6 +30,7 @@ class OutletVersion(Base):
     territory_id = Column(Integer, nullable=True)
     gps_lat = Column(Float, nullable=True)
     gps_lng = Column(Float, nullable=True)
+    photo_url = Column(Text, nullable=True)
     status = Column(String(50), nullable=True)
 
     # Audit tracking

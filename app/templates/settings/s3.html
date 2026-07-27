@@ -44,7 +44,7 @@
           </div>
           <div>
             <h2 class="text-lg font-bold text-white">Permanent Files - Bucket</h2>
-            <p class="text-xs text-slate-400">Stores permanent media assets such as outlet photos, material request images, QC inspection photos, &amp; user avatars.</p>
+            <p class="text-xs text-slate-400">Stores permanent images and media assets: <span class="text-indigo-300 font-medium">[Outlets, Assets, Material Requests, Work Orders (QC Images), Vendor Invoices, &amp; Avatars]</span>.</p>
           </div>
         </div>
 
@@ -75,7 +75,7 @@
           <input type="text" name="s3_bucket_name" value="{{ config.s3_bucket_name or '' }}"
                  placeholder="e.g. sastrybalm-permanent-files-bucket"
                  class="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
-          <p class="mt-1 text-[11px] text-slate-500">Dedicated bucket name for permanent files.</p>
+          <p class="mt-1 text-[11px] text-slate-500">Dedicated bucket name for permanent image &amp; asset storage.</p>
         </div>
 
         <div>
@@ -121,7 +121,7 @@
           </div>
           <div>
             <h2 class="text-lg font-bold text-white">Temporary Files - Bucket</h2>
-            <p class="text-xs text-slate-400">Stores temporary operational files, database backup dumps (.sql), PDF exports, &amp; temporary reports.</p>
+            <p class="text-xs text-slate-400">Stores temporary operational files: <span class="text-emerald-300 font-medium">[Analytics Scheduled Reports (CSV Files), Database Backups (.sql), &amp; Export Dumps]</span>.</p>
           </div>
         </div>
 

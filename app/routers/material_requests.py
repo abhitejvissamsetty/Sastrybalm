@@ -3,7 +3,7 @@ import logging
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -80,11 +80,26 @@ async def mr_create(
     product_id: int = Form(...),
     quantity: int = Form(...),
     notes: Optional[str] = Form(default=None),
+    image: Optional[UploadFile] = File(default=None),
 ):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product or product.category_type != ProductCategory.marketing_procurement:
         set_flash_error(request, "Material requests can only be placed for 'Marketing - Procurement' items.")
         return RedirectResponse("/material-requests/new", status_code=302)
+
+    image_url = None
+    if image and image.filename:
+        file_bytes = await image.read()
+        if file_bytes:
+            from app.utils.s3_service import upload_image_file
+            image_url = upload_image_file(
+                db=db,
+                file_bytes=file_bytes,
+                original_filename=image.filename,
+                folder_prefix="material_requests",
+                content_type=image.content_type or "image/jpeg",
+                bucket_type="permanent",
+            )
 
     import uuid
     mr = MaterialRequest(
@@ -93,6 +108,7 @@ async def mr_create(
         status=MRStatus.submitted,
         item_details=json.dumps({"product_id": product.id, "product_name": product.name, "qty": quantity}),
         notes=notes or None,
+        image_url=image_url,
     )
     db.add(mr)
     db.commit()
@@ -249,12 +265,27 @@ async def mr_submit_quote(
     quote_amount: str = Form(...),
     lead_time_days: int = Form(7),
     notes: Optional[str] = Form(default=None),
+    invoice_photo: Optional[UploadFile] = File(default=None),
 ):
     """Vendor places quotation on an Approved Material Request."""
     mr = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
     if not mr:
         set_flash_error(request, "Material Request not found.")
         return RedirectResponse("/material-requests", status_code=302)
+
+    invoice_photo_url = None
+    if invoice_photo and invoice_photo.filename:
+        file_bytes = await invoice_photo.read()
+        if file_bytes:
+            from app.utils.s3_service import upload_image_file
+            invoice_photo_url = upload_image_file(
+                db=db,
+                file_bytes=file_bytes,
+                original_filename=invoice_photo.filename,
+                folder_prefix="vendor_invoices",
+                content_type=invoice_photo.content_type or "image/jpeg",
+                bucket_type="permanent",
+            )
 
     quote = VendorQuotation(
         material_request_id=mr_id,
@@ -263,6 +294,7 @@ async def mr_submit_quote(
         lead_time_days=lead_time_days,
         status=QuotationStatus.pending,
         notes=notes or None,
+        invoice_photo_url=invoice_photo_url,
     )
     db.add(quote)
     db.commit()
@@ -374,8 +406,9 @@ async def work_order_qc(
                 db=db,
                 file_bytes=file_bytes,
                 original_filename=qc_photo.filename,
-                folder_prefix="qc_photos",
-                content_type=qc_photo.content_type or "image/jpeg"
+                folder_prefix="work_orders/qc",
+                content_type=qc_photo.content_type or "image/jpeg",
+                bucket_type="permanent",
             )
 
     if photo_path:
