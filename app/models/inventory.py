@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Numeric, DateTime, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Text, Numeric, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -16,6 +16,9 @@ class StockMovement(Base):
     notes = Column(Text, nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
 
     product = relationship("Product", foreign_keys=[product_id])
     warehouse = relationship("Warehouse", foreign_keys=[warehouse_id])

@@ -70,7 +70,6 @@ def run_daily_parquet_rolling_backup(db: Session, target_date: Optional[date] = 
     """
     from app.models.order import Order, OrderItem
     from app.models.payment import Payment
-    from app.models.payment_submission import PaymentSubmission
     from app.models.attendance import Attendance
     from app.models.timesheet import Timesheet
     from app.models.expense import Expense
@@ -86,7 +85,6 @@ def run_daily_parquet_rolling_backup(db: Session, target_date: Optional[date] = 
         Order,
         OrderItem,
         Payment,
-        PaymentSubmission,
         Attendance,
         Timesheet,
         Expense,
@@ -176,6 +174,12 @@ def run_daily_parquet_rolling_backup(db: Session, target_date: Optional[date] = 
             "storage_type": "S3 (Permanent Bucket)" if s3_url else "Local Disk Storage",
         })
 
+    # Stage 1: Soft-archive backed up records in SQL database
+    soft_archived_count = soft_archive_backed_up_records(db, end_cutoff_datetime)
+
+    # Stage 2: Hard-purge expired records older than retention window (default 90 days)
+    purge_res = run_hard_purge_expired_records(db)
+
     result = {
         "status": "success",
         "cutoff_date": date_str,
@@ -183,8 +187,131 @@ def run_daily_parquet_rolling_backup(db: Session, target_date: Optional[date] = 
         "target_bucket": s3_bucket if (is_s3_enabled and s3_bucket) else "Local Disk Storage",
         "total_tables": len(uploaded_files),
         "total_records": total_records_exported,
+        "soft_archived_count": soft_archived_count,
+        "hard_purged_count": purge_res.get("total_purged", 0),
+        "retention_days": purge_res.get("retention_days", 90),
         "files": uploaded_files,
         "executed_at": datetime.utcnow().isoformat(),
     }
     logger.info(f"[PARQUET ROLLING BACKUP COMPLETE] Date: {date_str}, Tables: {len(uploaded_files)}, Total Rows: {total_records_exported}")
     return result
+
+
+def soft_archive_backed_up_records(db: Session, end_cutoff_datetime: datetime) -> int:
+    """
+    Stage 1: Soft-Archival post-Parquet S3 upload.
+    Marks all exported records up to end_cutoff_datetime as soft-archived (is_archived = True, archived_at = NOW()).
+    """
+    from app.models.order import Order, OrderItem
+    from app.models.payment import Payment
+    from app.models.attendance import Attendance
+    from app.models.timesheet import Timesheet
+    from app.models.expense import Expense
+    from app.models.material_request import MaterialRequest, MaterialRequestHistoryLog
+    from app.models.procurement import VendorQuotation, WorkOrder
+    from app.models.inventory import StockMovement
+
+    target_models = [
+        OrderItem,
+        Order,
+        Payment,
+        Attendance,
+        Timesheet,
+        Expense,
+        MaterialRequestHistoryLog,
+        MaterialRequest,
+        VendorQuotation,
+        WorkOrder,
+        StockMovement,
+    ]
+
+    now_utc = datetime.utcnow()
+    total_soft_archived = 0
+
+    for model in target_models:
+        if hasattr(model, "is_archived") and hasattr(model, "created_at"):
+            query = db.query(model).filter(
+                model.is_archived == False,
+                model.created_at <= end_cutoff_datetime,
+            )
+            updated_count = query.update(
+                {model.is_archived: True, model.archived_at: now_utc},
+                synchronize_session=False,
+            )
+            total_soft_archived += updated_count
+    
+    db.commit()
+    logger.info(f"[PARQUET HYBRID ARCHIVAL] Soft-archived {total_soft_archived} records up to {end_cutoff_datetime.isoformat()}")
+    return total_soft_archived
+
+
+def run_hard_purge_expired_records(db: Session) -> Dict[str, Any]:
+    """
+    Stage 2: Hard Retention Purge.
+    Safely deletes records from SQL database that meet ALL 3 criteria:
+      1. is_archived == True (verifying they were backed up to S3 Parquet)
+      2. created_at <= hard_cutoff_datetime (older than retention_days, default 90 days)
+      3. Permanent S3 Bucket is enabled and connection is healthy.
+    Child detail tables are deleted before parent tables to prevent foreign key errors.
+    """
+    config = get_s3_config(db)
+    if not config.get("s3_is_enabled"):
+        return {"status": "skipped", "message": "Hard retention purge skipped: Permanent S3 Bucket is not enabled.", "total_purged": 0}
+
+    from app.utils.s3_service import test_s3_connection
+    s3_ok, s3_msg = test_s3_connection(config, bucket_type="permanent")
+    if not s3_ok:
+        return {"status": "skipped", "message": f"Hard retention purge skipped: S3 connection failed ({s3_msg}).", "total_purged": 0}
+
+    from app.models.company import SystemConfiguration
+    sys_config = db.query(SystemConfiguration).filter(SystemConfiguration.id == 1).first()
+    retention_days = sys_config.archival_retention_days if (sys_config and sys_config.archival_retention_days) else 90
+
+    hard_cutoff_datetime = datetime.utcnow() - timedelta(days=retention_days)
+
+    from app.models.order import Order, OrderItem, OrderHistoryLog
+    from app.models.payment import Payment
+    from app.models.attendance import Attendance
+    from app.models.timesheet import Timesheet
+    from app.models.expense import Expense
+    from app.models.material_request import MaterialRequest, MaterialRequestHistoryLog
+    from app.models.procurement import VendorQuotation, WorkOrder
+    from app.models.inventory import StockMovement
+
+    purge_sequence = [
+        OrderItem,
+        OrderHistoryLog,
+        Payment,
+        MaterialRequestHistoryLog,
+        VendorQuotation,
+        WorkOrder,
+        Order,
+        Attendance,
+        Timesheet,
+        Expense,
+        MaterialRequest,
+        StockMovement,
+    ]
+
+    total_purged = 0
+    purged_by_table = {}
+
+    for model in purge_sequence:
+        if hasattr(model, "is_archived") and hasattr(model, "created_at"):
+            query = db.query(model).filter(
+                model.is_archived == True,
+                model.created_at <= hard_cutoff_datetime,
+            )
+            count = query.delete(synchronize_session=False)
+            total_purged += count
+            purged_by_table[model.__tablename__] = count
+    
+    db.commit()
+    logger.info(f"[PARQUET HYBRID ARCHIVAL] Hard-purged {total_purged} expired records older than {retention_days} days")
+    return {
+        "status": "success",
+        "retention_days": retention_days,
+        "cutoff_datetime": hard_cutoff_datetime.isoformat(),
+        "total_purged": total_purged,
+        "purged_by_table": purged_by_table,
+    }

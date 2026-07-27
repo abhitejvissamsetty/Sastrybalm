@@ -45,6 +45,9 @@ class Timesheet(Base):
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
+
     user = relationship("User", foreign_keys=[user_id], back_populates="timesheets")
     approved_by = relationship("User", foreign_keys=[approved_by_id])
     attendance = relationship("Attendance", foreign_keys=[attendance_id])

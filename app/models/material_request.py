@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import (Column, DateTime, Enum, ForeignKey, Integer, String,
+from sqlalchemy import (Boolean, Column, DateTime, Enum, ForeignKey, Integer, String,
                         Text, func)
 from sqlalchemy.orm import relationship
 
@@ -46,6 +46,9 @@ class MaterialRequest(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
+
     user = relationship("User", foreign_keys=[user_id], back_populates="material_requests")
     vendor = relationship("User", foreign_keys=[vendor_id])
     outlet = relationship("Outlet", foreign_keys=[outlet_id])
@@ -83,6 +86,9 @@ class MaterialRequestHistoryLog(Base):
     vendor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
 
     material_request = relationship("MaterialRequest", back_populates="history_logs")
     performed_by = relationship("User", foreign_keys=[performed_by_id])

@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import (Column, DateTime, Enum, ForeignKey, Integer, Numeric,
+from sqlalchemy import (Boolean, Column, DateTime, Enum, ForeignKey, Integer, Numeric,
                         String, Text, func)
 from sqlalchemy.orm import relationship
 
@@ -49,15 +49,15 @@ class Payment(Base):
     denom_50 = Column(Integer, nullable=False, default=0)
     denom_20 = Column(Integer, nullable=False, default=0)
     denom_10 = Column(Integer, nullable=False, default=0)
-    # Submission tracking
-    submission_id = Column(Integer, ForeignKey("payment_submissions.id", ondelete="SET NULL"), nullable=True)
     collected_at = Column(DateTime, server_default=func.now())
     created_at = Column(DateTime, server_default=func.now())
+
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
 
     order = relationship("Order", back_populates="payments")
     outlet = relationship("Outlet", foreign_keys=[outlet_id])
     user = relationship("User", foreign_keys=[user_id], back_populates="payments")
-    submission = relationship("PaymentSubmission", back_populates="payment_items", foreign_keys=[submission_id])
 
     @property
     def denomination_total(self) -> int:

@@ -104,6 +104,71 @@
     </div>
   </div>
 
+  <!-- Hybrid Data Lifecycle & Archival Settings Card -->
+  <div class="glass rounded-2xl p-6 border border-cyan-500/20 bg-cyan-950/20 space-y-4 shadow-xl">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-700/60 pb-4">
+      <div class="flex items-center gap-3">
+        <div class="p-2.5 rounded-xl bg-cyan-600/20 text-cyan-400">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.75 7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Hybrid Data Lifecycle &amp; Archival Policy</h3>
+          <p class="text-xs text-slate-300">Two-stage enterprise lifecycle: Soft-archiving post S3 Parquet backup + Hard retention purge after cutoff window.</p>
+        </div>
+      </div>
+
+      <!-- Live DB Archival Stats Badges -->
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700/80 text-xs">
+          <span class="text-slate-400 font-medium">Hot Active Records:</span>
+          <span class="ml-1.5 font-bold font-mono text-emerald-400">{{ active_hot_count }}</span>
+        </div>
+        <div class="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700/80 text-xs">
+          <span class="text-slate-400 font-medium">Soft-Archived:</span>
+          <span class="ml-1.5 font-bold font-mono text-purple-400">{{ soft_archived_count }}</span>
+        </div>
+        <div class="px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700/80 text-xs">
+          <span class="text-slate-400 font-medium">SQL Retention Window:</span>
+          <span class="ml-1.5 font-bold font-mono text-cyan-400">{{ retention_days }} Days</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lifecycle Explanation & Retention Configuration Form -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+      <div class="md:col-span-2 text-xs text-slate-300 space-y-1.5 leading-relaxed">
+        <p>
+          <strong class="text-cyan-300">Stage 1 (Soft Archival):</strong> When daily Parquet rolling backup completes and uploads to <strong class="text-purple-300">Permanent S3 Bucket</strong>, records are flagged with <code class="font-mono text-purple-300 bg-slate-900 px-1 py-0.5 rounded">is_archived = True</code>. SQL queries for active transactions remain blazing fast.
+        </p>
+        <p>
+          <strong class="text-cyan-300">Stage 2 (Hard Purge):</strong> Soft-archived records older than the retention window (<strong class="text-cyan-300">{{ retention_days }} Days</strong>) are safely purged from the SQL database to prevent bloat. Multi-year historical data remains 100% accessible via S3 Parquet backups.
+        </p>
+      </div>
+
+      <!-- Retention Form -->
+      <form action="/settings/backup/retention" method="post" class="bg-slate-900/90 rounded-xl p-3 border border-slate-700/80 space-y-2">
+        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Configure SQL Retention Window (Days)</label>
+        <div class="flex items-center gap-2">
+          <input type="number" min="7" max="3650" name="archival_retention_days" value="{{ retention_days }}"
+                 class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-xs font-mono text-white font-bold focus:outline-none focus:ring-2 focus:ring-cyan-500">
+          <button type="submit"
+                  class="premium-btn flex-shrink-0 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-bold text-white shadow-md hover:bg-cyan-500 transition-all">
+            Save
+          </button>
+        </div>
+        <div class="flex gap-1.5 pt-1">
+          <button type="button" onclick="document.querySelector('[name=archival_retention_days]').value=30" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white border border-slate-700">30d</button>
+          <button type="button" onclick="document.querySelector('[name=archival_retention_days]').value=60" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white border border-slate-700">60d</button>
+          <button type="button" onclick="document.querySelector('[name=archival_retention_days]').value=90" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-cyan-400 font-bold border border-cyan-500/50">90d (Rec)</button>
+          <button type="button" onclick="document.querySelector('[name=archival_retention_days]').value=180" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white border border-slate-700">180d</button>
+          <button type="button" onclick="document.querySelector('[name=archival_retention_days]').value=365" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white border border-slate-700">365d</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Backups Table -->
   <div class="table-container shadow-2xl shadow-black/50">
     <table class="min-w-full divide-y divide-white/5">

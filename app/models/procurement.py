@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, DateTime, Enum as SAEnum, Text
+from sqlalchemy import Boolean, Column, Integer, String, Numeric, ForeignKey, DateTime, Enum as SAEnum, Text
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -37,6 +37,9 @@ class VendorQuotation(Base):
     invoice_photo_url = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
+
     material_request = relationship("MaterialRequest", backref="quotations")
     vendor = relationship("User", foreign_keys=[vendor_id])
 
@@ -57,6 +60,9 @@ class WorkOrder(Base):
     qc_verified_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
 
     quotation = relationship("VendorQuotation", backref="work_order")
     material_request = relationship("MaterialRequest", backref="work_orders")

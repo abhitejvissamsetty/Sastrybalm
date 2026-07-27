@@ -1,7 +1,7 @@
 import enum
 from datetime import date, datetime
 
-from sqlalchemy import (Column, Date, DateTime, Enum, ForeignKey, Integer,
+from sqlalchemy import (Boolean, Column, Date, DateTime, Enum, ForeignKey, Integer,
                         Numeric, String, Text, func)
 from sqlalchemy.orm import relationship
 
@@ -38,6 +38,9 @@ class Expense(Base):
     approved_at = Column(DateTime, nullable=True)
     rejection_reason = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
 
     user = relationship("User", foreign_keys=[user_id], back_populates="expenses")
     approved_by = relationship("User", foreign_keys=[approved_by_id])

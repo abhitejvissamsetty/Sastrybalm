@@ -270,6 +270,16 @@ docker compose up -d
 - **Automated Scheduler**: Triggered every night at **01:00 AM IST** via `job_daily_parquet_backup` in `app/scheduler.py`.
 - **Manual Trigger Route**: Admin button **"⚡ Run Parquet Rolling Backup Now"** on [/settings/backup](http://localhost:8090/settings/backup) (`POST /settings/backup/parquet-rolling-backup`).
 
+### Two-Stage Hybrid Data Lifecycle & Archival Strategy
+1. **Stage 1 (Soft Archival - Post-Parquet Upload)**:
+   - When daily Parquet rolling backup completes and uploads to **Permanent S3 Bucket**, all exported records up to yesterday are soft-archived (`is_archived = True`, `archived_at = timestamp`).
+   - Active SQL queries run fast on `is_archived = False`, while reporting screens maintain operational context without breaking.
+2. **Stage 2 (Hard Retention Purge - Configurable Retention Window)**:
+   - Records older than the configured retention window (**default: 90 days**, configurable in `SystemConfiguration.archival_retention_days`) that are soft-archived (`is_archived = True`) are permanently deleted from the SQL database.
+   - Foreign-key child records (`order_items`, `payment_submissions`, `vendor_quotations`, `material_request_history_logs`) are deleted first to preserve referential integrity.
+3. **Safety Guards**:
+   - Parquet backups, soft-archival, and hard retention purges execute **ONLY** if Permanent S3 Bucket is enabled (`s3_is_enabled == True`) and connection test passes.
+
 ---
 
 ## 🖼️ 13. Dual Bucket Directory Scoping & UI Image Viewer Architecture

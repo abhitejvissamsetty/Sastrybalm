@@ -135,6 +135,9 @@ class SystemConfiguration(Base):
     s3_files_region_name = Column(String(100), default="us-west-004", nullable=True)
     s3_files_public_url_prefix = Column(String(255), nullable=True)
 
+    # Parquet Archival Retention Setting
+    archival_retention_days = Column(Integer, default=90, nullable=False)
+
     # WhatsApp Business API Configuration
     whatsapp_api_key = Column(Text, nullable=True)
     whatsapp_phone_number_id = Column(String(255), nullable=True)

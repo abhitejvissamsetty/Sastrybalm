@@ -1,7 +1,7 @@
 import enum
 from datetime import date, datetime
 
-from sqlalchemy import (Column, Date, DateTime, Enum, ForeignKey, Integer,
+from sqlalchemy import (Boolean, Column, Date, DateTime, Enum, ForeignKey, Integer,
                         Numeric, String, Text, func)
 from sqlalchemy.orm import relationship
 
@@ -60,6 +60,9 @@ class Order(Base):
     sync_retries = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
 
     outlet = relationship("Outlet", foreign_keys=[outlet_id])
     user = relationship("User", foreign_keys=[user_id], back_populates="orders")
@@ -146,6 +149,9 @@ class OrderItem(Base):
     unit_price = Column(Numeric(10, 2), nullable=False)
     gst_rate = Column(Numeric(5, 2), nullable=False, default=0)
     discount_pct = Column(Numeric(5, 2), nullable=False, default=0)
+
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
 
     order = relationship("Order", back_populates="items")
     product = relationship("Product", foreign_keys=[product_id])

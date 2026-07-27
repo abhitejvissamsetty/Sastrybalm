@@ -5,7 +5,7 @@ Auto-calculates attendance type based on hours comparison.
 """
 import enum
 
-from sqlalchemy import Column, Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -47,6 +47,9 @@ class Attendance(Base):
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    is_archived = Column(Boolean, default=False, nullable=False, index=True)
+    archived_at = Column(DateTime, nullable=True)
 
     user = relationship("User", foreign_keys=[user_id])
     approved_by = relationship("User", foreign_keys=[approved_by_id])
