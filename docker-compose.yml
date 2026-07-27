@@ -52,6 +52,7 @@ services:
       - DB_USER=${DB_USER:-safar_user}
       - DB_PASSWORD=${DB_PASSWORD:-safar_password}
       - DB_NAME=${DB_NAME:-safar_db}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - JWT_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-10080}
       - CMMS_BASE_URL=${CMMS_BASE_URL:-}

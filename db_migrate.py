@@ -1,10 +1,91 @@
 import os
+import time
+import pymysql
 from sqlalchemy import text
 from app.database import engine
 from app.models.base import Base
 
 # Ensure all models are imported so Base.metadata is fully populated
 from app.models import *
+
+def wait_and_provision_db():
+    """
+    Waits for MySQL database to become ready.
+    If 'safar_user' encounters (1045, Access Denied) or (1049, Unknown database),
+    attempts auto-provisioning using root credentials ('MYSQL_ROOT_PASSWORD' or 'rootpassword')
+    to create database 'safar_db', user 'safar_user'@'%', and grant all privileges.
+    """
+    from app.config import settings
+
+    host = settings.db_host
+    port = int(settings.db_port)
+    user = settings.db_user
+    password = settings.db_password
+    dbname = settings.db_name
+    root_pass = os.environ.get("MYSQL_ROOT_PASSWORD", "rootpassword")
+
+    print(f"Connecting to MySQL database at {host}:{port} as user '{user}'...")
+
+    max_retries = 30
+    for attempt in range(1, max_retries + 1):
+        try:
+            conn = pymysql.connect(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                database=dbname,
+                charset="utf8mb4",
+                connect_timeout=5,
+            )
+            conn.close()
+            print(f"✓ Successfully authenticated to database '{dbname}' as '{user}'.")
+            return
+        except pymysql.err.OperationalError as e:
+            code, msg = e.args[0], e.args[1]
+            print(f"[Attempt {attempt}/{max_retries}] DB connection message ({code}): {msg}")
+
+            if code in (1045, 1049):
+                print(f"Attempting auto-provisioning as root user against {host}:{port}...")
+                root_passwords_to_try = [root_pass, "rootpassword", "root", "", password]
+                provisioned = False
+
+                for r_pass in root_passwords_to_try:
+                    try:
+                        r_conn = pymysql.connect(
+                            host=host,
+                            port=port,
+                            user="root",
+                            password=r_pass,
+                            charset="utf8mb4",
+                            connect_timeout=5,
+                        )
+                        cursor = r_conn.cursor()
+                        cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{dbname}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+                        cursor.execute(f"CREATE USER IF NOT EXISTS '{user}'@'%' IDENTIFIED BY '{password}';")
+                        cursor.execute(f"ALTER USER '{user}'@'%' IDENTIFIED BY '{password}';")
+                        cursor.execute(f"GRANT ALL PRIVILEGES ON `{dbname}`.* TO '{user}'@'%';")
+                        cursor.execute("FLUSH PRIVILEGES;")
+                        r_conn.commit()
+                        cursor.close()
+                        r_conn.close()
+                        print(f"✓ Auto-provisioned database '{dbname}' and granted all privileges to user '{user}'@'%'!")
+                        provisioned = True
+                        break
+                    except Exception as root_err:
+                        print(f"Root connect attempt with password '{'***' if r_pass else '<empty>'}' failed: {root_err}")
+
+                if provisioned:
+                    engine.dispose()
+                    time.sleep(1)
+                    continue
+
+            time.sleep(2)
+        except Exception as ex:
+            print(f"[Attempt {attempt}/{max_retries}] Waiting for database: {ex}")
+            time.sleep(2)
+
+    print("Warning: Exhausted retries waiting for database. Proceeding with migration...")
 
 def add_column_safely(conn, table, column, definition):
     try:
@@ -20,6 +101,7 @@ def add_column_safely(conn, table, column, definition):
 
 def run_migrations():
     print("Running database migrations...")
+    wait_and_provision_db()
     
     # 1. Ensure all tables defined in models exist
     print("Ensuring all database tables exist...")
