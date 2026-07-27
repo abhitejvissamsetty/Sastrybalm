@@ -17,40 +17,13 @@ from app.routers.api import auth as api_auth
 from app.routers.api import master as api_master
 from app.routers.api import operations as api_operations
 from app.routers.api import webhooks as api_webhooks
-import os
-import fcntl
 from app.scheduler import start_scheduler, scheduler
 from app.services.startup_validation import validate_admin_and_s3_config
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Single-worker lock to prevent Gunicorn multi-worker MySQL migration deadlocks
-    lock_file_path = "/tmp/sastrybalm_migration.lock"
-    lock_acquired = False
-    lock_file = None
-
-    try:
-        lock_file = open(lock_file_path, "w")
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        lock_acquired = True
-    except (IOError, OSError):
-        # Another worker is already executing migrations or completed them
-        lock_acquired = False
-
-    if lock_acquired:
-        try:
-            from db_migrate import run_migrations
-            run_migrations()
-        except Exception as e:
-            print(f"Lifespan migration error: {e}")
-        finally:
-            try:
-                if lock_file:
-                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-                    lock_file.close()
-            except Exception:
-                pass
-
+    # Migrations are run by entrypoint.sh BEFORE Gunicorn forks workers.
+    # Workers only need to validate config and start the scheduler.
     try:
         validate_admin_and_s3_config()
     except Exception as e:

@@ -15,7 +15,7 @@ Sastrybalm ERP is a comprehensive FMCG Sales & Distribution Management System bu
 
 The system orchestrates:
 - **Mandatory S3 Storage & Onboarding Trigger**: If S3/MinIO bucket storage is not configured or fails connectivity checks, `is_system_onboarded(db)` returns `False`, forcing redirection to `/onboarding`. Features an interactive **"⚡ Test S3 / MinIO Connection"** AJAX action button (`POST /onboarding/test-s3`) to verify bucket credentials and endpoint reachability with live feedback banners before completing setup.
-- **Server Startup Validation & Process Concurrency Lock**: Features non-blocking file locking (`fcntl.flock`) in FastAPI `lifespan` (`app/main.py`) to prevent multi-worker Gunicorn deadlocks on `ALTER TABLE` transactions, and safe exception handling when querying uninitialized database tables.
+- **Server Startup & Entrypoint Migration Architecture**: Database migrations (`db_migrate.py`) run once in `entrypoint.sh` (PID 1) before Gunicorn forks workers — preventing multi-worker `ALTER TABLE` deadlocks. FastAPI `lifespan` only runs startup validation and scheduler init. Safe exception handling in `is_system_onboarded()` and `validate_s3_configuration()` for uninitialized databases.
 - **Geography & Regional Warehouse Architecture**: Multi-tier hierarchy (`Zone` → `Region` → `Territory`) with region-level warehouse mapping and unified scoping (`get_user_allowed_geography_ids` & `get_user_allowed_warehouse_ids`).
 - **Position Hierarchy**: 4-level organizational hierarchy (`L1` to `L4`) with automatic reporting parent warehouse inheritance resolution.
 - **Beat & Outlet Management**: Beat territory selection scoped to L1 child territories under position/region hierarchy. Outlet scoping, non-admin approval workflows (`outlet_edit_approval`), Admin direct edit `OutletVersion` snapshots, version history, and Git-tree style version reverts.
@@ -215,9 +215,11 @@ python3 -m py_compile app/main.py app/services/startup_validation.py app/adapter
 ### Image Architecture & Dependency Encapsulation
 - **Multi-Stage Dockerfile (`Dockerfile`)**: Pre-compiles and installs all mandatory dependencies from `requirements.txt` (`boto3`, `botocore`, `gunicorn`, `cryptography`, `fastapi`, `pymysql`, `sqlalchemy`) into `/usr/local`.
 - **Zero-Installation Target Deployment**: When built locally or via CI/CD, the Docker image encapsulates all Python packages into an immutable container artifact. Target servers loading the container image via Docker Hub/Registry or `docker load < sastrybalm-app.tar.gz` run instantly without downloading or installing any dependencies from scratch.
+- **Docker Entrypoint Migration Architecture (`entrypoint.sh`)**: Database migrations (`python db_migrate.py`) run **once in PID 1** before Gunicorn forks workers. This prevents multi-worker `ALTER TABLE` deadlocks (MySQL 1213) and ensures all tables exist before any worker serves requests. The FastAPI `lifespan` handler does NOT run migrations — only startup validation and scheduler init.
+- **Gunicorn `--timeout 120`**: Workers get 120 seconds (up from default 30) to complete startup, preventing premature SIGABRT on slow MySQL connections.
 - **Docker Compose Architecture (`docker-compose.yml`)**:
   - `db`: MySQL 8.0 instance on port 3308 (internal 3306).
-  - `app`: FastAPI web application running Gunicorn with 4 Uvicorn workers on port 8090.
+  - `app`: FastAPI web application running Gunicorn with 4 Uvicorn workers on port 8090, using `entrypoint.sh`.
   - `nginx`: Reverse proxy on port 8080.
   - `adminer`: Web-based database management GUI on port 8081.
 

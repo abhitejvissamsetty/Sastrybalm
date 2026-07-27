@@ -31,6 +31,7 @@ COPY --from=builder /install /usr/local
 COPY alembic.ini .
 COPY run.py .
 COPY db_migrate.py .
+COPY entrypoint.sh .
 COPY app/ ./app/
 COPY migrations/ ./migrations/
 
@@ -44,15 +45,10 @@ USER sastrybalm
 # Expose the application port
 EXPOSE 8090
 
-# Health-check: hit the docs endpoint
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+# Health-check: hit the docs endpoint (generous start-period for migrations)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8090/api/docs')" || exit 1
 
-# Default: Gunicorn with Uvicorn workers for production
-CMD ["gunicorn", \
-     "--bind", "0.0.0.0:8090", \
-     "--workers", "4", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-", \
-     "app.main:app"]
+# Entrypoint: run migrations ONCE, then start Gunicorn (no per-worker deadlocks)
+ENTRYPOINT ["bash", "/app/entrypoint.sh"]
+
