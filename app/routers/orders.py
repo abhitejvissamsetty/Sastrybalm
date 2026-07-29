@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -24,6 +24,14 @@ from app.utils.encryption import decrypt
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 from app.utils.ref_generator import order_number
+from app.services.access_control import (
+    require_channel_partner_access,
+    require_order_access,
+    require_outlet_access,
+    scope_order_query,
+    scope_outlet_query,
+    scope_channel_partner_query,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +55,7 @@ async def order_list(
     from datetime import timedelta
     from app.models.local_distribution import LocalChannelPartner
 
-    query = db.query(Order)
-    if current_user.role == UserRole.field_rep:
-        query = query.filter(Order.user_id == current_user.id)
+    query = scope_order_query(db.query(Order), current_user, db)
     if q:
         query = query.filter(Order.order_number.ilike(f"%{q}%"))
     if status and status in [s.value for s in OrderStatus]:
@@ -63,11 +69,11 @@ async def order_list(
         is_filtered_by_days = True
 
     if pincode:
-        query = query.join(Outlet, Order.outlet_id == Outlet.id).filter(Outlet.pincode.ilike(f"%{pincode}%"))
+        query = query.filter(Outlet.pincode.ilike(f"%{pincode}%"))
 
     if partner_id:
         # Filter orders associated with channel partner outlets
-        query = query.join(Outlet, Order.outlet_id == Outlet.id).filter(Outlet.channel_partner_id == int(partner_id))
+        query = query.filter(Outlet.channel_partner_id == int(partner_id))
 
     if product_id:
         query = query.join(OrderItem, Order.id == OrderItem.order_id).filter(OrderItem.product_id == int(product_id))
@@ -75,7 +81,9 @@ async def order_list(
     query = query.order_by(Order.created_at.desc())
     pagination = paginate(query, page)
 
-    partners = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
+    partners = scope_channel_partner_query(
+        db.query(LocalChannelPartner), current_user, db
+    ).filter(LocalChannelPartner.is_active == True).order_by(LocalChannelPartner.name).all()
     products = db.query(Product).filter(Product.is_active == True, Product.category_type == ProductCategory.sales).order_by(Product.name).all()
 
     return templates.TemplateResponse("orders/list.html", {
@@ -97,7 +105,11 @@ async def order_new(
 ):
     from app.utils.timezone import ist_today
 
-    outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
+    outlets = scope_outlet_query(
+        db.query(Outlet).filter(Outlet.status == OutletStatus.active),
+        current_user,
+        db,
+    ).order_by(Outlet.name).all()
     # Confine to Products with Category Scope = Sales
     products = db.query(Product).filter(
         Product.is_active == True,
@@ -105,11 +117,9 @@ async def order_new(
     ).order_by(Product.name).all()
 
     from app.models.local_distribution import LocalChannelPartner
-    cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
-    if current_user.role == UserRole.territory_manager:
-        from app.routers.channel_partners import _get_tm_allowed_geo_ids
-        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
-        cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_ids))
+    cp_query = scope_channel_partner_query(
+        db.query(LocalChannelPartner), current_user, db
+    ).filter(LocalChannelPartner.is_active == True)
     channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
 
     # Active visits today for current user
@@ -154,18 +164,18 @@ async def order_create(
     gst_rates = form.getlist("gst_rate[]")
     discount_pcts = form.getlist("discount_pct[]")
 
-    cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
-    if current_user.role == UserRole.territory_manager:
-        from app.routers.channel_partners import _get_tm_allowed_geo_ids
-        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
-        cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_ids))
+    cp_query = scope_channel_partner_query(
+        db.query(LocalChannelPartner), current_user, db
+    ).filter(LocalChannelPartner.is_active == True)
     channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
 
     sales_products = db.query(Product).filter(
         Product.is_active == True,
         Product.category_type == ProductCategory.sales
     ).order_by(Product.name).all()
-    outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
+    outlets = scope_outlet_query(
+        db.query(Outlet), current_user, db
+    ).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
     active_visits = db.query(VisitRecord).filter(
         VisitRecord.user_id == current_user.id,
         func.date(VisitRecord.visit_time) == ist_today()
@@ -202,6 +212,8 @@ async def order_create(
                 "error": "Primary Orders must be placed directly against a valid Channel Partner.",
             })
         target_cp_id = int(channel_partner_id) if str(channel_partner_id).isdigit() else None
+        if target_cp_id:
+            require_channel_partner_access(db, current_user, target_cp_id)
         target_outlet_id = None
         target_visit_id = None
 
@@ -217,6 +229,7 @@ async def order_create(
             })
 
         target_outlet_id = int(outlet_id)
+        require_outlet_access(db, current_user, target_outlet_id, active_only=True)
 
         # Retrieve & Verify Mandatory Visit Record
         visit = None
@@ -248,6 +261,8 @@ async def order_create(
             is_regional = True
         else:
             target_cp_id = int(channel_partner_id) if channel_partner_id and str(channel_partner_id).isdigit() else None
+            if target_cp_id:
+                require_channel_partner_access(db, current_user, target_cp_id)
             is_regional = False
 
     if not product_ids:
@@ -269,7 +284,7 @@ async def order_create(
         visit_id=target_visit_id,
         company_profile_id=current_user.company_profile_id,
         order_type=ot,
-        flow_type=FlowType.zap_invoice,
+        flow_type=FlowType.native_order,
         sync_status=SyncStatus.not_applicable,
         status=OrderStatus.submitted,
         notes=notes or None,
@@ -352,11 +367,9 @@ async def order_detail(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Order).filter(Order.id == order_id)
-    if current_user.role == UserRole.field_rep:
-        q = q.filter(Order.user_id == current_user.id)
-    item = q.first()
-    if not item:
+    try:
+        item = require_order_access(db, current_user, order_id)
+    except HTTPException:
         set_flash_error(request, "Order not found.")
         return RedirectResponse("/operations/orders", status_code=302)
 
@@ -366,11 +379,9 @@ async def order_detail(
         auto_allocate_channel_partner_for_order(db, item)
 
     from app.models.local_distribution import LocalChannelPartner
-    cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
-    if current_user.role == UserRole.territory_manager:
-        from app.routers.channel_partners import _get_tm_allowed_geo_ids
-        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
-        cp_query = cp_query.filter(LocalChannelPartner.geography_id.in_(allowed_ids))
+    cp_query = scope_channel_partner_query(
+        db.query(LocalChannelPartner), current_user, db
+    ).filter(LocalChannelPartner.is_active == True)
     available_channel_partners = cp_query.order_by(LocalChannelPartner.name).all()
 
     from app.models.payment import Payment
@@ -402,8 +413,9 @@ async def order_record_payment(
     count_20: int = Form(default=0),
     count_10: int = Form(default=0),
 ):
-    item = db.query(Order).filter(Order.id == order_id).first()
-    if not item:
+    try:
+        item = require_order_access(db, current_user, order_id)
+    except HTTPException:
         set_flash_error(request, "Order not found.")
         return RedirectResponse("/operations/orders", status_code=302)
 
@@ -453,8 +465,9 @@ async def order_update_status(
     db: Session = Depends(get_db),
     new_status: str = Form(...),
 ):
-    item = db.query(Order).filter(Order.id == order_id).first()
-    if not item:
+    try:
+        item = require_order_access(db, current_user, order_id)
+    except HTTPException:
         set_flash_error(request, "Order not found.")
         return RedirectResponse("/operations/orders", status_code=302)
     try:
@@ -479,13 +492,7 @@ async def order_update_status(
             notes=f"Order status updated from '{old_status_val}' to '{new_status}' by {current_user.full_name}"
         )
 
-        # Auto-trigger CONNECT sync when confirming a CONNECT order
-        if new_status == "confirmed" and item.flow_type == FlowType.connect:
-            item.sync_status = SyncStatus.pending
-            db.commit()
-            await _sync_order_to_connect(item, db)
-        else:
-            db.commit()
+        db.commit()
 
         set_flash_success(request, f"Order {item.order_number} status → {new_status}.")
     except ValueError:
@@ -501,14 +508,17 @@ async def order_allocate_channel_partner(
     channel_partner_id: Optional[str] = Form(default=None),
     notes: Optional[str] = Form(default=None),
 ):
-    item = db.query(Order).filter(Order.id == order_id).first()
-    if not item:
+    try:
+        item = require_order_access(db, current_user, order_id)
+    except HTTPException:
         set_flash_error(request, "Order not found.")
         return RedirectResponse("/operations/orders", status_code=302)
 
     cp_id_int = int(channel_partner_id) if channel_partner_id and str(channel_partner_id).isdigit() else None
-    from app.models.local_distribution import LocalChannelPartner
-    cp = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id_int).first() if cp_id_int else None
+    cp = (
+        require_channel_partner_access(db, current_user, cp_id_int)
+        if cp_id_int else None
+    )
 
     old_cp_id = item.channel_partner_id
     item.channel_partner_id = cp.id if cp else None
@@ -534,103 +544,3 @@ async def order_allocate_channel_partner(
 
     set_flash_success(request, f"Fulfillment allocated to Channel Partner '{cp_name}'.")
     return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
-
-
-@router.post("/{order_id}/sync-connect")
-async def order_sync_connect(
-    order_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
-    db: Session = Depends(get_db),
-):
-    """Manually (re-)submit an order to CONNECT."""
-    item = db.query(Order).filter(Order.id == order_id).first()
-    if not item:
-        set_flash_error(request, "Order not found.")
-        return RedirectResponse("/operations/orders", status_code=302)
-
-    if item.flow_type != FlowType.connect:
-        set_flash_error(request, "This order does not use the CONNECT flow.")
-        return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
-
-    if item.status not in (OrderStatus.submitted, OrderStatus.confirmed):
-        set_flash_error(request, "Order must be submitted or confirmed to sync to CONNECT.")
-        return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
-
-    item.sync_status = SyncStatus.pending
-    item.sync_error = None
-    db.commit()
-
-    await _sync_order_to_connect(item, db)
-    return RedirectResponse(f"/operations/orders/{order_id}", status_code=302)
-
-
-async def _sync_order_to_connect(order: Order, db: Session) -> None:
-    """Internal helper: push an order to CONNECT and update status dynamically."""
-    profile = db.query(CompanyProfile).filter(CompanyProfile.id == order.company_profile_id).first()
-    if not profile or not profile.connect_base_url:
-        raise ValueError("CONNECT configuration missing for this company profile.")
-
-    api_key_secret = decrypt(profile.connect_api_key_encrypted)
-
-    items_payload = []
-    for it in order.items:
-        alias = db.query(ProductAliasMap).filter(
-            ProductAliasMap.company_profile_id == order.company_profile_id,
-            ProductAliasMap.product_id == it.product_id
-        ).first()
-
-        connect_code = alias.connect_item_code if alias else (it.product.sku or it.product.erp_id)
-        items_payload.append({
-            "item": connect_code,
-            "quantity": it.quantity,
-            "item_rate": float(it.unit_price),
-            "line_item_amount": float(it.line_total)
-        })
-
-    payload = {
-        "order_date": order.created_at.strftime("%Y-%m-%d %H:%M:%S") if order.created_at else datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "ordered_by": order.user.email,
-        "agent_code": order.user.employee_id or order.user.username,
-        "delivery_address": order.outlet.name,
-        "contact": order.outlet.owner_name or "N/A",
-        "service_category": order.outlet.channel.value if (order.outlet and order.outlet.channel) else "General",
-        "channel_partner": "",
-        "order_notes": order.notes or "",
-        "items": items_payload,
-        "timeline": [
-            {
-                "event_type": "Status Update",
-                "recorded_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "fieldname": "order_status",
-                "from_value": "Submitted",
-                "to_value": "Assigned",
-                "created_by": order.user.email
-            }
-        ]
-    }
-
-    dynamic_adapter = ConnectAdapter(
-        base_url=profile.connect_base_url,
-        api_key=api_key_secret
-    )
-
-    try:
-        result = await dynamic_adapter.submit_order(payload)
-        order.sync_status = SyncStatus.synced
-        order.connect_ref = result.get("data", {}).get("name") or result.get("name") or str(result)
-        order.sync_error = None
-        order.sync_retries = 0
-        db.commit()
-        logger.info("CONNECT sync success — order %s → ref %s", order.order_number, order.connect_ref)
-    except Exception as exc:
-        order.sync_status = SyncStatus.failed
-        order.sync_error = str(exc)[:1000]
-        order.sync_retries += 1
-        db.add(Alert(
-            severity=AlertSeverity.critical,
-            alert_type=AlertType.sync_failure,
-            title=f"CONNECT sync failed: {order.order_number}",
-            message=f"Order {order.order_number} failed to sync to CONNECT: {str(exc)[:500]}",
-        ))
-        db.commit()
-        logger.error("CONNECT sync failed — order %s: %s", order.order_number, exc)

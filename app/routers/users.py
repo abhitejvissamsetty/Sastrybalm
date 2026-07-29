@@ -1,3 +1,4 @@
+import secrets
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -14,6 +15,11 @@ from app.models.vendor import Vendor, VendorStatus
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 from app.utils.security import hash_password
+from app.services.access_control import (
+    build_access_scope,
+    require_user_access,
+    scope_user_query,
+)
 
 router = APIRouter(prefix="/master-data/users", tags=["users"])
 templates = Jinja2Templates(directory="app/templates")
@@ -121,11 +127,14 @@ async def user_position_view(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        set_flash_error(request, "User not found.")
-        return RedirectResponse("/users", status_code=302)
-    all_positions = db.query(Position).filter(Position.is_active == True).order_by(Position.name).all()
+    user = require_user_access(db, current_user, user_id)
+    access_scope = build_access_scope(current_user, db)
+    position_query = db.query(Position).filter(Position.is_active == True)
+    if not access_scope.unrestricted:
+        position_query = position_query.filter(
+            Position.id.in_(access_scope.position_ids or {-1})
+        )
+    all_positions = position_query.order_by(Position.name).all()
     return templates.TemplateResponse("users/position_view.html", {
         "request": request,
         "current_user": current_user,
@@ -144,14 +153,22 @@ async def user_position_update(
     position_ids: list[str] = Form(default=[]),
 ):
     """Update assigned positions for user."""
-    user_obj = db.query(User).filter(User.id == user_id).first()
-    if not user_obj:
-        set_flash_error(request, "User not found.")
-        return RedirectResponse("/users", status_code=302)
+    user_obj = require_user_access(db, current_user, user_id)
+    access_scope = build_access_scope(current_user, db)
 
     user_obj.positions.clear()
     if position_ids:
-        pos_objs = db.query(Position).filter(Position.id.in_(position_ids)).all()
+        position_query = db.query(Position).filter(
+            Position.id.in_(position_ids), Position.is_active == True
+        )
+        if not access_scope.unrestricted:
+            position_query = position_query.filter(
+                Position.id.in_(access_scope.position_ids or {-1})
+            )
+        pos_objs = position_query.all()
+        if len(pos_objs) != len(set(position_ids)):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Position not found.")
         user_obj.positions.extend(pos_objs)
 
     db.commit()
@@ -169,9 +186,7 @@ async def user_list(
     role: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(User)
-    if current_user.role == UserRole.territory_manager:
-        query = query.filter(User.role == UserRole.field_rep)
+    query = scope_user_query(db.query(User), current_user, db)
 
     if q:
         query = query.filter(
@@ -209,7 +224,7 @@ async def user_create(
     full_name: str = Form(...),
     email: str = Form(...),
     username: str = Form(...),
-    password: Optional[str] = Form(default=None),
+    password: str = Form(...),
     role: str = Form(...),
     employee_id: Optional[str] = Form(default=None),
     phone: str = Form(...),
@@ -225,7 +240,9 @@ async def user_create(
     err = None
 
     phone_clean = phone.strip() if phone else ""
-    if not err and not phone_clean:
+    if len(password) < 12:
+        err = "Password must contain at least 12 characters."
+    elif not err and not phone_clean:
         err = "Phone number is mandatory."
     elif not err and not re.match(r"^\d{10}$", phone_clean):
         err = "Phone number must be exactly 10 digits."
@@ -292,7 +309,7 @@ async def user_create(
         
     user = User(
         full_name=full_name, email=email, username=username,
-        hashed_password=hash_password(password) if password else hash_password("OTP_USER_PASSWORDLESS"),
+        hashed_password=hash_password(password),
         role=UserRole(role),
         employee_id=employee_id or None, phone=phone_clean or None,
         company_profile_id=int(company_profile_id) if company_profile_id else None,
@@ -510,13 +527,12 @@ async def user_activation_code(
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
-    import random
     item = db.query(User).filter(User.id == user_id).first()
     if not item:
         set_flash_error(request, "User not found.")
         return RedirectResponse("/users", status_code=302)
         
-    code = "".join([str(random.randint(0, 9)) for _ in range(6)])
+    code = f"{secrets.randbelow(1_000_000):06d}"
     item.activation_code = code
     db.commit()
     set_flash_success(request, f"Activation code generated for {item.full_name}: {code}")

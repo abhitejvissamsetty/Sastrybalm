@@ -14,12 +14,15 @@ from app.models.material_request import MaterialRequest, MRStatus
 from app.models.outlet import Outlet, OutletStatus
 from app.models.timesheet import Timesheet, TimesheetApproval
 from app.models.user import User, UserRole
+from app.models.leave import Leave
+from app.models.order import Order
+from app.models.payment import Payment
 from app.utils.flash import get_flash
 
 router = APIRouter(prefix="/action-center/approvals", tags=["approvals"])
 templates = Jinja2Templates(directory="app/templates")
 
-_ADMIN_MANAGER = require_web_roles(UserRole.admin, UserRole.territory_manager)
+_HUB_ROLES = require_web_roles(UserRole.admin, UserRole.territory_manager, UserRole.field_rep)
 
 
 from fastapi import HTTPException
@@ -51,13 +54,31 @@ def _check_approval_hub_permissions(user: User, db: Session):
 @router.get("", response_class=HTMLResponse)
 async def approvals_hub(
     request: Request,
-    current_user: User = Depends(_ADMIN_MANAGER),
+    current_user: User = Depends(_HUB_ROLES),
     db: Session = Depends(get_db),
 ):
     """Central hub showing pending counts across all approval queues scoped by user position & geography."""
-    _check_approval_hub_permissions(current_user, db)
+    is_self_view = current_user.role == UserRole.field_rep
+    if not is_self_view:
+        _check_approval_hub_permissions(current_user, db)
 
     allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
+
+    if is_self_view:
+        queues = [
+            {"name": "Attendance", "icon": "📋", "count": db.query(Attendance).filter(Attendance.user_id == current_user.id).count(), "url": "/attendance", "description": "Your attendance submissions"},
+            {"name": "Timesheets", "icon": "⏱️", "count": db.query(Timesheet).filter(Timesheet.user_id == current_user.id).count(), "url": "/tracking/timesheets", "description": "Your timesheet submissions"},
+            {"name": "Expenses", "icon": "🧾", "count": db.query(Expense).filter(Expense.user_id == current_user.id).count(), "url": "/expenses", "description": "Your expense submissions"},
+            {"name": "Leaves", "icon": "🏖️", "count": db.query(Leave).filter(Leave.user_id == current_user.id).count(), "url": "/leaves", "description": "Your leave submissions"},
+            {"name": "Orders", "icon": "🛒", "count": db.query(Order).filter(Order.user_id == current_user.id).count(), "url": "/operations/orders", "description": "Your order submissions"},
+            {"name": "Payments", "icon": "💳", "count": db.query(Payment).filter(Payment.user_id == current_user.id).count(), "url": "/operations/payments", "description": "Your payment submissions"},
+            {"name": "Material Requests", "icon": "🔧", "count": db.query(MaterialRequest).filter(MaterialRequest.user_id == current_user.id).count(), "url": "/operations/material-requests", "description": "Your Material Requests and high-level progress"},
+        ]
+        return templates.TemplateResponse("approvals/hub.html", {
+            "request": request, "current_user": current_user, "queues": queues,
+            "total_pending": sum(q["count"] for q in queues), "is_self_view": True,
+            **get_flash(request),
+        })
 
     # Attendance approvals
     att_q = db.query(func.count(Attendance.id)).filter(Attendance.approval_status == ApprovalStatus.pending)
@@ -135,7 +156,7 @@ async def approvals_hub(
             "icon": "🔧",
             "count": pending_mrs,
             "url": "/material-requests",
-            "description": "CMMS material requests in progress",
+            "description": "Material requests in progress",
         },
     ]
 

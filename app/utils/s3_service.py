@@ -62,7 +62,7 @@ def upload_image_file(
     """
     Unified file upload handler for outlet images, material request images, QC photos, asset pictures, and files/documents.
     Uploads to Backblaze B2 S3 bucket using dedicated bucket credentials based on bucket_type ("images" vs "files").
-    Falls back to local static disk storage if S3 is disabled or unconfigured.
+    Falls back to local static disk storage only in non-production environments.
     """
     ext = os.path.splitext(original_filename)[1] or ".jpg"
     timestamp_str = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -117,9 +117,20 @@ def upload_image_file(
             return f"https://{target_bucket}.s3.{region_name}.backblazeb2.com/{object_key}"
 
         except Exception as exc:
-            logger.error(f"[S3 UPLOAD ERROR] Failed to upload to Backblaze B2 S3 bucket '{target_bucket}': {exc}. Falling back to local disk storage.")
+            logger.exception(
+                "[S3 UPLOAD ERROR] Failed to upload object to bucket '%s'",
+                target_bucket,
+            )
+            from app.config import settings
+            if settings.is_production:
+                raise RuntimeError("Object storage upload failed.") from exc
 
     # Local Disk Fallback
+    from app.config import settings
+    if settings.is_production:
+        raise RuntimeError(
+            "Object storage is required in production; local upload fallback is disabled."
+        )
     local_dir = os.path.join("app", "static", "uploads", clean_prefix)
     os.makedirs(local_dir, exist_ok=True)
     filename = f"{timestamp_str}_{os.urandom(4).hex()}{ext}"

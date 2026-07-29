@@ -13,6 +13,12 @@ from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 
 from app.utils.beat_types import get_all_beat_types
+from app.services.access_control import (
+    build_access_scope,
+    require_beat_access,
+    require_channel_partner_access,
+    scope_beat_query,
+)
 
 router = APIRouter(prefix="/master-data/beats", tags=["beats"])
 templates = Jinja2Templates(directory="app/templates")
@@ -33,10 +39,11 @@ async def beat_list(
     from sqlalchemy.orm import selectinload
     from app.models.position import Position
 
-    query = db.query(Beat).options(selectinload(Beat.positions))
-    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
-    if allowed_geo_ids is not None:
-        query = query.filter(Beat.territory_id.in_(allowed_geo_ids))
+    query = scope_beat_query(
+        db.query(Beat).options(selectinload(Beat.positions)),
+        current_user,
+        db,
+    )
 
     if q:
         query = query.outerjoin(Beat.positions).filter(
@@ -120,7 +127,8 @@ async def beat_create(
     assigned_terr_id = int(territory_id) if territory_id else None
     if allowed_geo_ids is not None:
         if assigned_terr_id and assigned_terr_id not in allowed_geo_ids:
-            assigned_terr_id = None
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Geography not found.")
 
     beat = Beat(
         name=name, code=code.upper(), beat_type=parse_beat_type(beat_type),
@@ -134,7 +142,10 @@ async def beat_create(
 
     if channel_partner_ids:
         for c_id in channel_partner_ids:
-            db.add(BeatChannelPartner(beat_id=beat.id, channel_partner_id=int(c_id)))
+            partner = require_channel_partner_access(db, current_user, int(c_id))
+            db.add(BeatChannelPartner(
+                beat_id=beat.id, channel_partner_id=partner.id
+            ))
 
     db.commit()
     set_flash_success(request, f"Beat '{name}' created.")
@@ -150,16 +161,8 @@ async def beat_edit(
     from app.models.local_distribution import LocalChannelPartner
     from app.models.beat_channel_partner import BeatChannelPartner
 
-    item = db.query(Beat).filter(Beat.id == beat_id).first()
-    if not item or not item.is_active:
-        set_flash_error(request, "Active beat not found or beat is inactive.")
-        return RedirectResponse("/master-data/beats", status_code=302)
-
+    item = require_beat_access(db, current_user, beat_id, active_only=True)
     allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
-    if allowed_geo_ids is not None:
-        if item.territory_id and item.territory_id not in allowed_geo_ids:
-            set_flash_error(request, "Access denied. Beat is not in your assigned geography.")
-            return RedirectResponse("/master-data/beats", status_code=302)
 
     terr_query = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True)
     cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
@@ -196,10 +199,7 @@ async def beat_update(
     from app.models.local_distribution import LocalChannelPartner
     from app.models.beat_channel_partner import BeatChannelPartner
 
-    item = db.query(Beat).filter(Beat.id == beat_id).first()
-    if not item or not item.is_active:
-        set_flash_error(request, "Active beat not found or beat is inactive.")
-        return RedirectResponse("/master-data/beats", status_code=302)
+    item = require_beat_access(db, current_user, beat_id, active_only=True)
     if db.query(Beat).filter(Beat.code == code.upper(), Beat.id != beat_id).first():
         cp_query = db.query(LocalChannelPartner).filter(LocalChannelPartner.is_active == True)
         allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
@@ -223,13 +223,24 @@ async def beat_update(
     item.description = description or None
     item.pincodes = pincodes or None
     item.beat_grade = parse_beat_grade(beat_grade)
-    item.territory_id = int(territory_id) if territory_id else None
+    requested_territory_id = int(territory_id) if territory_id else None
+    access_scope = build_access_scope(current_user, db)
+    if (
+        requested_territory_id
+        and not access_scope.allows_geography(requested_territory_id)
+    ):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Geography not found.")
+    item.territory_id = requested_territory_id
     item.erp_id = erp_id or None
 
     db.query(BeatChannelPartner).filter(BeatChannelPartner.beat_id == beat_id).delete()
     if channel_partner_ids:
         for c_id in channel_partner_ids:
-            db.add(BeatChannelPartner(beat_id=beat_id, channel_partner_id=int(c_id)))
+            partner = require_channel_partner_access(db, current_user, int(c_id))
+            db.add(BeatChannelPartner(
+                beat_id=beat_id, channel_partner_id=partner.id
+            ))
 
     db.commit()
     set_flash_success(request, f"Beat '{name}' updated.")
@@ -242,11 +253,10 @@ async def beat_activate(
     current_user: User = Depends(require_restricted_module_web_access),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Beat).filter(Beat.id == beat_id).first()
-    if item:
-        item.is_active = True
-        db.commit()
-        set_flash_success(request, f"'{item.name}' activated.")
+    item = require_beat_access(db, current_user, beat_id)
+    item.is_active = True
+    db.commit()
+    set_flash_success(request, f"'{item.name}' activated.")
     return RedirectResponse("/master-data/beats", status_code=302)
 
 
@@ -256,16 +266,15 @@ async def beat_delete(
     current_user: User = Depends(require_restricted_module_web_access),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Beat).filter(Beat.id == beat_id).first()
-    if item:
-        if item.active_outlet_count > 0:
-            set_flash_error(request, f"Cannot deactivate '{item.name}' because it has active outlets.")
-            return RedirectResponse("/master-data/beats", status_code=302)
-        if any(p.is_active for p in item.positions):
-            set_flash_error(request, f"Cannot deactivate '{item.name}' because it is attached to active positions.")
-            return RedirectResponse("/master-data/beats", status_code=302)
-            
-        item.is_active = False
-        db.commit()
-        set_flash_success(request, f"'{item.name}' deactivated.")
+    item = require_beat_access(db, current_user, beat_id)
+    if item.active_outlet_count > 0:
+        set_flash_error(request, f"Cannot deactivate '{item.name}' because it has active outlets.")
+        return RedirectResponse("/master-data/beats", status_code=302)
+    if any(p.is_active for p in item.positions):
+        set_flash_error(request, f"Cannot deactivate '{item.name}' because it is attached to active positions.")
+        return RedirectResponse("/master-data/beats", status_code=302)
+
+    item.is_active = False
+    db.commit()
+    set_flash_success(request, f"'{item.name}' deactivated.")
     return RedirectResponse("/beats", status_code=302)

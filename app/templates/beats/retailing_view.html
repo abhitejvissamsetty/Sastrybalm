@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100 dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ beat.name }} — Retailing View | Safar SFA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Outfit', sans-serif; }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="h-full bg-slate-950 flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Retailing Header Bar (No Footer Menu) -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-xl border-b border-white/10 px-4 py-3.5 flex items-center justify-between shadow-2xl">
+    <div class="flex items-center gap-3">
+      <a href="/dashboard" class="p-2 rounded-xl bg-slate-800 border border-white/10 text-slate-300 hover:text-white hover:bg-slate-700 transition-all">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+        </svg>
+      </a>
+      <div>
+        <h1 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+          {{ beat.name }}
+          <span class="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-semibold border border-indigo-500/30">
+            {{ beat.code }}
+          </span>
+        </h1>
+        <p class="text-xs text-slate-400 font-medium">Retailing Mode • {{ outlets|length }} Active Outlets</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+        Active Beat
+      </span>
+    </div>
+  </header>
+
+  <!-- Live Search Bar Overlay (Toggled by FAB) -->
+  <div id="search-bar-container" class="hidden bg-slate-900/95 border-b border-white/10 p-3 shadow-xl backdrop-blur-xl">
+    <div class="relative max-w-lg mx-auto">
+      <input type="text" id="outlet-search-input" onkeyup="filterOutlets()" placeholder="Search by name, ID/code, or phone..." 
+             class="w-full pl-10 pr-10 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all">
+      <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+      </svg>
+      <button onclick="toggleSearchBar()" class="absolute right-3 top-2.5 text-slate-400 hover:text-white p-1">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Outlets Container -->
+  <main class="flex-1 overflow-y-auto p-4 max-w-3xl mx-auto w-full space-y-3 pb-24">
+    {% if outlets %}
+      <div id="outlets-list" class="space-y-3">
+        {% for outlet in outlets %}
+          <div class="outlet-card glass-panel rounded-2xl p-4 transition-all hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/5 group"
+               data-name="{{ outlet.name|lower }}" 
+               data-code="{{ outlet.code|lower }}" 
+               data-phone="{{ (outlet.mobile_number or outlet.phone_number or '')|lower }}">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="px-2 py-0.5 rounded-md bg-slate-800 border border-white/10 text-[11px] font-mono font-semibold text-indigo-300">
+                    ID: {{ outlet.code }}
+                  </span>
+                  {% if outlet.channel %}
+                    <span class="px-2 py-0.5 rounded-md bg-slate-800/80 text-[11px] font-medium text-slate-400 border border-white/5">
+                      {{ outlet.channel }}
+                    </span>
+                  {% endif %}
+                </div>
+                <h3 class="text-base font-bold text-white group-hover:text-indigo-400 transition-colors truncate">
+                  {{ outlet.name }}
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5 line-clamp-1">
+                  {{ outlet.address or 'No address registered' }}
+                </p>
+                <div class="flex items-center gap-4 mt-3 pt-3 border-t border-white/5 text-xs text-slate-300">
+                  <div class="flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.828-1.415-5.12-3.707-6.535-6.535l1.293-.97c.362-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                    </svg>
+                    <span>{{ outlet.mobile_number or outlet.phone_number or 'N/A' }}</span>
+                  </div>
+                  {% if outlet.contact_person %}
+                    <div class="flex items-center gap-1.5 text-slate-400">
+                      <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                      </svg>
+                      <span>{{ outlet.contact_person }}</span>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+              
+              <div class="flex flex-col gap-2">
+                <a href="/outlets/{{ outlet.id }}" 
+                   class="p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="glass-panel rounded-3xl p-8 text-center my-12 space-y-3">
+        <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36rem" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white">No Outlets Available in this Beat</h3>
+        <p class="text-xs text-slate-400 max-w-sm mx-auto">There are no active outlets mapped to {{ beat.name }} yet.</p>
+        {% if has_l1_position %}
+          <a href="/outlets/new?beat_id={{ beat.id }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-all">
+            + Create First Outlet
+          </a>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% from "shared/pagination.html" import render %}
+    {{ render(pagination, "/retailing/beat/" ~ beat.id ~ "?x=1") }}
+  </main>
+
+  <!-- Floating Action Buttons (FAB View) -->
+  <div class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <!-- Search FAB Button -->
+    <button type="button" onclick="toggleSearchBar()" 
+            class="h-12 w-12 rounded-full bg-slate-800/90 text-slate-200 border border-white/20 shadow-2xl backdrop-blur-xl flex items-center justify-center hover:bg-slate-700 hover:text-white transition-all transform hover:scale-105 active:scale-95">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+      </svg>
+    </button>
+
+    <!-- New Outlet FAB Button (Available for L1 Position) -->
+    {% if has_l1_position %}
+      <a href="/outlets/new?beat_id={{ beat.id }}" 
+         class="h-14 px-5 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-600 text-white font-bold text-sm shadow-2xl shadow-indigo-600/40 border border-white/20 flex items-center gap-2 hover:brightness-110 transition-all transform hover:scale-105 active:scale-95">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        <span>New Outlet</span>
+      </a>
+    {% endif %}
+  </div>
+
+  <script>
+    function toggleSearchBar() {
+      const container = document.getElementById('search-bar-container');
+      const input = document.getElementById('outlet-search-input');
+      if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        input.focus();
+      } else {
+        container.classList.add('hidden');
+      }
+    }
+
+    function filterOutlets() {
+      const q = document.getElementById('outlet-search-input').value.toLowerCase().trim();
+      const cards = document.querySelectorAll('.outlet-card');
+      cards.forEach(card => {
+        const name = card.getAttribute('data-name') || '';
+        const code = card.getAttribute('data-code') || '';
+        const phone = card.getAttribute('data-phone') || '';
+        if (!q || name.includes(q) || code.includes(q) || phone.includes(q)) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

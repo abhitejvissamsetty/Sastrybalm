@@ -4,7 +4,7 @@ Attendance router — Split-pane detail view showing activities alongside timesh
 from datetime import date, datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -20,6 +20,11 @@ from app.models.timesheet import Timesheet, TimesheetApproval, VisitRecord
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
+from app.services.access_control import (
+    require_attendance_access,
+    require_timesheet_access,
+    scope_employee_record_query,
+)
 
 router = APIRouter(prefix="/tracking/attendance", tags=["attendance"])
 templates = Jinja2Templates(directory="app/templates")
@@ -36,9 +41,7 @@ async def attendance_list(
     att_type: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(Attendance)
-    if current_user.role == UserRole.field_rep:
-        query = query.filter(Attendance.user_id == current_user.id)
+    query = scope_employee_record_query(db.query(Attendance), Attendance, current_user, db)
     if approval and approval in [s.value for s in ApprovalStatus]:
         query = query.filter(Attendance.approval_status == approval)
     if att_type and att_type in [t.value for t in AttendanceType]:
@@ -59,8 +62,9 @@ async def attendance_detail(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    att = db.query(Attendance).filter(Attendance.id == att_id).first()
-    if not att:
+    try:
+        att = require_attendance_access(db, current_user, att_id)
+    except HTTPException:
         set_flash_error(request, "Attendance record not found.")
         return RedirectResponse("/tracking/attendance", status_code=302)
 
@@ -167,17 +171,18 @@ async def attendance_approve(
     db: Session = Depends(get_db),
     attendance_type: str = Form(...),
 ):
-    att = db.query(Attendance).filter(Attendance.id == att_id).first()
-    if att and att.approval_status == ApprovalStatus.pending:
-        try:
-            att.attendance_type = AttendanceType(attendance_type)
-        except ValueError:
-            att.attendance_type = AttendanceType.full_day
-        att.approval_status = ApprovalStatus.approved
-        att.approved_by_id = current_user.id
-        att.approved_at = datetime.now()
-        db.commit()
-        set_flash_success(request, f"Attendance approved as {att.type_display}.")
+    att = require_attendance_access(db, current_user, att_id)
+    if att.approval_status != ApprovalStatus.pending:
+        raise HTTPException(status_code=409, detail="Attendance is not awaiting approval.")
+    try:
+        att.attendance_type = AttendanceType(attendance_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid attendance type.")
+    att.approval_status = ApprovalStatus.approved
+    att.approved_by_id = current_user.id
+    att.approved_at = datetime.now()
+    db.commit()
+    set_flash_success(request, f"Attendance approved as {att.type_display}.")
     return RedirectResponse(f"/tracking/attendance/{att_id}", status_code=302)
 
 
@@ -188,12 +193,15 @@ async def attendance_reject(
     db: Session = Depends(get_db),
     reason: str = Form(default=""),
 ):
-    att = db.query(Attendance).filter(Attendance.id == att_id).first()
-    if att and att.approval_status == ApprovalStatus.pending:
-        att.approval_status = ApprovalStatus.rejected
-        att.rejection_reason = reason or None
-        db.commit()
-        set_flash_error(request, "Attendance rejected.")
+    att = require_attendance_access(db, current_user, att_id)
+    if att.approval_status != ApprovalStatus.pending:
+        raise HTTPException(status_code=409, detail="Attendance is not awaiting review.")
+    if not reason.strip():
+        raise HTTPException(status_code=400, detail="Rejection reason is required.")
+    att.approval_status = ApprovalStatus.rejected
+    att.rejection_reason = reason.strip()
+    db.commit()
+    set_flash_error(request, "Attendance rejected.")
     return RedirectResponse(f"/tracking/attendance/{att_id}", status_code=302)
 
 
@@ -203,8 +211,9 @@ async def attendance_reset_checkout(
     current_user: User = Depends(_ADMIN_MANAGER),
     db: Session = Depends(get_db),
 ):
-    att = db.query(Attendance).filter(Attendance.id == att_id).first()
-    if not att:
+    try:
+        att = require_attendance_access(db, current_user, att_id)
+    except HTTPException:
         set_flash_error(request, "Attendance record not found.")
         return RedirectResponse("/tracking/attendance", status_code=302)
 
@@ -234,13 +243,14 @@ async def timesheet_approve(
     current_user: User = Depends(_ADMIN_MANAGER),
     db: Session = Depends(get_db),
 ):
-    ts = db.query(Timesheet).filter(Timesheet.id == ts_id).first()
-    if ts and ts.approval_status == TimesheetApproval.pending:
-        ts.approval_status = TimesheetApproval.approved
-        ts.approved_by_id = current_user.id
-        ts.approved_at = datetime.now()
-        db.commit()
-        set_flash_success(request, "Timesheet approved.")
+    ts = require_timesheet_access(db, current_user, ts_id)
+    if ts.approval_status != TimesheetApproval.pending:
+        raise HTTPException(status_code=409, detail="Timesheet is not awaiting approval.")
+    ts.approval_status = TimesheetApproval.approved
+    ts.approved_by_id = current_user.id
+    ts.approved_at = datetime.now()
+    db.commit()
+    set_flash_success(request, "Timesheet approved.")
     return RedirectResponse(request.headers.get("referer", "/tracking/attendance"), status_code=302)
 
 
@@ -251,10 +261,13 @@ async def timesheet_reject(
     db: Session = Depends(get_db),
     reason: str = Form(default=""),
 ):
-    ts = db.query(Timesheet).filter(Timesheet.id == ts_id).first()
-    if ts:
-        ts.approval_status = TimesheetApproval.rejected
-        ts.rejection_reason = reason or None
-        db.commit()
-        set_flash_error(request, "Timesheet rejected.")
+    ts = require_timesheet_access(db, current_user, ts_id)
+    if ts.approval_status != TimesheetApproval.pending:
+        raise HTTPException(status_code=409, detail="Timesheet is not awaiting review.")
+    if not reason.strip():
+        raise HTTPException(status_code=400, detail="Rejection reason is required.")
+    ts.approval_status = TimesheetApproval.rejected
+    ts.rejection_reason = reason.strip()
+    db.commit()
+    set_flash_error(request, "Timesheet rejected.")
     return RedirectResponse(request.headers.get("referer", "/tracking/attendance"), status_code=302)

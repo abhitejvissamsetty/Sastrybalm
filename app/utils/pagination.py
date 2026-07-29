@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 DEFAULT_PER_PAGE = 25
+MAX_PER_PAGE = 100
 
 
 @dataclass
@@ -42,6 +43,7 @@ class Page:
 
 def paginate(query, page: int = 1, per_page: int = DEFAULT_PER_PAGE) -> Page:
     page = max(1, page)
+    per_page = min(MAX_PER_PAGE, max(1, per_page))
     total = query.count()
     items = query.offset((page - 1) * per_page).limit(per_page).all()
     return Page(items=items, total=total, page=page, per_page=per_page)

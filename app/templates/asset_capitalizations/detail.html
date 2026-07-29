@@ -26,16 +26,6 @@
       </div>
     </div>
     
-    <div class="flex items-center gap-x-3">
-      {% if item.sync_status.value in ['pending', 'failed'] and current_user.role.value in ['admin', 'territory_manager'] %}
-        <form method="post" action="/operations/marketing-assets/{{ item.id }}/sync-cmms">
-          <button type="submit"
-                  class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
-            Sync to CMMS
-          </button>
-        </form>
-      {% endif %}
-    </div>
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -60,6 +50,10 @@
           <div class="flex justify-between">
             <dt class="text-slate-400">Warehouse</dt>
             <dd class="font-medium text-white">{{ item.warehouse_name or '—' }}</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-slate-400">Inventory Source</dt>
+            <dd class="font-medium text-white">{{ item.warehouse.code if item.warehouse else 'Legacy record' }}</dd>
           </div>
         </dl>
       </div>
@@ -86,26 +80,20 @@
       </div>
     </div>
     
-    <!-- Sync & Notes -->
+    <!-- Processing & Notes -->
     <div class="space-y-6">
       
       <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-4">
-        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Integration Status</h2>
+        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Processing Status</h2>
         <dl class="space-y-3 text-sm">
           <div class="flex justify-between items-center">
-            <dt class="text-slate-400">CMMS Sync</dt>
+            <dt class="text-slate-400">Native Processing</dt>
             <dd>
               <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ item.sync_badge_cls() }}">
                 {{ item.sync_status.value.replace('_', ' ').title() }}
               </span>
             </dd>
           </div>
-          {% if item.cmms_ref %}
-          <div class="flex justify-between">
-            <dt class="text-slate-400">CMMS Reference</dt>
-            <dd class="font-mono text-indigo-300">{{ item.cmms_ref }}</dd>
-          </div>
-          {% endif %}
         </dl>
         
         {% if item.sync_error %}

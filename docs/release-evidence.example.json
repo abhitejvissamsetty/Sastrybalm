@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "release_commit": "0000000000000000000000000000000000000000",
+  "credential_rotations": [
+    {
+      "system": "application_secret",
+      "rotated_at": "2026-07-29T00:00:00Z",
+      "owner": "REPLACE",
+      "evidence_id": "REPLACE",
+      "old_credential_revoked": false,
+      "post_rotation_test": false
+    },
+    {
+      "system": "database_app",
+      "rotated_at": "2026-07-29T00:00:00Z",
+      "owner": "REPLACE",
+      "evidence_id": "REPLACE",
+      "old_credential_revoked": false,
+      "post_rotation_test": false
+    },
+    {
+      "system": "database_root",
+      "rotated_at": "2026-07-29T00:00:00Z",
+      "owner": "REPLACE",
+      "evidence_id": "REPLACE",
+      "old_credential_revoked": false,
+      "post_rotation_test": false
+    },
+    {
+      "system": "administrator",
+      "rotated_at": "2026-07-29T00:00:00Z",
+      "owner": "REPLACE",
+      "evidence_id": "REPLACE",
+      "old_credential_revoked": false,
+      "post_rotation_test": false
+    },
+    {
+      "system": "webhook",
+      "rotated_at": "2026-07-29T00:00:00Z",
+      "owner": "REPLACE",
+      "evidence_id": "REPLACE",
+      "old_credential_revoked": false,
+      "post_rotation_test": false
+    },
+    {
+      "system": "s3_permanent",
+      "rotated_at": "2026-07-29T00:00:00Z",
+      "owner": "REPLACE",
+      "evidence_id": "REPLACE",
+      "old_credential_revoked": false,
+      "post_rotation_test": false
+    },
+    {
+      "system": "s3_temporary_role",
+      "rotated_at": "2026-07-29T00:00:00Z",
+      "owner": "REPLACE",
+      "evidence_id": "REPLACE",
+      "old_credential_revoked": false,
+      "post_rotation_test": false
+    },
+    {
+      "system": "metrics",
+      "rotated_at": "2026-07-29T00:00:00Z",
+      "owner": "REPLACE",
+      "evidence_id": "REPLACE",
+      "old_credential_revoked": false,
+      "post_rotation_test": false
+    },
+    {
+      "system": "sentry",
+      "rotated_at": "2026-07-29T00:00:00Z",
+      "owner": "REPLACE",
+      "evidence_id": "REPLACE",
+      "old_credential_revoked": false,
+      "post_rotation_test": false
+    }
+  ],
+  "webhook_rotation": {
+    "sender_updated": false,
+    "receiver_updated": false,
+    "replay_test_passed": false,
+    "change_id": ""
+  },
+  "s3_verification": {
+    "passed": false,
+    "report_sha256": ""
+  },
+  "observability": {
+    "sentry_event_url": "",
+    "sentry_trace_url": "",
+    "metrics_evidence_url": "",
+    "primary_alert_ack_id": "",
+    "secondary_alert_ack_id": "",
+    "redaction_verified": false
+  },
+  "hosted_ci": {
+    "conclusion": "",
+    "commit": "",
+    "run_url": "",
+    "artifacts": []
+  },
+  "uat": [
+    {
+      "role": "admin",
+      "passed": false,
+      "signer": "",
+      "signed_at": "",
+      "evidence_id": ""
+    },
+    {
+      "role": "l4",
+      "passed": false,
+      "signer": "",
+      "signed_at": "",
+      "evidence_id": ""
+    },
+    {
+      "role": "l3",
+      "passed": false,
+      "signer": "",
+      "signed_at": "",
+      "evidence_id": ""
+    },
+    {
+      "role": "l2",
+      "passed": false,
+      "signer": "",
+      "signed_at": "",
+      "evidence_id": ""
+    },
+    {
+      "role": "l1",
+      "passed": false,
+      "signer": "",
+      "signed_at": "",
+      "evidence_id": ""
+    },
+    {
+      "role": "vendor_admin",
+      "passed": false,
+      "signer": "",
+      "signed_at": "",
+      "evidence_id": ""
+    },
+    {
+      "role": "vendor_technician",
+      "passed": false,
+      "signer": "",
+      "signed_at": "",
+      "evidence_id": ""
+    },
+    {
+      "role": "qc_manager",
+      "passed": false,
+      "signer": "",
+      "signed_at": "",
+      "evidence_id": ""
+    }
+  ],
+  "independent_security_review": {
+    "independent": false,
+    "reviewer": "",
+    "critical_open": -1,
+    "high_open": -1,
+    "report_sha256": "",
+    "signed_at": ""
+  }
+}

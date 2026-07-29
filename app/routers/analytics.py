@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_web_auth, require_web_roles
@@ -15,6 +15,14 @@ from app.models.timesheet import Timesheet, VisitRecord
 from app.models.user import User, UserRole
 from app.models.outlet import Outlet
 from app.models.product import Product
+from app.services.access_control import (
+    scope_asset_query,
+    scope_material_request_query,
+    scope_order_query,
+    scope_outlet_query,
+    scope_payment_query,
+    scope_user_query,
+)
 from app.utils.flash import get_flash, set_flash_success
 from app.utils.pagination import paginate
 
@@ -41,25 +49,28 @@ async def sales_page(
     # Summary KPIs
     since = date.today() - timedelta(days=days)
     active_statuses = [OrderStatus.confirmed, OrderStatus.dispatched, OrderStatus.delivered]
-
-    total_revenue = db.query(
+    total_revenue = scope_order_query(db.query(
         func.sum(OrderItem.unit_price * OrderItem.quantity * (1 - OrderItem.discount_pct / 100))
-    ).join(Order).filter(
+    ).join(Order), current_user, db).filter(
         Order.status.in_(active_statuses),
         Order.order_date >= since,
     ).scalar() or 0
 
-    total_orders = db.query(func.count(Order.id)).filter(
+    total_orders = scope_order_query(db.query(func.count(Order.id)), current_user, db).filter(
         Order.order_date >= since,
         Order.status != OrderStatus.cancelled,
     ).scalar() or 0
 
-    total_payments = db.query(func.sum(Payment.amount)).filter(
+    total_payments = scope_payment_query(
+        db.query(func.sum(Payment.amount)), current_user, db
+    ).filter(
         Payment.status == PaymentStatus.verified,
         Payment.collected_at >= str(since),
     ).scalar() or 0
 
-    pending_orders = db.query(func.count(Order.id)).filter(
+    pending_orders = scope_order_query(
+        db.query(func.count(Order.id)), current_user, db
+    ).filter(
         Order.status == OrderStatus.submitted,
     ).scalar() or 0
 
@@ -82,6 +93,9 @@ async def sales_data(
 ):
     since = date.today() - timedelta(days=days)
     active_statuses = [OrderStatus.confirmed, OrderStatus.dispatched, OrderStatus.delivered]
+    allowed_order_ids = scope_order_query(
+        db.query(Order.id), current_user, db
+    ).subquery()
 
     # Revenue & order count by day
     daily_rows = db.query(
@@ -91,6 +105,7 @@ async def sales_data(
         ).label("revenue"),
         func.count(Order.id.distinct()).label("orders"),
     ).join(OrderItem, OrderItem.order_id == Order.id).filter(
+        Order.id.in_(allowed_order_ids),
         Order.status.in_(active_statuses),
         Order.order_date >= since,
     ).group_by(Order.order_date).order_by(Order.order_date).all()
@@ -104,7 +119,7 @@ async def sales_data(
     # Orders by status
     status_rows = db.query(
         Order.status, func.count(Order.id)
-    ).group_by(Order.status).all()
+    ).filter(Order.id.in_(allowed_order_ids)).group_by(Order.status).all()
     orders_by_status = {r[0].value: r[1] for r in status_rows}
 
     # Top 10 outlets by revenue
@@ -116,6 +131,7 @@ async def sales_data(
     ).join(Order, Order.outlet_id == Outlet.id).join(
         OrderItem, OrderItem.order_id == Order.id
     ).filter(
+        Order.id.in_(allowed_order_ids),
         Order.status.in_(active_statuses),
         Order.order_date >= since,
     ).group_by(Outlet.id, Outlet.name).order_by(func.sum(
@@ -134,6 +150,7 @@ async def sales_data(
     ).join(OrderItem, OrderItem.product_id == Product.id).join(
         Order, Order.id == OrderItem.order_id
     ).filter(
+        Order.id.in_(allowed_order_ids),
         Order.status.in_(active_statuses),
         Order.order_date >= since,
     ).group_by(Product.id, Product.name).order_by(
@@ -173,69 +190,97 @@ async def reps_data(
     current_user: User = Depends(_ADMIN_MANAGER),
     db: Session = Depends(get_db),
     days: int = Query(default=30, ge=7, le=365),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=50, ge=1, le=100),
 ):
     since = date.today() - timedelta(days=days)
     active_statuses = [OrderStatus.confirmed, OrderStatus.dispatched, OrderStatus.delivered]
 
-    reps = db.query(User).filter(
+    rep_query = scope_user_query(db.query(User), current_user, db, include_self=False).filter(
         User.role == UserRole.field_rep, User.is_active == True
-    ).order_by(User.full_name).all()
+    )
+    total = rep_query.count()
+    reps = rep_query.order_by(User.full_name).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
+
+    rep_ids = [rep.id for rep in reps]
+    order_metrics = {
+        row.user_id: row
+        for row in db.query(
+            Order.user_id,
+            func.count(Order.id.distinct()).label("cnt"),
+            func.coalesce(func.sum(
+                OrderItem.unit_price * OrderItem.quantity
+                * (1 - OrderItem.discount_pct / 100)
+            ), 0).label("rev"),
+        )
+        .outerjoin(OrderItem, OrderItem.order_id == Order.id)
+        .filter(
+            Order.user_id.in_(rep_ids or [-1]),
+            Order.status.in_(active_statuses),
+            Order.order_date >= since,
+        )
+        .group_by(Order.user_id)
+        .all()
+    }
+    visit_metrics = {
+        row.user_id: row
+        for row in db.query(
+            VisitRecord.user_id,
+            func.count(VisitRecord.id).label("cnt"),
+            func.sum(
+                case((VisitRecord.distance_from_outlet > 200, 1), else_=0)
+            ).label("out_of_range"),
+        )
+        .filter(
+            VisitRecord.user_id.in_(rep_ids or [-1]),
+            VisitRecord.visit_time >= str(since),
+        )
+        .group_by(VisitRecord.user_id)
+        .all()
+    }
+    attendance_metrics = dict(
+        db.query(Timesheet.user_id, func.count(Timesheet.id))
+        .filter(
+            Timesheet.user_id.in_(rep_ids or [-1]),
+            Timesheet.work_date >= since,
+        )
+        .group_by(Timesheet.user_id)
+        .all()
+    )
+    expense_metrics = dict(
+        db.query(Expense.user_id, func.coalesce(func.sum(Expense.amount), 0))
+        .filter(
+            Expense.user_id.in_(rep_ids or [-1]),
+            Expense.status == ExpenseStatus.approved,
+            Expense.expense_date >= since,
+        )
+        .group_by(Expense.user_id)
+        .all()
+    )
 
     results = []
     for rep in reps:
-        # Orders & revenue
-        order_rows = db.query(
-            func.count(Order.id.distinct()).label("cnt"),
-            func.coalesce(func.sum(
-                OrderItem.unit_price * OrderItem.quantity * (1 - OrderItem.discount_pct / 100)
-            ), 0).label("rev"),
-        ).outerjoin(OrderItem, OrderItem.order_id == Order.id).filter(
-            Order.user_id == rep.id,
-            Order.status.in_(active_statuses),
-            Order.order_date >= since,
-        ).first()
-
-        order_count = order_rows.cnt if order_rows else 0
-        revenue = round(float(order_rows.rev), 2) if order_rows else 0.0
-
-        # Visits
-        visit_count = db.query(func.count(VisitRecord.id)).filter(
-            VisitRecord.user_id == rep.id,
-            VisitRecord.visit_time >= str(since),
-        ).scalar() or 0
-
-        out_of_range = db.query(func.count(VisitRecord.id)).filter(
-            VisitRecord.user_id == rep.id,
-            VisitRecord.visit_time >= str(since),
-            VisitRecord.distance_from_outlet > 200,
-        ).scalar() or 0
-
-        # Attendance days
-        attendance_days = db.query(func.count(Timesheet.id)).filter(
-            Timesheet.user_id == rep.id,
-            Timesheet.work_date >= since,
-        ).scalar() or 0
-
-        # Expenses
-        expense_total = db.query(func.coalesce(func.sum(Expense.amount), 0)).filter(
-            Expense.user_id == rep.id,
-            Expense.status == ExpenseStatus.approved,
-            Expense.expense_date >= since,
-        ).scalar() or 0
+        order_row = order_metrics.get(rep.id)
+        visit_row = visit_metrics.get(rep.id)
 
         results.append({
             "name": rep.full_name,
-            "orders": order_count,
-            "revenue": revenue,
-            "visits": visit_count,
-            "out_of_range": out_of_range,
-            "attendance_days": attendance_days,
-            "expenses": round(float(expense_total), 2),
+            "orders": order_row.cnt if order_row else 0,
+            "revenue": round(float(order_row.rev), 2) if order_row else 0.0,
+            "visits": visit_row.cnt if visit_row else 0,
+            "out_of_range": int(visit_row.out_of_range or 0) if visit_row else 0,
+            "attendance_days": attendance_metrics.get(rep.id, 0),
+            "expenses": round(float(expense_metrics.get(rep.id, 0)), 2),
         })
 
     # Sort by revenue desc
     results.sort(key=lambda r: r["revenue"], reverse=True)
-    return JSONResponse({"reps": results, "days": days})
+    return JSONResponse({
+        "page": page, "per_page": per_page, "total": total,
+        "reps": results, "days": days,
+    })
 
 
 # ── Marketing Performance ───────────────────────────────────────────────────────
@@ -253,12 +298,16 @@ async def marketing_page(
     since = date.today() - timedelta(days=days)
 
     # Marketing KPI Summary
-    total_assets = db.query(func.sum(AssetCapitalization.quantity)).filter(
+    total_assets = scope_asset_query(
+        db.query(func.sum(AssetCapitalization.quantity)), current_user, db
+    ).filter(
         AssetCapitalization.status == ACStatus.deployed,
         AssetCapitalization.created_at >= since
     ).scalar() or 0
 
-    pending_mrs = db.query(func.count(MaterialRequest.id)).filter(
+    pending_mrs = scope_material_request_query(
+        db.query(func.count(MaterialRequest.id)), current_user, db
+    ).filter(
         MaterialRequest.status.in_([
             MRStatus.submitted, MRStatus.vendor_assigned, MRStatus.recce_completed,
             MRStatus.quotation_submitted, MRStatus.quotation_approved,
@@ -267,7 +316,9 @@ async def marketing_page(
         MaterialRequest.created_at >= since
     ).scalar() or 0
 
-    total_mrs = db.query(func.count(MaterialRequest.id)).filter(
+    total_mrs = scope_material_request_query(
+        db.query(func.count(MaterialRequest.id)), current_user, db
+    ).filter(
         MaterialRequest.created_at >= since
     ).scalar() or 0
 
@@ -293,10 +344,10 @@ async def marketing_data(
     since = date.today() - timedelta(days=days)
 
     # Assets Deployed by Name
-    asset_rows = db.query(
+    asset_rows = scope_asset_query(db.query(
         AssetCapitalization.item_name,
         func.sum(AssetCapitalization.quantity)
-    ).filter(
+    ), current_user, db).filter(
         AssetCapitalization.status == ACStatus.deployed,
         AssetCapitalization.created_at >= since
     ).group_by(AssetCapitalization.item_name).order_by(func.sum(AssetCapitalization.quantity).desc()).limit(10).all()
@@ -307,10 +358,10 @@ async def marketing_data(
     }
 
     # MRs by Status
-    mr_rows = db.query(
+    mr_rows = scope_material_request_query(db.query(
         MaterialRequest.status,
         func.count(MaterialRequest.id)
-    ).filter(
+    ), current_user, db).filter(
         MaterialRequest.created_at >= since
     ).group_by(MaterialRequest.status).all()
 
@@ -532,14 +583,18 @@ async def generate_scheduled_report(
     if report_type == "sales_summary":
         report_name = f"Sales_Summary_{now_str}.csv"
         writer.writerow(["Order ID", "Date", "Outlet Name", "Status", "Total Amount"])
-        orders = db.query(Order).order_by(Order.order_date.desc()).limit(200).all()
+        orders = scope_order_query(
+            db.query(Order), current_user, db
+        ).order_by(Order.order_date.desc()).limit(200).all()
         for o in orders:
             writer.writerow([o.id, str(o.order_date), o.outlet.name if o.outlet else "—", o.status.value, o.total_amount])
 
     elif report_type == "rep_performance":
         report_name = f"Rep_Performance_{now_str}.csv"
         writer.writerow(["User ID", "Full Name", "Username", "Role", "Email", "Phone"])
-        users = db.query(User).filter(User.is_active == True).all()
+        users = scope_user_query(
+            db.query(User), current_user, db
+        ).filter(User.is_active == True).all()
         for u in users:
             writer.writerow([u.id, u.full_name, u.username, u.role.value, u.email or "", u.phone or ""])
 
@@ -553,7 +608,9 @@ async def generate_scheduled_report(
     else:
         report_name = f"Master_Outlets_{now_str}.csv"
         writer.writerow(["Outlet ID", "Name", "Code", "Owner", "Mobile", "Status"])
-        outlets = db.query(Outlet).limit(500).all()
+        outlets = scope_outlet_query(
+            db.query(Outlet), current_user, db
+        ).limit(500).all()
         for ot in outlets:
             writer.writerow([ot.id, ot.name, ot.code or "", ot.owner_name or "", ot.mobile or "", ot.status.value])
 

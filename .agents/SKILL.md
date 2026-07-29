@@ -5,7 +5,8 @@ description: >-
   Geographies (Zones, Regions, Territories), Position Hierarchy (L1-L4) with
   Warehouse inheritance resolution, Beat Routing, Outlets & Git-Tree Version Reverts,
   Products & Inventory Audit Filters, Vendors, Channel Partners, Action Center (Approval Hub,
-  Alerts, Auto-Flags), Sidebar Navigation, Server Restart S3 Validation, and Scheduled Analytics.
+  Alerts, Auto-Flags), Sidebar Navigation, Server Restart S3 Validation, Scheduled Analytics,
+  Single-Day Leave Application & Hierarchical L1-L4 Approval Logic, Back-Button Anti-Cache Protection, and Reset Utilities.
 ---
 
 # Safar ERP — Sales & Distribution System Guide
@@ -26,6 +27,7 @@ The system orchestrates:
 - **Action Center**: Centralized **Action Center** section housing **Approval Hub** (restricted to Position level > L2 & Geography scope >= Region or Admin with scoped pending counts), **Alerts & Notifications**, and **Auto-Flags** risk detection.
 - **Analytics (Realtime & Scheduled)**: OOTB preset-filtered Realtime Analytics and Scheduled Analytics CSV report generator uploaded to S3/MinIO with expiring pre-signed URLs.
 - **Sidebar Navigation Section Hierarchy**: Master Data menu scoping (hiding `Users & Reps` and `Positions` for Territory Managers) and Action Center section integration.
+- **Leave Management & L1-L4 Approval Hierarchy**: Single-day leave application with Full Day / Half Day selection, stored in MySQL `leaves` table, with web management portal (`/leaves`) enforcing role & level approval rules (L1/L2 approved by L3/L4, L3 approved by L4 ONLY).
 
 ---
 
@@ -182,13 +184,83 @@ The **Action Center** section in sidebar navigation (`app/templates/shared/sideb
 Standardized sidebar layout (`app/templates/shared/sidebar.html`):
 1. **Dashboard**
 2. **Field Tracking** *(Attendance, Visit Records, GPS Map View)*
-3. **Operations** *(Orders, Expenses, Timesheets, Material Requests, Marketing Assets)*
+3. **Operations** *(Orders, Expenses, Timesheets, Material Requests, Marketing Assets, Leave Management)*
 4. **Action Center** *(Approval Hub, Alerts & Notifications, Auto-Flags)*
 5. **Analytics** *(Sales Analytics, Rep Performance, Marketing, Scheduled Reports S3)*
 6. **Catalogue** *(Products, Inventory, Warehouses)*
 7. **Master Data** *(Geography, Users & Reps [Admin Only], Positions [Admin Only], Beats & Routes, Outlets, Channel Partners, Vendors)*
 8. **Configuration** *(Sales Channels, SMTP Settings, Webhooks, WhatsApp API, Data Backup)*
 9. **Developer** *(Mobile API Docs)*
+
+---
+
+## 🏖️ 16. Leave Management & L1-L4 Approval Hierarchy Architecture
+
+### A. Mobile Application Single-Day & Full/Half Day Picker
+- **Single Day Date Picker**: Single date selection for leave application in `mobile/lib/screens/leave/leave_apply_screen.dart`.
+- **Duration Options**: Toggle card cards for **Full Day** vs **Half Day**, with half-day session dropdown (**First Half - Morning** / **Second Half - Afternoon**).
+
+### B. Role & Level Leave Approval Hierarchy Rules (`app/models/user.py`)
+- **Level Resolution (`user.level`)**: Evaluates highest position level (`L4`, `L3`, `L2`, `L1`). Admin defaults to `L4`.
+- **Approval Permission Matrix (`user.can_approve_leave_for(applicant)`)**:
+  - **L1 & L2 Applicants**: Can be approved/rejected by **L3** or **L4** users (and System Admin).
+  - **L3 Applicants**: Can **ONLY** be approved/rejected by **L4** users (and System Admin).
+  - **L1 & L2 Users**: Cannot approve any leave requests.
+  - **L3 Users**: Cannot approve `L3` or `L4` leave requests.
+
+### C. Web Admin Portal Integration (`/leaves`)
+- **Admin Router (`app/routers/admin_leaves.py`)**: Lists leave applications (`GET /leaves`), enforces `can_approve_leave_for` checks, and processes approval (`POST /leaves/{id}/approve`) and rejection (`POST /leaves/{id}/reject`).
+- **HTML Template (`app/templates/leaves/index.html`)**: Displays applicant level badges (`L1`, `L2`, `L3`, `L4`) and conditionally renders **Approve** / **Reject** buttons only if authorized. Displays `🔒 Requires L4 Approval Only` badge when an L3 leave is viewed by an unauthorized manager.
+
+---
+
+## 🛑 17. Back-Button Session Anti-Cache Protection
+
+- **Web Anti-Cache Middleware (`app/main.py`)**: Appends anti-caching HTTP response headers (`Cache-Control: no-cache, no-store, must-revalidate, max-age=0, private`, `Pragma: no-cache`, `Expires: 0`) to all non-static web requests. Forces browsers to invalidate `bfcache` (Back-Forward cache), preventing logged-out session viewing when clicking the browser Back button.
+- **Mobile Back Button Guard (`mobile/lib/screens/auth/login_screen.dart`)**: Wraps `LoginScreen` in `PopScope(canPop: false)`. Pressing the device back button on the Login screen exits the app (`SystemNavigator.pop()`) instead of popping into previously loaded session screens.
+
+---
+
+## 🧹 18. Demo Data Removal & Reset Utility
+
+- **Disabled Auto-Seeding**: Commented out demo product seeding (`seed_products()`) in [`exclude_from_deployment/create_db.py`](file:///Users/johnwesleygovada/Desktop/Sastrybalm/exclude_from_deployment/create_db.py).
+- **Data Truncation Utility**: [`clear_demo_data.py`](file:///Users/johnwesleygovada/Desktop/Sastrybalm/clear_demo_data.py) script truncates transactional tables (`orders`, `order_items`, `payments`, `expenses`, `leaves`, `material_requests`, `timesheets`, `asset_capitalizations`, `alerts`, `stock_movements`, `vendor_quotations`, `work_orders`).
+
+---
+
+## 🛍️ 19. Order Architecture, Party Refactoring & Embedded Payment Collection
+
+### A. Polymorphic Party Refactoring (`orders` Table & UI)
+- **Database & Model Refactoring**: Order target is generalized from `outlet_id` to `party_id` with `party_type` enum (`Outlet`, `Channel Partner`).
+  - **`party_type = 'Outlet'`**: Secondary Orders created during store visits. Requires mandatory `visit_id` (Visit Record).
+  - **`party_type = 'Channel Partner'`**: Primary Orders raised directly against distributors/channel partners without GPS/Geo tracking or visit records, capturing partner address details.
+- **Backend & Web UI Labels**: All Order forms, filters, data tables, and REST endpoints present the unified **Party** concept with type badges (`Outlet` / `Channel Partner`).
+
+### B. Warehouse Capture & L3 Position Resolution
+- **Explicit Warehouse Storage**: `warehouse_id` is stored on every `Order` record to track inventory source and fulfillment node.
+- **L3 Warehouse Resolution Algorithm**:
+  1. Identify the **Outlet** → **Beat** → **L1 Position**.
+  2. Traverse reporting hierarchy from L1 → L2 → **L3 Position**.
+  3. Resolve the L3 Position's mapped user/geography and return the associated **Warehouse**.
+  4. Map this warehouse to the Order's `warehouse_id`.
+
+### C. Embedded Payment Collection Fields & Validation Logic
+- **Order Model Payment Fields**:
+  - `is_company_order` (Boolean: `1` for Company Order, `0` for Channel Partner/Standard).
+  - `is_paid` (Boolean: `1` for Paid Order, `0` for Credit Order).
+  - `payment_type` (`Full`, `Partial`, `Credit`, or `None`).
+  - `payment_mode` (`Cash`, `UPI`, `NEFT/RTGS`, `Others`, or `None`).
+  - `payment_reference` (String, reference / transaction ID).
+- **Business Rules**:
+  - **`is_company_order = 1`**: UI prompts user to choose **Credit Order** or **Paid Order**.
+    - If **Credit Order**: sets `is_paid = 0`, `payment_type = 'Credit'`.
+    - If **Paid Order**: sets `is_paid = 1`, requiring selection of `payment_type` (`Full`, `Partial`), `payment_mode` (`Cash`, `UPI`, `NEFT/RTGS`, `Others`), and `payment_reference`.
+
+### D. Triple-Scoped Today's Order Fetching (`GET /api/v1/orders/outlet-today-l1-orders`)
+- **Strict Scoping Enforcement**:
+  1. **Outlet Scope (`outlet_id`)**: Restricts query to orders punched for the target outlet today.
+  2. **Beat Scope (`beat_id`)**: Filters orders associated with the active beat route.
+  3. **Position & Hierarchy Scope (`subordinate_user_id` / Manager Hierarchy)**: Enforces that `Order.user_id` matches the selected subordinate L1 rep or users within the manager's active position reporting hierarchy.
 
 ---
 
@@ -204,273 +276,138 @@ PYTHONPATH=. ./venv/bin/python run.py
 PYTHONPATH=. ./venv/bin/python db_migrate.py
 ```
 
+### Clear All Demo Transactional Data
+```bash
+docker exec -i safar-app python - < clear_demo_data.py
+```
+
 ### Verify Python Syntax
 ```bash
-python3 -m py_compile app/main.py app/services/startup_validation.py app/adapters/s3_storage.py app/utils/geography_scope.py app/routers/vendors.py app/routers/outlets.py app/routers/inventory.py app/routers/warehouses.py app/routers/beats.py app/routers/approvals.py app/routers/analytics.py
+python3 -m py_compile app/main.py app/models/user.py app/routers/admin_leaves.py app/utils/geography_scope.py app/routers/vendors.py app/routers/outlets.py
 ```
 
 ---
 
-## 🐳 11. Docker Containerization, Immutable Image Packaging & Deployment
+## ✅ 20. Verified Workflow Completion (2026-07-28)
 
-### Image Architecture & Dependency Encapsulation
-- **Multi-Stage Dockerfile (`Dockerfile`)**: Pre-compiles and installs all mandatory dependencies from `requirements.txt` (`boto3`, `botocore`, `gunicorn`, `cryptography`, `fastapi`, `pymysql`, `sqlalchemy`) into `/usr/local`.
-- **Zero-Installation Target Deployment**: When built locally or via CI/CD, the Docker image encapsulates all Python packages into an immutable container artifact. Target servers loading the container image via Docker Hub/Registry or `docker load < safar-app.tar.gz` run instantly without downloading or installing any dependencies from scratch.
-- **Docker Entrypoint Migration Architecture (`entrypoint.sh`)**: Database migrations (`python db_migrate.py`) run **once in PID 1** before Gunicorn forks workers. This prevents multi-worker `ALTER TABLE` deadlocks (MySQL 1213) and ensures all tables exist before any worker serves requests. The FastAPI `lifespan` handler does NOT run migrations — only startup validation and scheduler init.
-- **Gunicorn `--timeout 120`**: Workers get 120 seconds (up from default 30) to complete startup, preventing premature SIGABRT on slow MySQL connections.
-- **Docker Compose Architecture (`docker-compose.yml`)**:
-  - `db`: MySQL 8.0 instance on port 3308 (internal 3306).
-  - `app`: FastAPI web application running Gunicorn with 4 Uvicorn workers on port 8090, using `entrypoint.sh`.
-  - `nginx`: Reverse proxy on port 8080.
-  - `adminer`: Web-based database management GUI on port 8081.
+### Orders and Warehouse
+- Orders persist unified Party, warehouse, delivery address, Company/Paid flags, payment type/mode/reference, and mandatory Visit linkage for Secondary Orders.
+- Primary Orders require a Channel Partner Party and no Visit/GPS. Secondary Orders require an Outlet Party and the submitting user's current-day Visit.
+- Company Orders reject invalid payment states, non-Sales/non-stockable products, and quantities exceeding resolved warehouse stock.
+- L3 warehouse resolution follows Beat L1 → L2 → L3 → assigned L3 user → Geography → active Warehouse, with position inheritance fallback; creation fails if none resolves.
+- Web/API presentation uses Party name/type and exposes warehouse and embedded payment details.
 
-### Production Docker Commands
-```bash
-# Build immutable production container image
-docker compose build
+### Joint Working
+- Only L2/L3/L4 managers can operate Joint Working.
+- Assigned L1 users come only from active descendant L1 Positions in the manager's reporting tree; vacant positions are excluded.
+- Subordinate Beat and same-day Order lookups repeat hierarchy authorization server-side.
+- Joint visits persist selected L1 user, Outlet, notes, no-order reason, linked current-day L1 Order, device GPS, and validated JPG/PNG/WEBP photo evidence.
 
-# Export image package for offline target server deployment
-docker save safar-app:latest | gzip > safar-app.tar.gz
+### Leaves
+- Single-day leave persists `duration` and `half_day_session`.
+- L3 approves descendant L1/L2 only; L4 approves its reporting subtree including L3; System Admin is global.
+- The web list includes only applications the current approver may act on.
 
-# Load and launch on target environment
-docker load < safar-app.tar.gz
-docker compose up -d
-```
+### Verification
+- Python compile, Docker health/migrations, MySQL schema inspection, and live OpenAPI assertions: PASS.
+- Flutter analyzer: no compilation errors; unrelated existing lint/deprecation warnings remain.
 
 ---
 
-## 📦 12. Parquet Daily Rolling Backup Architecture
+## ✅ 21. Outlet Material Requests & Marketing Stock Assets (2026-07-28)
 
-### Data Scope & Export Mechanism
-- **Operational & Transactional Data**: Automatically queries 12 core operational models up to yesterday (`cutoff_date = datetime.utcnow().date() - timedelta(days=1)`):
-  - `Order` (`orders`) & `OrderItem` (`order_items`)
-  - `Payment` (`payments`) & `PaymentSubmission` (`payment_submissions`)
-  - `Attendance` (`attendance`) & `Timesheet` (`timesheets`)
-  - `Expense` (`expenses`)
-  - `MaterialRequest` (`material_requests`) & `MaterialRequestHistoryLog` (`material_request_history_logs`)
-  - `VendorQuotation` (`vendor_quotations`) & `WorkOrder` (`work_orders`)
-  - `StockMovement` (`stock_movements`)
-- **Parquet Format**: Converts rows into Apache Parquet format using `pyarrow` and `pandas` with Snappy compression for optimal data warehousing and analytical query performance.
-- **S3 Bucket Target**: Uploads directly to **Permanent Files - Bucket** (`s3_bucket_name`).
-- **Daily Directory Structure**:
-  ```text
-  rolling_backups/parquet/YYYY-MM-DD/orders.parquet
-  rolling_backups/parquet/YYYY-MM-DD/order_items.parquet
-  rolling_backups/parquet/YYYY-MM-DD/payments.parquet
-  rolling_backups/parquet/YYYY-MM-DD/payment_submissions.parquet
-  rolling_backups/parquet/YYYY-MM-DD/attendance.parquet
-  rolling_backups/parquet/YYYY-MM-DD/timesheets.parquet
-  rolling_backups/parquet/YYYY-MM-DD/expenses.parquet
-  rolling_backups/parquet/YYYY-MM-DD/material_requests.parquet
-  rolling_backups/parquet/YYYY-MM-DD/material_request_history_logs.parquet
-  rolling_backups/parquet/YYYY-MM-DD/vendor_quotations.parquet
-  rolling_backups/parquet/YYYY-MM-DD/work_orders.parquet
-  rolling_backups/parquet/YYYY-MM-DD/stock_movements.parquet
-  ```
-- **Automated Scheduler**: Triggered every night at **01:00 AM IST** via `job_daily_parquet_backup` in `app/scheduler.py`.
-- **Manual Trigger Route**: Admin button **"⚡ Run Parquet Rolling Backup Now"** on [/settings/backup](http://localhost:8090/settings/backup) (`POST /settings/backup/parquet-rolling-backup`).
+### Outlet-scoped mobile actions
+- Outlet Detail exposes **New MR** and **Assets**. Assets opens a bottom action sheet with **Asset List** and **New Asset**.
+- Routes carry `outletId` explicitly: `/outlet/:id/material-requests/new`, `/outlet/:id/assets`, and `/outlet/:id/assets/new`.
 
-### Two-Stage Hybrid Data Lifecycle & Archival Strategy
-1. **Stage 1 (Soft Archival - Post-Parquet Upload)**:
-   - When daily Parquet rolling backup completes and uploads to **Permanent S3 Bucket**, all exported records up to yesterday are soft-archived (`is_archived = True`, `archived_at = timestamp`).
-   - Active SQL queries run fast on `is_archived = False`, while reporting screens maintain operational context without breaking.
-2. **Stage 2 (Hard Retention Purge - Configurable Retention Window)**:
-   - Records older than the configured retention window (**default: 90 days**, configurable in `SystemConfiguration.archival_retention_days`) that are soft-archived (`is_archived = True`) are permanently deleted from the SQL database.
-   - Foreign-key child records (`order_items`, `payment_submissions`, `vendor_quotations`, `material_request_history_logs`) are deleted first to preserve referential integrity.
-3. **Safety Guards**:
-   - Parquet backups, soft-archival, and hard retention purges execute **ONLY** if Permanent S3 Bucket is enabled (`s3_is_enabled == True`) and connection test passes.
+### Material Request rules
+- Each newly submitted MR links exactly one active Product with `category_type = "Marketing - Procurement"`.
+- The API accepts multipart form data with a required description and three required JPG/PNG/WEBP images (maximum 5 MB each): Present Outlet, Installation Place, and Customer Approval Letter.
+- Optional Length, Width, Height, and Depth are persisted independently with a unit. Supplied values must be positive.
+- Outlet name, address, contact, GPS, and the three image URLs are snapshotted on the MR for historical auditability.
+- Legacy `category`, `approx_dimensions`, and `image_url` fields remain populated/compatible for existing web and procurement flows.
+
+### Marketing Stock asset rules
+- Eligible assets are active `Marketing - Stock` Products with active, positive `ProductWarehouseStock` in the warehouse resolved through the Outlet Beat and L3 hierarchy.
+- Mobile clients cannot choose or type a warehouse, item name, or item code. The backend derives them from the resolved warehouse and selected Product.
+- Deployment locks the warehouse stock row, rejects insufficient stock with HTTP 409, creates the Asset Capitalization, deducts stock, and writes an `OUTWARD` Stock Movement in one transaction.
+- Asset records retain linked `product_id`/`warehouse_id` plus name/code/warehouse snapshots for historical display.
+
+### API contracts
+- `GET /api/v1/outlets/{outlet_id}/material-request-context`
+- `POST /api/v1/material-requests`
+- `GET /api/v1/outlets/{outlet_id}/asset-products`
+- `GET /api/v1/outlets/{outlet_id}/assets`
+- `POST /api/v1/asset-capitalizations`
+
+### Runtime verification
+- Database migrations add the MR product, dimension, snapshot, and image columns plus Asset product/warehouse links without invalidating legacy rows.
+- Docker App and MySQL services are healthy; migrations and Gunicorn multi-worker startup pass; API docs return HTTP 200 through Nginx port `8080`.
+- The configured S3 bucket currently returns `HeadBucket 403 Forbidden`; `upload_image_file` therefore uses its existing local static-storage fallback until bucket credentials/policy are corrected.
 
 ---
 
-## 🖼️ 13. Dual Bucket Directory Scoping & UI Image Viewer Architecture
+## ✅ 22. Role-Based Procurement Lifecycle (2026-07-28)
 
-### Bucket Classification & Directory Rules
-1. **Permanent Files - Bucket (`s3_bucket_name`)**: Stores all long-term operational images, documents, and transactional Parquet backups under dedicated directory keys:
-   - Outlets Signboard Photos: `outlets/`
-   - Marketing Assets & Proof of Deployment: `assets/`
-   - Material Request Attachments: `material_requests/`
-   - Work Orders QC Verification Photos: `work_orders/qc/`
-   - Vendor Invoices & Proformas: `vendor_invoices/`
-   - User Profile Avatars: `avatars/`
-   - Parquet Daily Rolling Backups: `rolling_backups/parquet/YYYY-MM-DD/`
+### Enforced lifecycle
+- L1 creates one-Product Marketing Procurement MR → L3/L4 assigns Vendor → Vendor Technician submits two-image Recce → L3/L4 approves/rejects Recce → Vendor Admin submits server-calculated GST Quotation → L3/L4 approves Quotation and creates exactly one Work Order.
+- Vendor Admin acknowledges Assigned Work Orders and reports monotonic progress. `100%` transitions automatically to `QC Pending`.
+- QC Manager submits a two-image QC Report, remark, and maintenance schedule. Completion locks the Vendor sequence, creates a unique Vendor Batch ID, creates one Ready Procurement Item in the resolved L3 warehouse, and records an inward Stock Movement.
+- Vendor Technician deploys a Ready Item exactly once. Deployment creates the linked Asset, changes Item status to `Asset Capitalised`, and creates an outward Stock Movement.
+- Maintenance supports `In Progress → Completed → Validated`, immutable progress logs, image evidence, and QC-only validation.
 
-2. **Temporary Files - Bucket (`s3_files_bucket_name`)**: Stores ephemeral artifacts:
-   - Scheduled Analytics CSV Exports: `analytics/scheduled/`
-   - Full Database Backups (`.sql`): `backups/`
+### Integrity and security
+- Removed fallback Vendor/Outlet ID `1` behavior from the lifecycle.
+- Vendor Admin/Technician queries and mutations are restricted to `current_user.vendor_id`; QC queries honor assigned `qc_vendors`.
+- L3/L4-only guards protect Vendor assignment and Recce/Quotation review.
+- Unique/transactional guards prevent duplicate Work Orders per Quotation, Items per completed QC, and Assets per Procurement Item.
+- QC recall invalidates (never deletes) an uninstalled Item and records an outward reversal. Installed Items block direct recall.
+- Field Rep Approvals Hub is a self-submission/status hub and exposes only high-level procurement entities; confidential Recce, Quotation, QC, and Item payloads remain role-scoped.
 
-### UI Image Viewing & Lightbox Modal
-- **Global Lightbox Modal (`app/templates/base.html`)**: Includes `global-image-viewer-modal` rendered with glassmorphism backdrop blur and full-screen image display.
-- **JavaScript Helper**: `openImageViewer(url, title)` opens the full-size image instantly when clicked.
-- **Interactive Thumbnails**: Rendered across Outlets list (`outlets/list.html`), Assets list (`asset_capitalizations/list.html`), Material Requests list (`material_requests/list.html`), and Material Request Detail & QC inspection records (`material_requests/detail.html`).
+### New persistence
+- `work_order_progress_logs`, `qc_reports`, `procurement_attachments`, and `maintenance_progress_logs`.
+- Structured Recce dimensions, approval/rejection metadata and versions.
+- Quotation base/GST/total snapshots and approval metadata.
+- Work Order acknowledgement/progress fields.
+- Procurement Item Product/Warehouse/QC Report links and invalidation metadata.
+- Vendor locked batch prefix/sequence.
+- Asset state plus Maintenance status/progress/completion/validation metadata.
 
----
+### Performance
+- Composite indexes cover MR Vendor/status, WO Vendor/status, Item Vendor/status/warehouse, and Maintenance status/date.
+- Backend procurement lists use joined/select-in eager loading to avoid summary-card N+1 queries.
+- Mobile list endpoints return bounded role-scoped summaries; map views use coordinate-only records and OpenStreetMap.
 
-## 👥 14. User Onboarding, Geography Allotment & Position Hierarchy Scope Rules
-
-### A. Geography Allotment & Single-Manager Rule
-- **Single Territory Manager Rule**: A Region/Geography (`Geography`) can only be assigned to **ONE** active Territory Manager (`UserRole.territory_manager`).
-- **Form Context Dropdown Filtering (`app/routers/users.py`)**: `_form_context` queries all geographies currently assigned to active Territory Managers and excludes them from the `Managing Region / Zone (Geography Scope)` dropdown when creating a new user (`/users/new`). When editing an existing user (`/users/{id}/edit`), the user's current geography is retained in their edit options.
-- **Backend Validation**: `user_create` and `user_update` reject forms submitting an already-allotted geography with error `"Geography is already assigned to active Territory Manager '<Name>'."`
-
-### B. Managing Geography Level to Position Hierarchy Mapping
-- **Level Scope Mapping**: Position availability dynamically filters based on the level (`level_code`) of the selected Managing Geography:
-  - **Territory** scope $\rightarrow$ **L1** & **L2** positions.
-  - **Region** scope $\rightarrow$ **L3** positions.
-  - **Zone** scope $\rightarrow$ **L4** positions.
-- **Dynamic Frontend Filtering (`app/templates/users/form.html`)**: Options render `data-level="{{ g.level_code }}"` and position items render `data-level="{{ p.level_code }}"`. When a geography is selected or changed, `filterPositions()` instantly shows matching position levels and hides out-of-scope positions.
-- **Server-Side Validation**: `user_create` and `user_update` in `app/routers/users.py` validate position level against managing geography level prior to DB insertion/update.
-
-### D. Permission Matrix Access Restriction & Default Module Scope
-- **Restricted Roles**: Users created or edited with roles `field_rep`, `vendor_admin`, `vendor_technician`, or `qc_manager` **cannot** access or view the Dashboard & Feature Access Permission Matrix in New/Edit forms.
-- **Frontend UI Visibility**: `updateRoleScopedFields()` in `app/templates/users/form.html` automatically hides `#permission-matrix-container` (`classList.add('hidden')`) for these restricted roles. The matrix is only accessible when assigning `admin` or `territory_manager` system roles.
-- **Automated Default Module Provisioning**: `_resolve_user_modules(role, submitted_modules)` in `app/routers/users.py` automatically provisions standard role modules on form submit:
-  - **`field_rep`**: `["orders", "inventory", "expenses", "timesheets", "attendance", "visits", "gps_map"]`
-  - **`vendor_admin` / `vendor_technician`**: `["orders", "inventory", "expenses"]`
-  - **`qc_manager`**: `["orders", "inventory", "material_requests", "approvals"]`
-
-### F. Permission Matrix to Sidebar Navigation Enforcement
-- **Dynamic Navigation Scoping (`app/templates/shared/sidebar.html`)**: The sidebar template extracts the user's enabled modules via `mods = current_user.active_modules()`.
-- **Module to Menu Item Mapping**:
-  - `attendance` $\rightarrow$ Attendance
-  - `visits` $\rightarrow$ Visit Records (with role check)
-  - `gps_map` $\rightarrow$ GPS Map View (with role check)
-  - `orders` $\rightarrow$ Orders
-  - `expenses` $\rightarrow$ Expenses
-  - `timesheets` $\rightarrow$ Timesheets
-  - `inventory` $\rightarrow$ Material Requests & Marketing Assets (for non-admin users) / Inventory (Catalogue)
-  - `approvals` $\rightarrow$ Approval Hub, Alerts & Notifications, Auto-Flags
-  - `analytics` $\rightarrow$ Sales Analytics, Rep Performance, Marketing, Scheduled Reports
-- **Admin Bypass**: `system_role == admin` bypasses individual module toggles to preserve complete system configuration & management oversight.
-- **Eager Loading (`app/dependencies.py`)**: `get_current_web_user` uses `options(joinedload(User.module_access))` to ensure clean template rendering without lazy loading overhead.
-
-### G. Structured Section URL Slugs Architecture
-All Web UI routes are structured with section prefixes corresponding to their sidebar tab hierarchy:
-- **Field Tracking (`/tracking/...`)**: `/tracking/attendance`, `/tracking/visits`, `/tracking/map`
-- **Operations (`/operations/...`)**: `/operations/orders`, `/operations/expenses`, `/operations/timesheets`, `/operations/material-requests`, `/operations/marketing-assets`
-- **Action Center (`/action-center/...`)**: `/action-center/approvals`, `/action-center/alerts`, `/action-center/flags`
-- **Analytics (`/analytics/...`)**: `/analytics/sales`, `/analytics/reps`, `/analytics/marketing`, `/analytics/scheduled`
-- **Catalogue (`/catalogue/...`)**: `/catalogue/products`, `/catalogue/inventory`, `/catalogue/warehouses`
-- **Master Data (`/master-data/...`)**: `/master-data/geography`, `/master-data/users`, `/master-data/positions`, `/master-data/beats`, `/master-data/outlets`, `/master-data/channel-partners`, `/master-data/vendors`
-- **Configuration (`/settings/...`)**: `/settings/...`
-- **Legacy Path Redirects**: Backward-compatibility 307 redirects are mounted in `app/main.py` for legacy top-level routes (e.g. `/orders` $\rightarrow$ `/operations/orders`).
+### Verification
+- Python compile: PASS.
+- Flutter analyzer: no compilation errors; existing lint/deprecation diagnostics remain.
+- MySQL migrations are repeatable and repaired legacy missing `work_orders.outlet_id`, `manufactured_photo_url`, and Quotation Recce fields.
+- ORM parity queries for every new model: PASS.
+- Docker App/MySQL healthy; live OpenAPI exposes all role lifecycle endpoints through Nginx port `8080`.
 
 ---
 
-## 📱 15. Mobile SFA API & Executive Architecture
+## ✅ 23. Production Security Gate 1 (2026-07-29)
 
-### A. Mobile Authentication & OTP Verification
-- **Authentication Routes (`app/routers/api/auth.py`)**:
-  - `POST /api/v1/auth/token`: Admin password login returning Bearer JWT token.
-  - `POST /api/v1/auth/request-otp`: Field Rep OTP request dispatched via Email/Alerts.
-  - `POST /api/v1/auth/verify-otp`: OTP verification & JWT issuance for Field Reps. Enforces active checkout session lock.
-  - `GET /api/v1/auth/me`: Authenticated user profile lookup (`UserResponse` with `can_access_restricted_modules` flag).
+### Authentication
+- Newly issued login OTPs are stored only as bcrypt hashes and are never returned by the API, written to Alerts, or logged.
+- OTP requests use a generic non-enumerating response, are limited to three per user per 15 minutes, expire after 10 minutes, and lock after five failed verification attempts.
+- The duplicate debug `/api/auth/login` route and token-bearing response logging were removed.
 
-### B. Mobile Master Data & Operations API Endpoints
-- **Master Data (`app/routers/api/master.py`)**:
-  - `GET /api/v1/config`: Mobile sync configuration (`payment_mode`, `denomination_mandatory`, `gps_threshold_metres`, `sync_interval_seconds`).
-  - `GET /api/v1/geography/tree`: Full geography tree for offline mobile caching.
-  - `GET /api/v1/beats`: Active beats list & `GET /api/v1/beats/my` (assigned beats).
-  - `GET /api/v1/outlets`: Paginated outlet list, `GET /api/v1/outlets/{id}`, & `PATCH /api/v1/outlets/{id}/location` (mobile GPS update).
-  - `GET /api/v1/products`: Product catalog for offline caching (with MRP & GST rate).
-- **Operations (`app/routers/api/operations.py`)**:
-  - `POST /api/v1/attendance/checkin` & `/checkout`: Geofenced shift attendance & timesheet tracking.
-  - `GET /api/v1/attendance/history` & `GET /api/v1/visits/my`: History tracking logs.
-  - `POST /api/v1/visits` & `/checkout`: Outlet visit logging with haversine distance verification.
-  - `POST /api/v1/orders` & `/submit`: Create draft order & submit for ERP sync.
-  - `POST /api/v1/payments`: Collect payment (Cash/UPI/Cheque/NEFT) with denomination breakdown.
-  - `GET /api/v1/orders/my`, `GET /api/v1/payments/my`: Rep's history endpoints.
-  - `GET /api/v1/work-orders/pending-qc` & `POST /api/v1/work-orders/{id}/qc-approve`: QC inspection approval with photo upload.
+### Runtime hardening
+- Production startup rejects default/short secrets, missing CMMS webhook keys, insecure cookies, and wildcard CORS configuration.
+- CMMS webhooks fail closed when their secret is absent.
+- CORS uses an explicit environment allowlist; browser responses include anti-sniffing, frame, referrer, and permissions headers, plus HSTS when secure cookies are enabled.
+- MySQL, Adminer, the direct app port, and Nginx are bound to localhost in the development Compose stack; Adminer is version-pinned.
 
-### C. Module Access Restriction & Beat Creation Rules
-- **Access Rule**: **Beat Creation**, **Expenses**, **Timesheets**, and **Material Requests** are restricted ONLY to:
-  1. `admin` users.
-  2. `territory_manager` users whose assigned Geography level is `>= Region` (`Zone` or `Region`).
-  3. All other roles (`field_rep`, `vendor_admin`, `vendor_technician`, `qc_manager`, or `territory_manager` assigned to `Territory` level below Region) are strictly blocked with `HTTP 403 Access Denied`.
-- **Model Property (`User.can_access_restricted_modules`)**: Evaluates role and geography level depth safely, handling `DetachedInstanceError` when un-sessioned.
-- **Dependency Guard (`app/dependencies.py`)**: `require_restricted_module_web_access` and `require_restricted_module_api_access` enforce permissions on web (`/master-data/beats/new`, `/master-data/beats/{id}/edit`, etc.) and API (`POST /api/v1/beats`) endpoints.
-- **Mobile UI Dynamic Quick Actions**: `dashboard_tab.dart` dynamically switches Quick Action cards based on `user.canAccessRestrictedModules`.
+### Scheduler and migrations
+- Gunicorn workers no longer start APScheduler.
+- A dedicated `scheduler` Compose service owns all seven scheduled jobs exactly once.
+- Migration failure now stops application startup instead of allowing a partially migrated service to report healthy.
 
-### D. Complete Legacy Module Purge (`payment_submissions`)
-- Fully purged legacy `payment_submissions` table, models (`payment_submission.py`), template directories (`app/templates/payment_submissions/`), router endpoints (`app/routers/payment_submissions.py`), and foreign key constraints (`payments.submission_id`).
-
-### E. Executive Glassmorphic UI & Error Templates
-- **Mobile Flutter UI**: Executive design system featuring multi-stop gradient workday card (`#3B82F6` → `#4F46E5` → `#7C3AED`), 3D ambient glow spheres, glassmorphic `WORKDAY ACTIVE` / `GpsStatusChip` pill badges, and floating bottom navigation bar (`#4F46E5` active tab highlight).
-- **Web 403 & 404 Glassmorphic Error Pages (`app/templates/errors/403.html`)**: Centered glass card (`bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl`), glowing rose/indigo badge, dynamic exception detail message, and high-contrast text (`text-white` & `text-slate-300`).
-
-### F. Alert & Notification Scoping Rules & Dual-Pane UI
-- **Admin**: Sees **ALL** system alerts (`Alert` table).
-- **Strict Login & OTP Alert Isolation**: Login alerts (titles matching `Login%`, `OTP%`, `%Login%`, or `%OTP%`) are strictly private. They are visible **ONLY to Admin and the specific user themselves** (`Alert.user_id == current_user.id`).
-- **Territory Manager ($\ge$ Region)**: Sees own alerts + operational updates (Orders, Assets, Material Requests, Timesheets, Expenses, Vendor & Channel Partner updates) generated by subordinate L1 reps in their geography/position scope. Other users' private Login/OTP alerts are strictly excluded.
-- **Dual-Pane Interface (`/action-center/alerts`)**: Admin and Territory Managers ($\ge$ Region) receive a 2-pane tabbed view:
-  - **Pane 1 (`tab=personal`)**: *"My Personal Alerts"* addressing the current user directly.
-  - **Pane 2 (`tab=operational`)**: *"Team & Operational Alerts"* displaying team/vendor updates across their allowed geography scope.
-- **All Other Users (Field Reps, Vendor Admins, QC Managers, TMs < Region)**: See **ONLY** their own respective alerts in a single streamlined view (`Alert.user_id == current_user.id`).
-
-### G. Operational Command Dashboard KPI Grid
-- **Purged Non-Operational & Redundant KPIs**: Completely removed **SKUs/Products**, **Receivables**, and **System Health** cards from the main dashboard.
-- **Clubbed Attendance & Workforce KPI**: Combined field workforce and daily attendance into a single high-impact card **`ATTENDANCE / WORKFORCE`** (`{{ checkins_today }} / {{ active_reps }}` e.g., `0/1` showing checked-in reps vs active reps under the user's geography scope).
-- **Vendor & Asset Operational KPI Cards**: Introduced real-time vendor and asset operational metrics:
-  1. `ATTENDANCE / WORKFORCE`: Shift checked-in reps / active field workforce under territory/region scope (`/tracking/attendance`).
-  2. `OUTLETS SCOPE`: Total verified retail points in allowed geography scope (`/master-data/outlets?status=approved`).
-  3. `ORDERS TODAY`: Active sales orders & ₹ volume generated today (`/operations/orders`).
-  4. `MARKETING ASSETS`: Deployed marketing & signage assets (`/operations/marketing-assets`).
-  5. `PENDING OUTLET APPROVALS`: Draft outlets awaiting manager approval (`/master-data/outlets?status=draft`).
-  6. `WORK ORDERS`: Active vendor maintenance work orders (`WorkOrder` count).
-  7. `VENDOR QUOTATIONS`: Pending quotes submitted by vendors awaiting review (`VendorQuotation` count).
-- **Admin-Only Core Infrastructure Panel Scoping**:
-  - Legacy offline sync items (`ZAP Sync`, `CMMS Sync`, `CONNECT Sync`) have been completely purged from the dashboard panel.
-  - The **Core Infrastructure** panel (`API Core`, `Datastore`, `Job Scheduler`) is strictly scoped and visible **ONLY to System Administrators** (`{% if current_user.role.value == 'admin' %}`). Hidden for Territory Managers and Field Reps.
-
-### H. Order Creation, OrderType & Sales Category Scoping
-- **Purged Legacy `Flow Type`**: Removed `Flow Type` dropdown from order forms (`/operations/orders/new`) and templates.
-- **`Order Type` Field (`Order.order_type`)**: Introduced `OrderType` enum (`Primary`, `Secondary`). Saved on `Order.order_type` column and displayed as colored badges (`Primary Order` in purple, `Secondary Order` in indigo) across order lists.
-- **Product Category Scope Validation**: Product selection dropdowns in `/operations/orders/new` are strictly confined and validated for **`Product.category_type == ProductCategory.sales`** (`"Sales"` category). Marketing & procurement stock items are excluded from order creation dropdowns.
-- **Executive Dark Glassmorphic Design**: Redesigned `/operations/orders/new` with executive glass cards (`bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-3xl p-8`), interactive line item calculation, and grand total pills.
-
-### I. Centralized Indian Standard Time (IST, GMT +5:30) Architecture
-- **Environment & Timezone Utility (`app/utils/timezone.py`)**: Centralized datetime helper module providing `ist_now()`, `ist_today()`, and `format_ist()` configured strictly to `Asia/Kolkata` (GMT +5:30).
-- **Process & Database Session Enforcement (`app/database.py`)**: OS process environment variable `TZ=Asia/Kolkata` enforced. SQLAlchemy engine event listener automatically executes `SET time_zone = '+05:30';` on every database connection.
-- **Transaction & Model Defaults**: All transaction defaults (`order_date`, `expense_date`, `work_date`, reference number prefix date generation, checkin/checkout timestamps, visit timestamps) evaluate in IST.
-- **Jinja2 Template Filter**: Registered `format_ist` Jinja2 filter in `app/main.py` for rendering IST formatted timestamps.
-
-### J. Primary vs Secondary Order Flow Rules & Direct Payment Fulfillment
-- **Secondary Order Flow (`OrderType.secondary`)**:
-  - **Mandatory Visit Association**: Every Secondary Order MUST be associated with a valid, active `VisitRecord` against the selected `Outlet` logged on `ist_today()`. If no visit record exists, order creation is blocked with a validation error.
-  - **Fulfillment Entity Selection**: Lists Channel Partners serving the Beat along with a default option: **`Regional Company`** (`is_regional_company=True`).
-  - **Direct Payment Collection Flow**: If **`Regional Company`** is selected as the fulfillment entity, immediate payment collection details (`amount_collected`, `payment_method`, `transaction_ref`) are captured, creating a `Payment` record and computing `payment_settlement` status (`paid`, `partial`, `unpaid`) and outstanding balance.
-- **Primary Order Flow (`OrderType.primary`)**:
-  - **User Role Restriction**: Available ONLY for L2/L3/L4 users (`territory_manager` and `admin`). Blocked for L1 (`field_rep`) users with HTTP 403 / validation error.
-  - **Direct Channel Partner Target**: Placed directly against a `Channel Partner` (`channel_partner_id`). `outlet_id` and `visit_id` are `None` (no visit or outlet record required).
-  - **Payment Flow Bypassed**: Payment collection flow is completely skipped for Primary Orders.
-
-### K. Beats List View Position Column & Unassigned Fallback
-- **Position Column in Beats List View (`/master-data/beats`)**: Added a dedicated `POSITION` column to the Beats & Routes table view (`app/templates/beats/list.html`).
-- **Position Assignment Display**: Renders indigo pill badges containing the Position name (`pos.name`) assigned to each Beat via the `position_beats` junction table (`Beat.positions`).
-- **Unassigned Fallback Badge**: If no position is assigned to a Beat (`not item.positions`), displays a distinct amber badge: **`Unassigned`** (`bg-amber-500/10 text-amber-400 border-amber-500/20`).
-- **Search & Eager Loading Optimization**: `app/routers/beats.py` uses SQLAlchemy `selectinload(Beat.positions)` for zero N+1 queries, and enables searching beats by position name or code via `q` filter.
-
-### L. Docker 502 Fix — MySQL User Provisioning Race Condition
-- **Root Cause**: Docker Compose `depends_on: condition: service_healthy` only waits for MySQL root ping, NOT for `safar_user` grants to be applied — causing `(1045, Access Denied)` for `safar_user` every cold-start and crashing `entrypoint.sh` (which used `set -e`), preventing Gunicorn from ever starting → 502.
-- **`db_migrate.py` — `wait_and_provision_db()`**: Added a retry loop (30 attempts × 2s) that connects as `safar_user`. On `1045` or `1049` errors, it auto-provisions using root credentials:
-  - `CREATE DATABASE IF NOT EXISTS safar_db`
-  - `CREATE USER IF NOT EXISTS safar_user@'%'` + `ALTER USER` (resets password if already exists)
-  - `GRANT ALL PRIVILEGES ON safar_db.* TO safar_user@'%'; FLUSH PRIVILEGES;`
-  - Disposes SQLAlchemy pool after provisioning so next retry uses fresh connections.
-  - Root password read from `MYSQL_ROOT_PASSWORD` env var (falls back to `rootpassword`).
-- **`docker-compose.yml`**: Added `MYSQL_ROOT_PASSWORD` env var to `app` service so provisioning code can connect as root.
-- **`entrypoint.sh`**: Added TCP-level port wait (`/dev/tcp/${DB_HOST}/${DB_PORT}`, 60 retries × 2s) before migrations run. Migration failure is non-fatal (`|| echo WARNING`) so Gunicorn always starts even if migration fails.
-
-### M. MRStatus Enum — Valid Values & Stale Reference Fixes
-- **`MRStatus` Enum** (`app/models/material_request.py`) valid values (in lifecycle order):
-  ```
-  draft → submitted → vendor_assigned → recce_completed →
-  quotation_submitted → quotation_approved → work_order_issued →
-  qc_pending → completed | cancelled
-  ```
-- **Never valid**: `MRStatus.acknowledged`, `MRStatus.in_progress` — these do NOT exist in the enum.
-- **Files fixed** (stale `acknowledged`/`in_progress` references replaced):
-  - `app/routers/approvals.py` — `/action-center/approvals` was returning 500; fixed pending MR filter to use all 7 non-terminal statuses.
-  - `app/routers/analytics.py` — marketing KPI pending MR count fixed.
-  - `app/routers/material_requests.py` — "Approved" action now transitions to `vendor_assigned`; work order creation transitions to `work_order_issued`.
-- **Rule**: When filtering "pending" material requests, use `~MaterialRequest.status.in_([MRStatus.completed, MRStatus.cancelled])` (negation of terminals) rather than listing specific pending states, to be future-proof.
-
+### Verification
+- Focused security regression tests: 4 passed.
+- App and MySQL containers: healthy.
+- Dedicated scheduler: running with seven registered jobs.
+- Protected live API: HTTP 401 with security headers.
+- S3 remains externally blocked by `HeadBucket 403` and is still a production release blocker.

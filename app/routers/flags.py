@@ -14,6 +14,10 @@ from app.models.auto_flag import AutoFlag, FlagSeverity, FlagStatus, FlagType
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
+from app.services.access_control import (
+    require_flag_access,
+    scope_employee_record_query,
+)
 
 router = APIRouter(prefix="/action-center/flags", tags=["auto-flags"])
 templates = Jinja2Templates(directory="app/templates")
@@ -31,7 +35,9 @@ async def flag_list(
     status: str = Query(default="open"),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(AutoFlag)
+    query = scope_employee_record_query(
+        db.query(AutoFlag), AutoFlag, current_user, db
+    )
     if severity and severity in [s.value for s in FlagSeverity]:
         query = query.filter(AutoFlag.severity == severity)
     if flag_type and flag_type in [t.value for t in FlagType]:
@@ -58,10 +64,7 @@ async def flag_review(
     new_status: str = Form(default="reviewed"),
     review_notes: Optional[str] = Form(default=None),
 ):
-    flag = db.query(AutoFlag).filter(AutoFlag.id == flag_id).first()
-    if not flag:
-        set_flash_error(request, "Flag not found.")
-        return RedirectResponse("/flags", status_code=302)
+    flag = require_flag_access(db, current_user, flag_id)
 
     # Clamp rating 1-5
     flag.admin_rating = max(1, min(5, admin_rating))
@@ -85,12 +88,11 @@ async def flag_escalate(
     db: Session = Depends(get_db),
     review_notes: Optional[str] = Form(default=None),
 ):
-    flag = db.query(AutoFlag).filter(AutoFlag.id == flag_id).first()
-    if flag:
-        flag.status = FlagStatus.escalated
-        flag.reviewed_by_id = current_user.id
-        flag.reviewed_at = datetime.now()
-        flag.review_notes = review_notes or None
-        db.commit()
-        set_flash_success(request, "Flag escalated.")
+    flag = require_flag_access(db, current_user, flag_id)
+    flag.status = FlagStatus.escalated
+    flag.reviewed_by_id = current_user.id
+    flag.reviewed_at = datetime.now()
+    flag.review_notes = review_notes or None
+    db.commit()
+    set_flash_success(request, "Flag escalated.")
     return RedirectResponse("/flags", status_code=302)

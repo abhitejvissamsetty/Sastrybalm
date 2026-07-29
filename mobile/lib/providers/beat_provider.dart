@@ -9,7 +9,8 @@ final masterServiceProvider = Provider((ref) {
   return MasterService(client);
 });
 
-final beatPlanProvider = FutureProvider.family<Map<String, dynamic>, int?>((ref, beatId) async {
+final beatPlanProvider =
+    FutureProvider.family<Map<String, dynamic>, int?>((ref, beatId) async {
   if (beatId == null) {
     return {'beat': null, 'outlets': <Outlet>[]};
   }
@@ -22,6 +23,12 @@ final selectedOutletProvider = StateProvider<Outlet?>((ref) => null);
 final productsProvider = FutureProvider<List<Product>>((ref) async {
   final service = ref.watch(masterServiceProvider);
   return service.fetchProducts();
+});
+
+final warehouseProductsProvider =
+    FutureProvider.family<List<Product>, int?>((ref, warehouseId) async {
+  final service = ref.watch(masterServiceProvider);
+  return service.fetchProducts(warehouseId: warehouseId);
 });
 
 final beatsProvider = FutureProvider<List<Beat>>((ref) async {

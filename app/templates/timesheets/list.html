@@ -1,96 +1,159 @@
 {% extends "base.html" %}
 {% from "shared/pagination.html" import render as paginate %}
 
-{% block title %}Attendance{% endblock %}
+{% block title %}Timesheets & Attendance{% endblock %}
+{% block page_title %}Timesheets & Attendance{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
 
-  <div class="flex items-center justify-between">
+  <!-- Header Banner & Workshift Trigger -->
+  <div class="flex items-center justify-between flex-wrap gap-4">
     <div>
-      <h1 class="text-2xl font-bold text-white">Attendance</h1>
-      <p class="mt-1 text-sm text-slate-400">Daily field rep check-in / check-out records</p>
+      <h1 class="text-2xl font-bold text-white tracking-tight">Timesheets & Workshift Management</h1>
+      <p class="mt-1 text-sm text-slate-400">Track daily workshift hours, retailing activities, and timesheet submissions</p>
     </div>
-    {% if current_user.role.value in ['admin', 'territory_manager'] %}
-    <a href="/tracking/visits"
-       class="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors">
-      View Visit Records
-    </a>
-    {% endif %}
+    
+    <div class="flex items-center gap-3">
+      <!-- Start Workshift Button -->
+      <form action="/operations/timesheets/start-workshift" method="post">
+        <button type="submit" 
+                class="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-4 py-2.5 text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 border border-emerald-400/20 transform hover:scale-105 active:scale-95">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Start Workshift</span>
+        </button>
+      </form>
+
+      {% if current_user.role.value in ['admin', 'territory_manager'] %}
+      <a href="/operations/timesheets/visits/all"
+         class="rounded-xl border border-white/10 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-all">
+        All Visit Records
+      </a>
+      {% endif %}
+    </div>
   </div>
 
-  <form method="get" class="flex flex-wrap gap-3">
-    {% if reps %}
-    <select name="user_id"
-            class="rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-      <option value="">All Reps</option>
-      {% for rep in reps %}
-      <option value="{{ rep.id }}" {% if user_id == rep.id|string %}selected{% endif %}>{{ rep.full_name }}</option>
-      {% endfor %}
-    </select>
-    {% endif %}
-    <input type="date" name="work_date" value="{{ work_date }}"
-           class="rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-    <button type="submit" class="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-600 transition-colors">Filter</button>
-    {% if user_id or work_date %}
-    <a href="/operations/timesheets" class="rounded-lg bg-slate-800 border border-slate-700 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors">Clear</a>
-    {% endif %}
-  </form>
+  <!-- Dual Tab Navigation Bar (Non-Submitted vs Submitted) -->
+  <div class="border-b border-white/10 flex items-center justify-between flex-wrap gap-4">
+    <nav class="-mb-px flex space-x-6">
+      <a href="/operations/timesheets?tab=non_submitted{% if user_id %}&user_id={{ user_id }}{% endif %}{% if work_date %}&work_date={{ work_date }}{% endif %}"
+         class="py-3.5 text-sm font-bold border-b-2 flex items-center gap-2 transition-all {% if tab != 'submitted' %}border-indigo-500 text-indigo-400{% else %}border-transparent text-slate-400 hover:text-slate-200{% endif %}">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+        </svg>
+        <span>Non Submitted Timesheets</span>
+      </a>
 
-  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
-    <table class="min-w-full divide-y divide-slate-700">
+      <a href="/operations/timesheets?tab=submitted{% if user_id %}&user_id={{ user_id }}{% endif %}{% if work_date %}&work_date={{ work_date }}{% endif %}"
+         class="py-3.5 text-sm font-bold border-b-2 flex items-center gap-2 transition-all {% if tab == 'submitted' %}border-indigo-500 text-indigo-400{% else %}border-transparent text-slate-400 hover:text-slate-200{% endif %}">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>Submitted Timesheets</span>
+      </a>
+    </nav>
+
+    <!-- Filters -->
+    <form method="get" class="flex items-center gap-3 py-2">
+      <input type="hidden" name="tab" value="{{ tab }}">
+      {% if reps %}
+      <select name="user_id"
+              class="rounded-xl bg-slate-900 border border-white/10 text-white px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500">
+        <option value="">All Field Reps</option>
+        {% for rep in reps %}
+        <option value="{{ rep.id }}" {% if user_id == rep.id|string %}selected{% endif %}>{{ rep.full_name }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      <input type="date" name="work_date" value="{{ work_date }}"
+             class="rounded-xl bg-slate-900 border border-white/10 text-white px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500">
+      <button type="submit" class="rounded-xl bg-slate-800 border border-white/10 px-3.5 py-2 text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-700 transition-colors">
+        Filter
+      </button>
+      {% if user_id or work_date %}
+      <a href="/operations/timesheets?tab={{ tab }}" class="rounded-xl bg-slate-900 border border-white/10 px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Timesheets List Table -->
+  <div class="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl shadow-2xl">
+    <table class="min-w-full divide-y divide-white/10">
       <thead>
-        <tr class="bg-slate-800">
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+        <tr class="bg-slate-900/90 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <th class="px-5 py-3.5">Date</th>
           {% if current_user.role.value in ['admin', 'territory_manager'] %}
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Rep</th>
+          <th class="px-5 py-3.5">Field Rep</th>
           {% endif %}
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Check-in</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Check-out</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Hours</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Visits</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-          <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+          <th class="px-5 py-3.5 hidden sm:table-cell">Log In / Log Out</th>
+          <th class="px-5 py-3.5 hidden md:table-cell">Hours Logged</th>
+          <th class="px-5 py-3.5 hidden md:table-cell">Outlets Visited</th>
+          <th class="px-5 py-3.5">Version</th>
+          <th class="px-5 py-3.5">Status</th>
+          <th class="px-5 py-3.5 text-right">Action</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-700/50">
+      <tbody class="divide-y divide-white/5">
         {% for item in pagination.items %}
-        <tr class="hover:bg-slate-800/60 transition-colors">
-          <td class="px-4 py-3 text-sm font-medium text-white">{{ item.work_date }}</td>
-          {% if current_user.role.value in ['admin', 'territory_manager'] %}
-          <td class="px-4 py-3 text-sm text-slate-300">{{ item.user.full_name if item.user else '—' }}</td>
-          {% endif %}
-          <td class="px-4 py-3 text-sm text-slate-300 hidden sm:table-cell">
-            {{ item.checkin_time.strftime('%H:%M') if item.checkin_time else '—' }}
-          </td>
-          <td class="px-4 py-3 text-sm text-slate-300 hidden sm:table-cell">
-            {{ item.checkout_time.strftime('%H:%M') if item.checkout_time else '—' }}
-          </td>
-          <td class="px-4 py-3 text-sm text-slate-300 hidden md:table-cell">
-            {{ item.hours_worked ~ 'h' if item.hours_worked else '—' }}
-          </td>
-          <td class="px-4 py-3 text-sm text-slate-300 hidden md:table-cell">{{ item.visit_count }}</td>
-          <td class="px-4 py-3 text-sm">
-            {% if item.status.value == 'open' %}
-            <span class="inline-flex items-center rounded-full bg-amber-900/50 px-2.5 py-0.5 text-xs font-semibold text-amber-300">Open</span>
-            {% else %}
-            <span class="inline-flex items-center rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">Closed</span>
+        <tr class="hover:bg-slate-800/50 transition-colors group">
+          <td class="px-5 py-4 text-sm font-bold text-white">
+            {{ item.work_date }}
+            {% if item.submitted_at %}
+              <div class="text-[10px] text-slate-500 font-mono font-medium">Submitted {{ item.submitted_at.strftime('%Y-%m-%d %H:%M') }}</div>
             {% endif %}
           </td>
-          <td class="px-4 py-3 text-right text-sm">
-            <a href="/operations/timesheets/{{ item.id }}" class="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">Detail</a>
+          {% if current_user.role.value in ['admin', 'territory_manager'] %}
+          <td class="px-5 py-4 text-sm font-medium text-slate-300">{{ item.user.full_name if item.user else '—' }}</td>
+          {% endif %}
+          <td class="px-5 py-4 text-xs font-mono text-slate-300 hidden sm:table-cell">
+            <span class="text-emerald-400">{{ item.checkin_time.strftime('%H:%M') if item.checkin_time else '—' }}</span>
+            <span class="text-slate-600 mx-1">→</span>
+            <span class="text-cyan-400">{{ item.checkout_time.strftime('%H:%M') if item.checkout_time else '23:59 (Auto Cutoff)' }}</span>
+          </td>
+          <td class="px-5 py-4 text-sm font-bold text-indigo-400 hidden md:table-cell">
+            {{ item.hours_worked ~ ' hrs' if item.hours_worked else 'Ongoing' }}
+          </td>
+          <td class="px-5 py-4 text-sm text-slate-300 hidden md:table-cell">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-800 text-xs font-semibold text-slate-300 border border-white/5">
+              {{ item.visit_count }} visits
+            </span>
+          </td>
+          <td class="px-5 py-4 text-xs font-mono font-bold text-amber-300">
+            v{{ item.version or 1 }}
+          </td>
+          <td class="px-5 py-4 text-sm">
+            {% if item.submitted_at %}
+              <span class="inline-flex items-center rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-bold text-indigo-300 border border-indigo-500/30">
+                Submitted ({{ item.approval_status.value }})
+              </span>
+            {% else %}
+              <span class="inline-flex items-center rounded-full bg-amber-500/20 px-3 py-1 text-xs font-bold text-amber-300 border border-amber-500/30">
+                Non Submitted
+              </span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-4 text-right text-sm">
+            <a href="/operations/timesheets/{{ item.id }}" 
+               class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600 hover:text-white font-semibold text-xs border border-indigo-500/30 transition-all">
+              <span>View Detail</span>
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+            </a>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="8" class="px-4 py-12 text-center text-sm text-slate-500">
-            No attendance records found.
+          <td colspan="8" class="px-5 py-12 text-center text-sm text-slate-500">
+            No timesheet records found for this view.
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
-    {% set qs = "user_id=" ~ user_id ~ "&work_date=" ~ work_date %}
+    {% set qs = "tab=" ~ tab ~ "&user_id=" ~ user_id ~ "&work_date=" ~ work_date %}
     {{ paginate(pagination, "/operations/timesheets?" ~ qs) }}
   </div>
 

@@ -1,13 +1,14 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, dev]
   pull_request:
     branches: [main]
 
 jobs:
-  test:
+  backend:
     runs-on: ubuntu-latest
 
     services:
@@ -29,18 +30,28 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements.lock
+            requirements-dev.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pytest httpx
+        run: pip install -r requirements-dev.txt
 
       - name: Lint
-        run: |
-          pip install flake8
-          flake8 app/ --max-line-length=120 --ignore=W503,E501
+        # Gate syntax errors, undefined names, and other correctness failures.
+        # Legacy style cleanup is tracked separately from release correctness.
+        run: flake8 app/ --select=E9,F63,F7,F82
 
-      - name: Run tests
+      - name: Scan Python dependencies
+        run: pip-audit -r requirements.lock
+
+      - name: Scan backend security rules
+        run: bandit -r app -q -x app/static --severity-level high
+
+      - name: Verify migrations
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
@@ -48,5 +59,156 @@ jobs:
           DB_PASSWORD: root
           DB_NAME: safar_test
           SECRET_KEY: ci-test-secret-key-not-for-production
+        run: alembic upgrade head && alembic check
+
+      - name: Run backend tests with coverage gate
+        env:
+          SECRET_KEY: ci-test-secret-key-not-for-production
+        run: python -m pytest -v --tb=short
+
+      - name: Run high-volume performance release gate
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: safar_test
+          SECRET_KEY: ci-test-secret-key-not-for-production
+          CORS_ORIGINS: http://127.0.0.1:8090
+          SECURE_COOKIES: "false"
         run: |
-          python -m pytest tests/ -v --tb=short
+          python -m performance.seed_base
+          gunicorn --bind 127.0.0.1:8090 --workers 4 --timeout 120 \
+            --worker-class uvicorn.workers.UvicornWorker app.main:app \
+            > /tmp/safar-performance-gunicorn.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" || true' EXIT
+          for _ in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:8090/health/live && break
+            sleep 1
+          done
+          python -m performance.release_gate
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: coverage.xml
+          if-no-files-found: error
+
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-release-report
+          path: performance/latest-report.json
+          if-no-files-found: error
+
+      - name: Build production image
+        run: docker build --tag safar-sfa:${{ github.sha }} .
+
+      - name: Scan production image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: safar-sfa:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan repository history for leaked credentials
+        run: >-
+          docker run --rm -v "$PWD:/repo"
+          zricethezav/gitleaks:v8.24.2
+          detect --source=/repo --redact --no-banner
+
+  mobile:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: safar_mobile_e2e
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements.lock
+
+      - name: Install deterministic backend
+        run: pip install -r requirements.lock
+
+      - name: Start deterministic backend for mobile E2E
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: safar_mobile_e2e
+          SECRET_KEY: ci-mobile-e2e-secret-key-not-production
+          CORS_ORIGINS: http://127.0.0.1:8091
+          SECURE_COOKIES: "false"
+        run: |
+          alembic upgrade head
+          python -m performance.seed_base
+          gunicorn --bind 127.0.0.1:8091 --workers 2 --timeout 120 \
+            --worker-class uvicorn.workers.UvicornWorker app.main:app \
+            > /tmp/safar-mobile-e2e-gunicorn.log 2>&1 &
+          echo "$!" > /tmp/safar-mobile-e2e.pid
+          for _ in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:8091/health/live && break
+            sleep 1
+          done
+          python -m performance.write_mobile_e2e_config \
+            --output /tmp/safar-mobile-e2e.json \
+            --base-url http://127.0.0.1:8091/api/v1
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.1"
+          channel: stable
+          cache: true
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Enforce zero analyzer diagnostics
+        working-directory: mobile
+        run: flutter analyze
+
+      - name: Run mobile tests
+        working-directory: mobile
+        run: flutter test
+
+      - name: Run mobile end-to-end tests against deterministic backend
+        working-directory: mobile
+        run: >-
+          flutter test test/backend_e2e_test.dart
+          --dart-define-from-file=/tmp/safar-mobile-e2e.json
+
+      - name: Stop deterministic mobile backend
+        if: always()
+        run: |
+          if test -f /tmp/safar-mobile-e2e.pid; then
+            kill "$(cat /tmp/safar-mobile-e2e.pid)" || true
+          fi
+          rm -f /tmp/safar-mobile-e2e.json

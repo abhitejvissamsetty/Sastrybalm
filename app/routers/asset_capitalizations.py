@@ -1,7 +1,4 @@
-"""
-Asset Capitalizations router — Rep or vendor technician deploys CMMS items at outlets.
-No approval needed — goes direct to CMMS queue.
-"""
+"""Asset capitalizations deployed through the native procurement workflow."""
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
@@ -18,6 +15,14 @@ from app.models.outlet import Outlet, OutletStatus
 from app.models.user import User, UserRole
 from app.models.vendor import Vendor, VendorEmployee
 from app.models.warehouse import Warehouse
+from app.services.access_control import (
+    build_access_scope,
+    require_asset_access,
+    require_outlet_access,
+    require_vendor_access,
+    scope_asset_query,
+    scope_outlet_query,
+)
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.geography_scope import get_user_allowed_warehouse_ids
 from app.utils.pagination import paginate
@@ -41,9 +46,7 @@ async def ac_list(
     status: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(AssetCapitalization)
-    if current_user.role == UserRole.field_rep:
-        query = query.filter(AssetCapitalization.user_id == current_user.id)
+    query = scope_asset_query(db.query(AssetCapitalization), current_user, db)
     if status and status in [s.value for s in ACStatus]:
         query = query.filter(AssetCapitalization.status == status)
     query = query.order_by(AssetCapitalization.created_at.desc())
@@ -61,8 +64,18 @@ async def ac_new(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
-    vendors = db.query(Vendor).filter(Vendor.status == "active").order_by(Vendor.name).all()
+    outlets = scope_outlet_query(
+        db.query(Outlet).filter(Outlet.status == OutletStatus.active),
+        current_user,
+        db,
+    ).order_by(Outlet.name).all()
+    access_scope = build_access_scope(current_user, db)
+    vendor_query = db.query(Vendor).filter(Vendor.status == "active")
+    if not access_scope.unrestricted:
+        vendor_query = vendor_query.filter(
+            Vendor.id.in_(access_scope.vendor_ids or {-1})
+        )
+    vendors = vendor_query.order_by(Vendor.name).all()
     allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
     wh_query = db.query(Warehouse).filter(Warehouse.is_active == True)
     if allowed_wh_ids is not None:
@@ -90,6 +103,11 @@ async def ac_create(
     notes: Optional[str] = Form(default=None),
     image: Optional[UploadFile] = File(default=None),
 ):
+    outlet = require_outlet_access(db, current_user, int(outlet_id), active_only=True)
+    selected_vendor_id = int(vendor_id) if vendor_id else None
+    if selected_vendor_id:
+        require_vendor_access(db, current_user, selected_vendor_id)
+
     ac_num = _ac_number(db)
 
     image_url = None
@@ -109,14 +127,14 @@ async def ac_create(
     ac = AssetCapitalization(
         ac_number=ac_num,
         user_id=current_user.id,
-        outlet_id=int(outlet_id),
+        outlet_id=outlet.id,
         company_profile_id=current_user.company_profile_id,
         item_name=item_name,
         item_code=item_code or None,
         quantity=quantity,
         warehouse_name=warehouse_name or None,
         deployed_by=DeployedByType(deployed_by),
-        vendor_id=int(vendor_id) if vendor_id else None,
+        vendor_id=selected_vendor_id,
         status=ACStatus.pending,
         sync_status=ACSyncStatus.pending,
         notes=notes or None,
@@ -125,8 +143,8 @@ async def ac_create(
     db.add(ac)
     db.commit()
 
-    # Queue CMMS sync
-    await _sync_ac_to_cmms(ac, db)
+    from app.services.native_operations_service import deploy_asset_capitalization_natively
+    deploy_asset_capitalization_natively(ac, db)
 
     set_flash_success(request, f"Asset capitalization {ac_num} created.")
     return RedirectResponse("/operations/marketing-assets", status_code=302)
@@ -138,36 +156,10 @@ async def ac_detail(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    item = db.query(AssetCapitalization).filter(AssetCapitalization.id == ac_id).first()
-    if not item:
-        set_flash_error(request, "Asset capitalization not found.")
-        return RedirectResponse("/operations/marketing-assets", status_code=302)
+    item = require_asset_access(db, current_user, ac_id)
     return templates.TemplateResponse("asset_capitalizations/detail.html", {
         "request": request, "current_user": current_user,
         "item": item, "ACStatus": ACStatus, "ACSyncStatus": ACSyncStatus,
         **get_flash(request),
     })
-
-
-@router.post("/{ac_id}/sync-cmms")
-async def ac_sync_cmms(
-    ac_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
-    db: Session = Depends(get_db),
-):
-    item = db.query(AssetCapitalization).filter(AssetCapitalization.id == ac_id).first()
-    if not item:
-        set_flash_error(request, "Not found.")
-        return RedirectResponse("/operations/marketing-assets", status_code=302)
-    item.sync_status = ACSyncStatus.pending
-    item.sync_error = None
-    db.commit()
-    await _sync_ac_to_cmms(item, db)
-    return RedirectResponse(f"/operations/marketing-assets/{ac_id}", status_code=302)
-
-
-async def _sync_ac_to_cmms(ac: AssetCapitalization, db: Session):
-    """Internal helper: deploy asset capitalization locally."""
-    from app.services.native_operations_service import deploy_asset_capitalization_natively
-    deploy_asset_capitalization_natively(ac, db)
 

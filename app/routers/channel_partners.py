@@ -12,6 +12,10 @@ from app.models.user import User, UserRole
 from app.utils.beat_types import get_all_beat_types
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
+from app.services.access_control import (
+    require_channel_partner_access,
+    scope_channel_partner_query,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +60,9 @@ async def channel_partner_list(
     q: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(LocalChannelPartner)
-    if current_user.role == UserRole.territory_manager:
-        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
-        query = query.filter(LocalChannelPartner.geography_id.in_(allowed_ids))
+    query = scope_channel_partner_query(
+        db.query(LocalChannelPartner), current_user, db
+    )
 
     if q:
         query = query.filter(
@@ -110,7 +113,7 @@ async def channel_partner_create(
     address: Optional[str] = Form(default=None),
     erp_id: Optional[str] = Form(default=None),
     notification_preference: str = Form("none"),
-    notification_channel: str = Form("email"),
+    notification_channel: str = Form("in_app"),
 ):
     form_data = await request.form()
     raw_channels = form_data.getlist("sales_channels") or sales_channels
@@ -174,16 +177,7 @@ async def channel_partner_edit(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
-    if not item:
-        set_flash_error(request, "Channel Partner not found.")
-        return RedirectResponse("/master-data/channel-partners", status_code=302)
-
-    if current_user.role == UserRole.territory_manager:
-        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
-        if item.geography_id not in allowed_ids:
-            set_flash_error(request, "You are not authorized to edit Channel Partners outside your region.")
-            return RedirectResponse("/master-data/channel-partners", status_code=302)
+    item = require_channel_partner_access(db, current_user, cp_id)
 
     return templates.TemplateResponse("channel_partners/form.html", {
         "request": request,
@@ -210,19 +204,10 @@ async def channel_partner_update(
     address: Optional[str] = Form(default=None),
     erp_id: Optional[str] = Form(default=None),
     notification_preference: str = Form("none"),
-    notification_channel: str = Form("email"),
+    notification_channel: str = Form("in_app"),
     is_active: Optional[str] = Form(default=None),
 ):
-    item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
-    if not item:
-        set_flash_error(request, "Channel Partner not found.")
-        return RedirectResponse("/master-data/channel-partners", status_code=302)
-
-    if current_user.role == UserRole.territory_manager:
-        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
-        if item.geography_id not in allowed_ids:
-            set_flash_error(request, "You are not authorized to edit Channel Partners outside your region.")
-            return RedirectResponse("/master-data/channel-partners", status_code=302)
+    item = require_channel_partner_access(db, current_user, cp_id)
 
     form_data = await request.form()
     raw_channels = form_data.getlist("sales_channels") or sales_channels
@@ -283,16 +268,7 @@ async def channel_partner_deactivate(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
-    if not item:
-        set_flash_error(request, "Channel Partner not found.")
-        return RedirectResponse("/master-data/channel-partners", status_code=302)
-
-    if current_user.role == UserRole.territory_manager:
-        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
-        if item.geography_id not in allowed_ids:
-            set_flash_error(request, "You are not authorized to deactivate Channel Partners outside your region.")
-            return RedirectResponse("/master-data/channel-partners", status_code=302)
+    item = require_channel_partner_access(db, current_user, cp_id)
 
     item.is_active = False
     db.commit()
@@ -307,16 +283,7 @@ async def channel_partner_activate(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
-    if not item:
-        set_flash_error(request, "Channel Partner not found.")
-        return RedirectResponse("/master-data/channel-partners", status_code=302)
-
-    if current_user.role == UserRole.territory_manager:
-        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
-        if item.geography_id not in allowed_ids:
-            set_flash_error(request, "You are not authorized to activate Channel Partners outside your region.")
-            return RedirectResponse("/master-data/channel-partners", status_code=302)
+    item = require_channel_partner_access(db, current_user, cp_id)
 
     item.is_active = True
     db.commit()
@@ -335,16 +302,7 @@ async def export_channel_partner_daily_orders_csv(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(LocalChannelPartner).filter(LocalChannelPartner.id == cp_id).first()
-    if not item:
-        set_flash_error(request, "Channel Partner not found.")
-        return RedirectResponse("/master-data/channel-partners", status_code=302)
-
-    if current_user.role == UserRole.territory_manager:
-        allowed_ids = _get_tm_allowed_geo_ids(db, current_user)
-        if item.geography_id not in allowed_ids:
-            set_flash_error(request, "You are not authorized to export data for Channel Partners outside your region.")
-            return RedirectResponse("/master-data/channel-partners", status_code=302)
+    item = require_channel_partner_access(db, current_user, cp_id)
 
     csv_data = generate_channel_partner_daily_orders_csv(db, item)
     filename = f"channel_partner_{item.code or item.id}_daily_orders.csv"

@@ -2,21 +2,30 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.dependencies import get_db, require_api_auth, require_restricted_module_api_access
 from app.models.beat import Beat, BeatType, BeatGrade
 from app.models.company import SystemConfiguration
 from app.models.geography import Geography
 from app.models.outlet import Outlet, OutletStatus, ChannelType, ShopType
+from app.models.position import Position
 from app.models.product import Product
 from app.models.user import User
+from app.services.access_control import (
+    build_access_scope,
+    require_beat_access,
+    require_outlet_access,
+    scope_outlet_query,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["mobile-master"])
 
 
 @router.get("/geography/tree")
 async def geography_tree(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=50, ge=1, le=100),
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
@@ -31,32 +40,44 @@ async def geography_tree(
             "children": [_node(c) for c in geo.children if c.is_active],
         }
 
-    roots = (
-        db.query(Geography)
-        .filter(Geography.parent_id == None, Geography.is_active == True)
-        .order_by(Geography.name)
-        .all()
-    )
-    return {"tree": [_node(g) for g in roots]}
+    scope = build_access_scope(current_user, db)
+    roots_query = db.query(Geography).filter(Geography.is_active == True)
+    if scope.unrestricted:
+        roots_query = roots_query.filter(Geography.parent_id == None)
+    else:
+        roots_query = roots_query.filter(
+            Geography.id.in_(scope.geography_ids or {-1})
+        )
+    total = roots_query.count()
+    roots = roots_query.order_by(Geography.name).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
+    return {
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "tree": [_node(g) for g in roots],
+    }
 
 
 @router.get("/beats/daily-plan")
 async def beat_daily_plan(
     beat_id: int = Query(...),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=100, ge=1, le=200),
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
     """Ordered outlet list for a beat (approved outlets only)."""
-    beat = db.query(Beat).filter(Beat.id == beat_id, Beat.is_active == True).first()
-    if not beat:
-        return {"beat": None, "outlets": []}
+    beat = require_beat_access(db, current_user, beat_id, active_only=True)
 
-    outlets = (
+    outlet_query = (
         db.query(Outlet)
         .filter(Outlet.beat_id == beat_id, Outlet.status == OutletStatus.active)
         .order_by(Outlet.name)
-        .all()
     )
+    total = outlet_query.count()
+    outlets = outlet_query.offset((page - 1) * per_page).limit(per_page).all()
     return {
         "beat": {
             "id": beat.id,
@@ -64,6 +85,9 @@ async def beat_daily_plan(
             "code": beat.code,
             "beat_type": beat.beat_type.value,
         },
+        "page": page,
+        "per_page": per_page,
+        "total": total,
         "outlets": [
             {
                 "id": o.id,
@@ -90,8 +114,11 @@ async def outlet_list(
     db: Session = Depends(get_db),
 ):
     """Paginated approved outlets, optionally filtered by beat."""
-    query = db.query(Outlet).filter(Outlet.status == OutletStatus.active)
+    query = scope_outlet_query(
+        db.query(Outlet), current_user, db
+    ).filter(Outlet.status == OutletStatus.active)
     if beat_id:
+        require_beat_access(db, current_user, beat_id, active_only=True)
         query = query.filter(Outlet.beat_id == beat_id)
     query = query.order_by(Outlet.name)
     total = query.count()
@@ -121,6 +148,9 @@ async def outlet_list(
 
 @router.get("/products")
 async def product_list(
+    warehouse_id: Optional[int] = None,
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=100, ge=1, le=200),
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
@@ -128,8 +158,14 @@ async def product_list(
     query = db.query(Product).filter(Product.is_active == True)
     if current_user.company_profile_id:
         query = query.filter(Product.company_profile_id == current_user.company_profile_id)
-    products = query.order_by(Product.name).all()
+    total = query.count()
+    products = query.order_by(Product.name).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
     return {
+        "page": page,
+        "per_page": per_page,
+        "total": total,
         "items": [
             {
                 "id": p.id,
@@ -142,6 +178,17 @@ async def product_list(
                 "mrp": float(p.mrp) if p.mrp else None,
                 "gst_rate": float(p.gst_rate) if p.gst_rate else 0,
                 "must_sell": p.must_sell,
+                "is_stockable_item": bool(p.is_stockable),
+                "category_scope": p.category_type.value if p.category_type else "Sales",
+                "warehouse_id": warehouse_id,
+                "warehouse_stock_qty": next(
+                    (
+                        int(stock.stock_qty)
+                        for stock in p.warehouse_stocks
+                        if warehouse_id and stock.warehouse_id == warehouse_id and stock.is_active
+                    ),
+                    int(p.stock_qty or 0) if warehouse_id and p.warehouse_id == warehouse_id else 0,
+                ),
             }
             for p in products
         ]
@@ -207,7 +254,9 @@ def _format_beat_item(b: Beat):
     }
 
 
-def resolve_user_hierarchy_beats(user: User, db: Session) -> List[Beat]:
+def resolve_user_hierarchy_beats(
+    user: User, db: Session, page: int, per_page: int
+) -> tuple[List[Beat], int]:
     """
     Collects beats assigned to:
     1. Direct positions assigned to the user.
@@ -235,23 +284,48 @@ def resolve_user_hierarchy_beats(user: User, db: Session) -> List[Beat]:
                 pos_queue.append(child)
 
     if target_beat_ids:
-        return db.query(Beat).filter(Beat.id.in_(target_beat_ids), Beat.is_active == True).order_by(Beat.name).all()
+        query = db.query(Beat).filter(
+            Beat.id.in_(target_beat_ids), Beat.is_active == True
+        ).options(
+            selectinload(Beat.positions).selectinload(Position.users),
+            selectinload(Beat.outlets),
+        )
+        total = query.count()
+        return (
+            query.order_by(Beat.name).offset(
+                (page - 1) * per_page
+            ).limit(per_page).all(),
+            total,
+        )
 
     role_val = getattr(user.role, "value", str(user.role or ""))
     if role_val == "admin":
-        return db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
+        query = db.query(Beat).filter(Beat.is_active == True).options(
+            selectinload(Beat.positions).selectinload(Position.users),
+            selectinload(Beat.outlets),
+        )
+        total = query.count()
+        return (
+            query.order_by(Beat.name).offset(
+                (page - 1) * per_page
+            ).limit(per_page).all(),
+            total,
+        )
 
-    return []
+    return [], 0
 
 
 @router.get("/beats")
 async def get_beats(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=100, ge=1, le=200),
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
     """List active beats filtered strictly by user position hierarchy."""
-    beats = resolve_user_hierarchy_beats(current_user, db)
+    beats, total = resolve_user_hierarchy_beats(current_user, db, page, per_page)
     return {
+        "page": page, "per_page": per_page, "total": total,
         "items": [_format_beat_item(b) for b in beats]
     }
 
@@ -356,9 +430,9 @@ async def create_outlet(
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid shop_type '{payload.shop_type}'.")
 
-    beat = db.query(Beat).filter(Beat.id == payload.beat_id, Beat.is_active == True).first()
-    if not beat:
-        raise HTTPException(status_code=400, detail="Active beat is mandatory and must exist.")
+    beat = require_beat_access(
+        db, current_user, payload.beat_id, active_only=True
+    )
 
     outlet = Outlet(
         name=payload.name,
@@ -371,7 +445,7 @@ async def create_outlet(
         channel=channel_type,
         shop_type=st,
         beat_id=payload.beat_id,
-        territory_id=payload.territory_id or beat.territory_id,
+        territory_id=beat.territory_id,
         gps_lat=payload.gps_lat,
         gps_lng=payload.gps_lng,
         status=OutletStatus.active,
@@ -397,26 +471,32 @@ async def create_outlet(
 
 @router.get("/beats/my")
 async def get_my_beats(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=100, ge=1, le=200),
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
     """List beats assigned to the authenticated user via their positions."""
-    beats = resolve_user_hierarchy_beats(current_user, db)
+    beats, total = resolve_user_hierarchy_beats(current_user, db, page, per_page)
     return {
+        "page": page, "per_page": per_page, "total": total,
         "items": [_format_beat_item(b) for b in beats]
     }
 
 
 @router.get("/beats/l1-positions")
 async def get_l1_position_beats(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=100, ge=1, le=200),
     current_user: User = Depends(require_api_auth),
     db: Session = Depends(get_db),
 ):
     """
     List beats assigned to positions under the user's position hierarchy.
     """
-    beats = resolve_user_hierarchy_beats(current_user, db)
+    beats, total = resolve_user_hierarchy_beats(current_user, db, page, per_page)
     return {
+        "page": page, "per_page": per_page, "total": total,
         "items": [_format_beat_item(b) for b in beats]
     }
 
@@ -443,9 +523,7 @@ async def get_outlet_detail(
     db: Session = Depends(get_db),
 ):
     """Detailed view of a single outlet with Mandatory Field Check."""
-    o = db.query(Outlet).filter(Outlet.id == outlet_id).first()
-    if not o:
-        raise HTTPException(status_code=404, detail="Outlet not found.")
+    o = require_outlet_access(db, current_user, outlet_id)
 
     missing_fields = []
     if not o.photo_url or not str(o.photo_url).strip():
@@ -492,9 +570,7 @@ async def request_outlet_edit(
     db: Session = Depends(get_db),
 ):
     """Submit outlet edit changes for Approval Flow."""
-    o = db.query(Outlet).filter(Outlet.id == outlet_id).first()
-    if not o:
-        raise HTTPException(status_code=404, detail="Outlet not found.")
+    o = require_outlet_access(db, current_user, outlet_id)
 
     # Create AutoFlag / Edit Approval Request
     from app.models.auto_flag import AutoFlag, RiskSeverity, FlagStatus
@@ -531,11 +607,8 @@ async def update_outlet_location(
     db: Session = Depends(get_db),
 ):
     """Update outlet GPS coordinates captured by Field Rep on mobile."""
-    o = db.query(Outlet).filter(Outlet.id == outlet_id).first()
-    if not o:
-        raise HTTPException(status_code=404, detail="Outlet not found.")
+    o = require_outlet_access(db, current_user, outlet_id)
     o.gps_lat = payload.gps_lat
     o.gps_lng = payload.gps_lng
     db.commit()
     return {"id": o.id, "gps_lat": o.gps_lat, "gps_lng": o.gps_lng, "message": "Outlet location updated successfully."}
-

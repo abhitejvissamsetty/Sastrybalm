@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum as SAEnum
+from sqlalchemy import Boolean, Column, DateTime, Enum as SAEnum, Integer, String
 from app.models.base import Base
 
 
@@ -37,7 +37,7 @@ class SystemWebhook(Base):
     name = Column(String(255), nullable=False)
     event_type = Column(SAEnum(WebhookEvent), nullable=False)
     endpoint_url = Column(String(500), nullable=False)
-    secret_key = Column(String(255), nullable=True)
+    secret_key = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     last_triggered_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -4,7 +4,9 @@ Startup Validation Service — Executed on FastAPI lifespan startup to verify:
 2. S3/MinIO configuration settings exist and connectivity to bucket is functional.
 """
 import logging
+from datetime import datetime, timedelta
 from typing import Optional
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -77,3 +79,52 @@ def validate_admin_and_s3_config():
         }
     finally:
         db.close()
+
+
+def readiness_checks() -> dict[str, bool]:
+    """Return bounded production dependency checks without exposing credentials."""
+    checks = {
+        "database": False,
+        "migrations": False,
+        "object_storage": False,
+        "smtp": False,
+        "scheduler": False,
+    }
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        checks["database"] = True
+
+        from alembic.config import Config
+        from alembic.runtime.migration import MigrationContext
+        from alembic.script import ScriptDirectory
+        current = MigrationContext.configure(db.connection()).get_current_revision()
+        head = ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+        checks["migrations"] = bool(current and current == head)
+
+        checks["object_storage"] = bool(
+            validate_s3_configuration(db).get("configured")
+        )
+
+        from app.utils.email import get_smtp_config_from_db
+        smtp = get_smtp_config_from_db(db)
+        checks["smtp"] = bool(
+            smtp.get("host")
+            and smtp.get("from_email")
+            and (not smtp.get("user") or smtp.get("password"))
+        )
+
+        from app.models.scheduler_state import SchedulerHeartbeat
+        heartbeat = db.query(SchedulerHeartbeat).filter(
+            SchedulerHeartbeat.id == 1
+        ).first()
+        checks["scheduler"] = bool(
+            heartbeat
+            and heartbeat.heartbeat_at >= datetime.utcnow() - timedelta(seconds=90)
+        )
+
+    except Exception:
+        logger.exception("Readiness dependency check failed")
+    finally:
+        db.close()
+    return checks

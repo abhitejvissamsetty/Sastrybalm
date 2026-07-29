@@ -1,69 +1,13 @@
 {% extends "base.html" %}
-
-{% block title %}Product Mappings - {{ profile.name }}{% endblock %}
-
+{% block title %}Product Mappings{% endblock %}
 {% block content %}
 <div class="space-y-6">
-
-  <div class="flex items-center gap-x-4">
-    <a href="/company/profiles" class="text-slate-400 hover:text-white transition-colors">
-      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-      </svg>
-    </a>
-    <div>
-      <h1 class="text-2xl font-bold text-white">Product Mappings</h1>
-      <p class="mt-1 text-sm text-slate-400">View mapped backend item codes for local products of {{ profile.name }}</p>
-    </div>
-  </div>
-
-  <!-- Mappings List (Full Width) -->
-  <div class="w-full overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-4">
-    <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Active Mappings</h2>
-
-    <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-slate-700">
-        <thead>
-          <tr class="bg-slate-900/50">
-            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Product</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">ZAP Code</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">CMMS Code</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">CONNECT Code</th>
-            <th class="px-6 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Conversion Factor</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-700/50">
-          {% for m in mappings %}
-          <tr class="hover:bg-slate-800/30 transition-colors">
-            <td class="px-6 py-4 text-sm">
-              <div class="font-medium text-white flex items-center gap-2">
-                {{ m.product.name }}
-                {% if m.product.primary_category == 'Consumable' %}
-                  <span class="inline-flex items-center rounded-md bg-blue-900/50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-300 border border-blue-800/30">CMMS</span>
-                {% elif m.product.primary_category == 'Connect' %}
-                  <span class="inline-flex items-center rounded-md bg-purple-900/50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-300 border border-purple-800/30">CONNECT</span>
-                {% else %}
-                  <span class="inline-flex items-center rounded-md bg-emerald-900/50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-800/30">ZAP</span>
-                {% endif %}
-              </div>
-              <div class="text-xs text-slate-500 font-mono">{{ m.product.erp_id }}</div>
-            </td>
-            <td class="px-6 py-4 text-sm text-slate-300 font-mono">{{ m.zap_item_code or '—' }}</td>
-            <td class="px-6 py-4 text-sm text-slate-300 font-mono">{{ m.cmms_item_code or '—' }}</td>
-            <td class="px-6 py-4 text-sm text-slate-300 font-mono">{{ m.connect_item_code or '—' }}</td>
-            <td class="px-6 py-4 text-sm text-slate-300 font-mono">{{ m.conversion_factor }}</td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="5" class="px-6 py-12 text-center text-sm text-slate-500">
-              No product mappings configured yet.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
+  <div><h1 class="text-2xl font-bold text-white">Product Mappings</h1><p class="text-sm text-slate-400">{{ profile.name }} · conversion settings</p></div>
+  <form method="post" action="/company/profiles/{{ profile.id }}/product-mappings/new" class="grid gap-3 rounded-xl border border-slate-700 bg-slate-800/40 p-5 sm:grid-cols-4">
+    <select name="product_id" required class="rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2">{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+    <input name="conversion_factor" type="number" step="0.00001" value="1" class="rounded-lg bg-slate-900 border border-slate-700 text-white px-3 py-2">
+    <button class="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white">Add</button>
+  </form>
+  <div class="overflow-hidden rounded-xl border border-slate-700"><table class="min-w-full divide-y divide-slate-700"><thead><tr><th class="px-4 py-3 text-left text-xs text-slate-400">Product</th><th class="px-4 py-3 text-left text-xs text-slate-400">Factor</th></tr></thead><tbody class="divide-y divide-slate-700">{% for m in mappings %}<tr><td class="px-4 py-3 text-white">{{ m.product.name }}</td><td class="px-4 py-3 text-slate-300">{{ m.conversion_factor }}</td></tr>{% else %}<tr><td colspan="2" class="px-4 py-8 text-center text-slate-500">No mappings.</td></tr>{% endfor %}</tbody></table></div>
 </div>
 {% endblock %}

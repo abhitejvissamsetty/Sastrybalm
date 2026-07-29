@@ -26,8 +26,10 @@ class _GpsStatusChipState extends State<GpsStatusChip> {
     });
 
     try {
-      bool serviceEnabled = (await Geolocator.isLocationServiceEnabled()) == true;
+      bool serviceEnabled =
+          (await Geolocator.isLocationServiceEnabled()) == true;
       if (!serviceEnabled) {
+        if (!mounted) return;
         setState(() {
           _hasGps = false;
           _message = 'GPS Disabled';
@@ -40,6 +42,7 @@ class _GpsStatusChipState extends State<GpsStatusChip> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
+          if (!mounted) return;
           setState(() {
             _hasGps = false;
             _message = 'No Permission';
@@ -49,6 +52,7 @@ class _GpsStatusChipState extends State<GpsStatusChip> {
         }
       }
       if (permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
         setState(() {
           _hasGps = false;
           _message = 'Blocked';
@@ -57,12 +61,14 @@ class _GpsStatusChipState extends State<GpsStatusChip> {
         return;
       }
 
+      if (!mounted) return;
       setState(() {
         _hasGps = true;
         _message = 'GPS Active';
         _checking = false;
       });
     } catch (e) {
+      if (!mounted) return;
       // In simulator environments or when permission fails, fallback to GPS Active
       setState(() {
         _hasGps = true;
@@ -90,7 +96,8 @@ class _GpsStatusChipState extends State<GpsStatusChip> {
         decoration: BoxDecoration(
           color: const Color(0xFF27272A), // Zinc 800
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF3F3F46), width: 1), // Zinc 700
+          border:
+              Border.all(color: const Color(0xFF3F3F46), width: 1), // Zinc 700
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

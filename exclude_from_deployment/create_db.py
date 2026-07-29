@@ -5,6 +5,7 @@ Safe to re-run — it skips existing data and applies missing columns.
 
     python create_db.py
 """
+import os
 import pymysql
 from sqlalchemy import text
 
@@ -67,6 +68,11 @@ def apply_schema_updates() -> None:
 
 
 def seed_admin() -> None:
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if not admin_password or len(admin_password) < 12:
+        raise RuntimeError(
+            "ADMIN_PASSWORD must be supplied and contain at least 12 characters."
+        )
     db = SessionLocal()
     try:
         if db.query(User).filter(User.role == UserRole.admin).first():
@@ -76,16 +82,14 @@ def seed_admin() -> None:
                 email="admin@safar.com",
                 username="admin",
                 full_name="System Administrator",
-                hashed_password=hash_password("Admin@123"),
+                hashed_password=hash_password(admin_password),
                 role=UserRole.admin,
                 is_active=True,
             )
             db.add(admin)
             db.commit()
-            print("[ok] Default admin user created:")
+            print("[ok] Administrator created:")
             print("      Username : admin")
-            print("      Password : Admin@123")
-            print("      IMPORTANT: change this password after first login!")
     finally:
         db.close()
 
@@ -194,5 +198,5 @@ if __name__ == "__main__":
     apply_schema_updates()
     seed_admin()
     seed_system_config()
-    seed_products()
+    # seed_products() # Disabled to prevent automatic demo data fillup
     print("=== Done. Run: python run.py ===")

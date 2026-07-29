@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% from "shared/pagination.html" import render as paginate %}
+
+{% block title %}Backend Procurement Management{% endblock %}
+{% block page_title %}Backend Procurement Management{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="flex items-center justify-between flex-wrap gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-white tracking-tight">Backend Procurement Hub</h1>
+      <p class="mt-1 text-sm text-slate-400">Manage field recces, supplier quotations, work orders, and batching</p>
+    </div>
+  </div>
+
+  <!-- Sub-Tab Navigation Bar -->
+  <div class="border-b border-white/10 flex items-center justify-between flex-wrap gap-4">
+    <nav class="-mb-px flex space-x-6">
+      <a href="/operations/procurement?tab=recce" 
+         class="py-3.5 text-sm font-bold border-b-2 flex items-center gap-2 transition-all {% if tab == 'recce' %}border-indigo-500 text-indigo-400{% else %}border-transparent text-slate-400 hover:text-slate-200{% endif %}">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+        </svg>
+        <span>Recce Records</span>
+      </a>
+
+      <a href="/operations/procurement?tab=quotations" 
+         class="py-3.5 text-sm font-bold border-b-2 flex items-center gap-2 transition-all {% if tab == 'quotations' %}border-indigo-500 text-indigo-400{% else %}border-transparent text-slate-400 hover:text-slate-200{% endif %}">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>Supplier Quotations</span>
+      </a>
+
+      <a href="/operations/procurement?tab=work_orders" 
+         class="py-3.5 text-sm font-bold border-b-2 flex items-center gap-2 transition-all {% if tab == 'work_orders' %}border-indigo-500 text-indigo-400{% else %}border-transparent text-slate-400 hover:text-slate-200{% endif %}">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l5.654-4.654m.824-3.12l5.878-5.878a2.652 2.652 0 113.75 3.75L12.56 12.56m-3.12-.824L6.91 9.24m0 0l-3.32-3.32M6.91 9.24L9.24 6.91" />
+        </svg>
+        <span>Work Orders</span>
+      </a>
+    </nav>
+  </div>
+
+  <!-- Cards Grid View -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for item in pagination.items %}
+
+      {% if tab == 'recce' %}
+        <!-- Recce Card -->
+        {% set mr = item.material_request %}
+        {% set outlet = mr.outlet if mr else None %}
+        <div class="glass-panel rounded-3xl p-5 border border-white/10 space-y-3 flex flex-col justify-between hover:border-indigo-500/40 transition-all">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="px-2.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 text-xs font-mono font-bold border border-purple-500/30">
+                Recce #{{ item.id }}
+              </span>
+              <span class="text-[11px] text-slate-500 font-mono">{{ item.created_at.strftime('%Y-%m-%d') }}</span>
+            </div>
+
+            <!-- Outlet Details Card Section -->
+            {% if outlet %}
+              <div class="p-3 rounded-2xl bg-slate-900/80 border border-white/5 space-y-1">
+                <h4 class="text-sm font-bold text-white truncate">{{ outlet.name }}</h4>
+                <p class="text-xs text-slate-400 font-mono">ID: {{ outlet.code }} • {{ outlet.channel or 'GT' }}</p>
+                <p class="text-[11px] text-slate-400 line-clamp-1">{{ outlet.address or 'No address' }}</p>
+                <p class="text-[11px] text-indigo-400 font-medium pt-1">
+                  Contact: {{ outlet.owner_name or 'N/A' }} ({{ outlet.mobile or 'N/A' }})
+                </p>
+              </div>
+            {% endif %}
+
+            <div class="space-y-1 text-xs text-slate-300">
+              <p><strong>Dimensions:</strong> {{ item.dimensions or 'N/A' }}</p>
+              <p><strong>Specs:</strong> {{ item.material_specifications or 'N/A' }}</p>
+              {% if item.client_notes %}
+                <p class="text-slate-400 italic">"{{ item.client_notes }}"</p>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-white/5 flex items-center justify-between">
+            <span class="text-[11px] text-slate-400">MR: {{ mr.mr_number if mr else 'N/A' }}</span>
+            {% if is_regional and item.status == 'Submitted' %}
+              <div class="flex gap-2">
+                <form method="post" action="/operations/procurement/recces/{{ item.id }}/approve"><button class="text-xs text-emerald-400 font-bold">Approve</button></form>
+                <form method="post" action="/operations/procurement/recces/{{ item.id }}/reject" class="flex gap-1">
+                  <input name="reason" required placeholder="Reason" class="w-20 bg-slate-900 border border-slate-700 rounded px-1 text-xs">
+                  <button class="text-xs text-red-400 font-bold">Reject</button>
+                </form>
+              </div>
+            {% endif %}
+            {% if item.photo_url %}
+              <button type="button" onclick="openImageViewer('{{ item.photo_url }}', 'Recce Photo')" class="text-xs text-indigo-400 font-bold hover:underline">
+                View Photo
+              </button>
+            {% endif %}
+          </div>
+        </div>
+
+      {% elif tab == 'quotations' %}
+        <!-- Supplier Quotation Card -->
+        {% set mr = item.material_request %}
+        {% set outlet = mr.outlet if mr else None %}
+        <div class="glass-panel rounded-3xl p-5 border border-white/10 space-y-3 flex flex-col justify-between hover:border-indigo-500/40 transition-all">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 text-xs font-mono font-bold border border-indigo-500/30">
+                Quote #{{ item.id }}
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold 
+                {% if item.status.value == 'Approved' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30
+                {% elif item.status.value == 'Rejected' %}bg-red-500/20 text-red-300 border border-red-500/30
+                {% else %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% endif %}">
+                {{ item.status.value }}
+              </span>
+            </div>
+
+            <!-- Outlet Details Card Section -->
+            {% if outlet %}
+              <div class="p-3 rounded-2xl bg-slate-900/80 border border-white/5 space-y-1">
+                <h4 class="text-sm font-bold text-white truncate">{{ outlet.name }}</h4>
+                <p class="text-xs text-slate-400 font-mono">ID: {{ outlet.code }} • {{ outlet.channel or 'GT' }}</p>
+                <p class="text-[11px] text-slate-400 line-clamp-1">{{ outlet.address or 'No address' }}</p>
+              </div>
+            {% endif %}
+
+            <div class="space-y-1 text-xs text-slate-300">
+              <p class="text-base font-black text-emerald-400">₹{{ item.quote_amount }}</p>
+              <p><strong>Vendor:</strong> {{ item.vendor.name if item.vendor else 'Unassigned' }}</p>
+              <p><strong>Base:</strong> ₹{{ item.base_amount or item.quote_amount }} • <strong>GST:</strong> {{ item.gst_percent or 0 }}%</p>
+              <p><strong>Lead Time:</strong> {{ item.lead_time_days }} days</p>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-white/5 flex items-center justify-between">
+            <span class="text-[11px] text-slate-400">MR: {{ mr.mr_number if mr else 'N/A' }}</span>
+            {% if mr %}
+              <a href="/operations/material-requests/{{ mr.id }}" class="text-xs text-indigo-400 font-bold hover:underline">
+                View MR Detail
+              </a>
+            {% endif %}
+          </div>
+        </div>
+
+      {% else %}
+        <!-- Work Order Card -->
+        {% set mr = item.material_request or (item.quotation.material_request if item.quotation else None) %}
+        {% set outlet = item.outlet or (mr.outlet if mr else None) %}
+        <div class="glass-panel rounded-3xl p-5 border border-white/10 space-y-3 flex flex-col justify-between hover:border-indigo-500/40 transition-all">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="px-2.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 text-xs font-mono font-bold border border-cyan-500/30">
+                {{ item.wo_number }}
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold 
+                {% if item.status.value == 'Paid' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30
+                {% elif item.status.value == 'Completed' %}bg-blue-500/20 text-blue-300 border border-blue-500/30
+                {% else %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% endif %}">
+                {{ item.status.value }}
+              </span>
+            </div>
+
+            <!-- Outlet Details Card Section -->
+            {% if outlet %}
+              <div class="p-3 rounded-2xl bg-slate-900/80 border border-white/5 space-y-1">
+                <h4 class="text-sm font-bold text-white truncate">{{ outlet.name }}</h4>
+                <p class="text-xs text-slate-400 font-mono">ID: {{ outlet.code }} • {{ outlet.channel or 'GT' }}</p>
+                <p class="text-[11px] text-slate-400 line-clamp-1">{{ outlet.address or 'No address' }}</p>
+              </div>
+            {% endif %}
+
+            <div class="space-y-1 text-xs text-slate-300">
+              <p><strong>Vendor:</strong> {{ item.vendor.name if item.vendor else 'Unassigned' }}</p>
+              <p><strong>Progress:</strong> {{ item.progress_percent }}%</p>
+              <p><strong>QC Status:</strong> {{ item.qc_status.value }}</p>
+              {% if item.qc_notes %}
+                <p class="text-slate-400 italic">"QC: {{ item.qc_notes }}"</p>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-white/5 flex items-center justify-between flex-wrap gap-2">
+            <!-- Mark as Paid Action (Restricted to Users >= Region) -->
+            {% if is_regional and item.status.value in ['Completed', 'concluded'] %}
+              <form action="/operations/procurement/work-orders/{{ item.id }}/mark-paid" method="post" onsubmit="return confirm('Transition Work Order to Paid status?');">
+                <button type="submit" class="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all border border-emerald-400/30">
+                  Mark as Paid
+                </button>
+              </form>
+            {% else %}
+              <span class="text-[11px] text-slate-500">
+                {% if item.status.value == 'Paid' %}Paid Confirmed{% else %}In Progress{% endif %}
+              </span>
+            {% endif %}
+
+            {% if mr %}
+              <a href="/operations/material-requests/{{ mr.id }}" class="text-xs text-indigo-400 font-bold hover:underline">
+                Audit Trail
+              </a>
+            {% endif %}
+          </div>
+        </div>
+
+      {% endif %}
+
+    {% else %}
+      <div class="col-span-full p-12 text-center text-sm text-slate-500 glass rounded-3xl border border-white/5">
+        No records found for {{ tab|replace('_', ' ')|title }}.
+      </div>
+    {% endfor %}
+  </div>
+
+  {% set qs = "tab=" ~ tab ~ "&status=" ~ status %}
+  {{ paginate(pagination, "/operations/procurement?" ~ qs) }}
+
+</div>
+{% endblock %}

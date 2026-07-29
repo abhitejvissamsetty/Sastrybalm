@@ -75,6 +75,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=True)
     role = Column(SAEnum(UserRole), nullable=False, default=UserRole.field_rep)
     is_active = Column(Boolean, default=True, nullable=False)
+    token_version = Column(Integer, default=0, nullable=False)
 
     employee_id = Column(String(100))
     phone = Column(String(20), unique=True, nullable=True)
@@ -147,6 +148,73 @@ class User(Base):
                     return geo_level in ("zone", "region", "country", "national")
             except Exception:
                 pass
+        return False
+
+    @property
+    def level(self) -> str:
+        """
+        Returns highest position level ('L4', 'L3', 'L2', 'L1') for this user.
+        Admin users default to 'L4'.
+        """
+        role_val = getattr(self.role, "value", str(self.role or "")).lower()
+        if role_val == "admin":
+            return "L4"
+
+        levels = set()
+        for pos in getattr(self, "positions", []):
+            lvl = getattr(pos.level, "value", str(pos.level or "")).upper()
+            if lvl in ("L1", "L2", "L3", "L4"):
+                levels.add(lvl)
+
+        if "L4" in levels:
+            return "L4"
+        if "L3" in levels:
+            return "L3"
+        if "L2" in levels:
+            return "L2"
+        if "L1" in levels:
+            return "L1"
+
+        if role_val == "territory_manager":
+            return "L2"
+        return "L1"
+
+    def can_approve_leave_for(self, applicant: "User", db=None) -> bool:
+        """
+        Leave Approval Hierarchy Rules:
+        - L1 & L2 leaves can be approved by L3 & L4 users (and Admin).
+        - L3 leaves can ONLY be approved by L4 users (and Admin).
+        - L1 & L2 users cannot approve any leaves.
+        - L3 users cannot approve L3 or L4 leaves.
+        """
+        approver_lvl = self.level
+        applicant_lvl = applicant.level if applicant else "L1"
+
+        if approver_lvl in ("L1", "L2"):
+            return False
+
+        level_allowed = (
+            approver_lvl == "L3" and applicant_lvl in ("L1", "L2")
+        ) or approver_lvl == "L4"
+        if not level_allowed:
+            return False
+
+        role_val = getattr(self.role, "value", str(self.role or "")).lower()
+        if role_val == "admin":
+            return True
+
+        # Approvers may act only on users in their reporting-position subtree.
+        approver_position_ids = {p.id for p in self.positions if p.is_active}
+        if not approver_position_ids:
+            return False
+        for applicant_position in applicant.positions:
+            curr = applicant_position.reporting_to
+            visited = set()
+            while curr and curr.id not in visited:
+                if curr.id in approver_position_ids:
+                    return True
+                visited.add(curr.id)
+                curr = curr.reporting_to
         return False
 
 

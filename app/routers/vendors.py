@@ -4,7 +4,7 @@ Vendors are mobile-only with separate login.
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -15,6 +15,7 @@ from app.models.vendor import Vendor, VendorEmployee, VendorStatus
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 from app.utils.security import hash_password
+from app.services.access_control import require_vendor_access, scope_vendor_query
 
 router = APIRouter(prefix="/master-data/vendors", tags=["vendors"])
 templates = Jinja2Templates(directory="app/templates")
@@ -33,10 +34,7 @@ async def vendor_list(
     status: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(Vendor)
-    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
-    if allowed_geo_ids is not None:
-        query = query.filter(Vendor.geography_id.in_(allowed_geo_ids))
+    query = scope_vendor_query(db.query(Vendor), current_user, db)
     if q:
         query = query.filter(Vendor.name.ilike(f"%{q}%") | Vendor.mobile.ilike(f"%{q}%"))
     if status and status in [s.value for s in VendorStatus]:
@@ -94,7 +92,6 @@ async def vendor_create(
     mobile: Optional[str] = Form(default=None),
     email: Optional[str] = Form(default=None),
     category: Optional[str] = Form(default=None),
-    cmms_supplier_ref: Optional[str] = Form(default=None),
     geography_id: Optional[str] = Form(default=None),
     product_ids: list[str] = Form(default=[]),
     password: Optional[str] = Form(default=None),
@@ -118,7 +115,6 @@ async def vendor_create(
         mobile=mobile or None,
         email=email or None,
         category=category or None,
-        cmms_supplier_ref=cmms_supplier_ref or None,
         geography_id=assigned_geo_id,
         hashed_password=hash_password(password) if password else None,
         address=address or None,
@@ -139,8 +135,9 @@ async def vendor_edit(
     current_user: User = Depends(_ADMIN),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Vendor).filter(Vendor.id == vendor_id).first()
-    if not item:
+    try:
+        item = require_vendor_access(db, current_user, vendor_id)
+    except HTTPException:
         set_flash_error(request, "Vendor not found.")
         return RedirectResponse("/master-data/vendors", status_code=302)
     allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
@@ -164,14 +161,14 @@ async def vendor_update(
     mobile: Optional[str] = Form(default=None),
     email: Optional[str] = Form(default=None),
     category: Optional[str] = Form(default=None),
-    cmms_supplier_ref: Optional[str] = Form(default=None),
     geography_id: Optional[str] = Form(default=None),
     product_ids: list[str] = Form(default=[]),
     new_password: Optional[str] = Form(default=None),
     address: Optional[str] = Form(default=None),
 ):
-    item = db.query(Vendor).filter(Vendor.id == vendor_id).first()
-    if not item:
+    try:
+        item = require_vendor_access(db, current_user, vendor_id)
+    except HTTPException:
         set_flash_error(request, "Vendor not found.")
         return RedirectResponse("/master-data/vendors", status_code=302)
     allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
@@ -190,7 +187,6 @@ async def vendor_update(
     item.mobile = mobile or None
     item.email = email or None
     item.category = category or None
-    item.cmms_supplier_ref = cmms_supplier_ref or None
     item.geography_id = assigned_geo_id
     item.address = address or None
     if new_password:
@@ -212,7 +208,10 @@ async def vendor_toggle(
     current_user: User = Depends(_ADMIN),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    try:
+        item = require_vendor_access(db, current_user, vendor_id)
+    except HTTPException:
+        item = None
     if item:
         if item.status == VendorStatus.active:
             item.status = VendorStatus.inactive
@@ -232,8 +231,9 @@ async def employee_list(
     current_user: User = Depends(_ADMIN),
     db: Session = Depends(get_db),
 ):
-    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
-    if not vendor:
+    try:
+        vendor = require_vendor_access(db, current_user, vendor_id)
+    except HTTPException:
         set_flash_error(request, "Vendor not found.")
         return RedirectResponse("/master-data/vendors", status_code=302)
     return templates.TemplateResponse("vendors/employees.html", {
@@ -253,6 +253,11 @@ async def employee_add(
     email: Optional[str] = Form(default=None),
     password: Optional[str] = Form(default=None),
 ):
+    try:
+        require_vendor_access(db, current_user, vendor_id)
+    except HTTPException:
+        set_flash_error(request, "Vendor not found.")
+        return RedirectResponse("/master-data/vendors", status_code=302)
     emp = VendorEmployee(
         vendor_id=vendor_id,
         name=name,
@@ -263,4 +268,6 @@ async def employee_add(
     db.add(emp)
     db.commit()
     set_flash_success(request, f"Employee '{name}' added.")
-    return RedirectResponse(f"/vendors/{vendor_id}/employees", status_code=302)
+    return RedirectResponse(
+        f"/master-data/vendors/{vendor_id}/employees", status_code=302
+    )

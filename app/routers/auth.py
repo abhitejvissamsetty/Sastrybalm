@@ -7,8 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_web_user, get_db
 from app.models.user import User, UserRole
-from app.services.auth import (authenticate_user, generate_and_send_user_otp,
-                               verify_user_otp)
+from app.services.auth import (
+    authenticate_user,
+    generate_and_send_user_otp,
+    verify_user_otp,
+)
 
 router = APIRouter(tags=["auth"])
 templates = Jinja2Templates(directory="app/templates")
@@ -58,6 +61,8 @@ async def login(
         request.session["_flash_error"] = "Field Representatives are not permitted to access the web dashboard. Please use the mobile app."
         return RedirectResponse("/login", status_code=302)
 
+    request.state.audit_user_id = user.id
+    request.state.audit_user_role = user.role.value
     request.session["user_id"] = user.id
     return RedirectResponse("/dashboard", status_code=302)
 
@@ -68,23 +73,18 @@ async def request_otp(
     email: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    res = generate_and_send_user_otp(db, email)
-    if not res["success"]:
+    result = generate_and_send_user_otp(db, email)
+    if not result["success"]:
         return templates.TemplateResponse("auth/login.html", {
             "request": request,
-            "error": res["error"],
+            "error": result["error"],
             "otp_step": False,
         })
-
-    info_msg = f"OTP verification code sent to {res['email']}."
-    if not res.get("email_sent"):
-        info_msg += f" (Test Mode: Code is {res['otp_code']})"
-
     return templates.TemplateResponse("auth/login.html", {
         "request": request,
-        "info": info_msg,
+        "info": "OTP verification code sent to your registered email.",
         "otp_step": True,
-        "email": res["email"],
+        "email": result["email"],
     })
 
 
@@ -99,19 +99,18 @@ async def verify_otp(
     if not user:
         return templates.TemplateResponse("auth/login.html", {
             "request": request,
-            "error": "Invalid or expired OTP code. Please try again.",
+            "error": "Invalid or expired OTP code.",
             "otp_step": True,
             "email": email,
         })
-
-    # Block field reps from web dashboard — mobile app only
     if user.role == UserRole.field_rep:
         return templates.TemplateResponse("auth/login.html", {
             "request": request,
-            "error": "Field Representatives are not permitted to access the web dashboard. Please use the mobile app.",
+            "error": "Field Representatives must use the mobile app.",
             "otp_step": False,
         })
-
+    request.state.audit_user_id = user.id
+    request.state.audit_user_role = user.role.value
     request.session["user_id"] = user.id
     return RedirectResponse("/dashboard", status_code=302)
 
@@ -119,4 +118,8 @@ async def verify_otp(
 @router.get("/logout")
 async def logout(request: Request):
     request.session.clear()
-    return RedirectResponse("/login", status_code=302)
+    response = RedirectResponse("/login", status_code=302)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0, private"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response

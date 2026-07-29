@@ -191,9 +191,100 @@ The app features a bottom navigation bar (`HomeScreen`):
 
 ---
 
+## 📱 7. Enhanced Mobile Workflows: Start Retailing, Create Primary & Joint Working
+
+### A. Start Retailing Workflow & Order Entry
+1. **Outlet Discovery & Visit Initiation**:
+   - Outlets viewable in **List / Map View** under active Beat.
+   - Select Outlet → Outlet Detail View → Footer Action Button (**Begin Visit**).
+   - Initiate Visit against Outlet (`visit_id` created) → Navigation to **Order View** or **No Order Reason View**.
+2. **Order View Specifications**:
+   - **Product Catalog Filtering**: Display items where `category_scope == 'Sale'`.
+   - **L3 Warehouse Resolution for Stockable Items**:
+     - If product has `is_stockable_item == 1`, fetch resolved warehouse from the user's **L3 Position hierarchy** (`Outlet → Beat → L1 Position → L2 Position → L3 Position → L3 User → geography → warehouse`).
+     - Map resolved warehouse to the Order's `warehouse_id`.
+   - **Custom Numeric On-Screen Keyboard (OSK)**:
+     - Embedded numeric OSK (digits 0-9, backspace/delete, and **Next** button) to enter line item quantities.
+     - Live calculation of **Order Line Amount** and grand total.
+   - **Fulfillment & Stockable Validation Step**:
+     - Tapping **Next** on OSK transitions to the Fulfillment Step.
+     - Options: `['Channel Partner', 'Company Order']`.
+     - **Validation & Disabled State**: If ANY selected product in the order has `is_stockable_item == 0`, grey out **'Company Order'** and display warning banner: *"Product is not available to be sold in warehouse L3 User"*.
+     - **Channel Partner Selection**: Directly submits the order.
+     - **Company Order Selection (`is_company_order = 1`)**: Directs to Payment Details Page.
+3. **Embedded Payment Collection Page**:
+   - Offers **Credit Order** vs **Paid Order** (`Full` / `Partial`).
+   - If **Credit Order**: sets `is_paid = 0`, `payment_type = 'Credit'`.
+   - If **Paid Order**: sets `is_paid = 1`, requiring selection of `payment_type` (`Full`, `Partial`), `payment_mode` (`Cash`, `UPI`, `NEFT/RTGS`, `Others`), and `payment_reference`.
+
+### B. Create Primary Order Workflow (Mobile & Backend Logic)
+- **Target Selection**: Raised against a **Channel Partner** (instead of an Outlet).
+- **Location & Visit Handling**: Requires **Address Details**, does **NOT** capture GPS coordinates or create a Visit Record (`visit_id = null`).
+- **Database & UI Mapping**: Uses unified `party_id` with `party_type = 'Channel Partner'`.
+- **Payment Defaults**: Defaults to `is_company_order = 1`, `is_paid = 0` (unless paid order is selected).
+
+### C. Joint Working Workflow
+- **Bottom Drawer Transition**: Sliding modal bottom sheet drawer for selecting manager hierarchy.
+- **Subordinate Position & Beat Selection**:
+  - Territory Managers (Positions `L2`, `L3`, `L4`) select an **L1 Position** under their direct reporting hierarchy (includes inline search filter).
+  - List displays assigned user name per position; unassigned positions are hidden.
+  - Select Beat under the selected L1 Position.
+- **Outlet View & Visit Execution**:
+  - Displays Outlets under Beat in List/Map View (**without** New Outlet FAB).
+  - Select Outlet → Outlet Detail View → Footer Action Button (**Begin Visit**) → Initiate Visit.
+- **Joint Visit Outcomes**:
+  1. **No Order Reason** or **Visit Notes**.
+  2. **Triple-Scoped Order Placement Link**: Select Order ID from today's orders punched by L1 users. Includes **"Fetch Orders Today"** action button passing `outlet_id`, `beat_id`, and `subordinate_user_id` query parameters for strict Outlet, Beat, and Position Hierarchy scoping.
+  3. **Photo Evidence Upload**: Capture and upload store visit photo.
+
+---
+
 ## 🧪 Testing Verification
 Run mobile Flutter unit and widget tests:
 ```bash
 cd mobile
 flutter test
 ```
+
+### Completion Verification — 2026-07-28
+- Start Retailing passes the active Visit ID, displays resolved L3 warehouse stock, persists No Order Reason, and server-validates Company Order availability/payment state.
+- Create Primary persists Channel Partner Party and delivery address without Visit/GPS and uses Sales-scope, warehouse-stock-aware product entry.
+- Joint Working is reporting-tree scoped for L2/L3/L4 managers and persists selected L1 user, notes, No Order Reason, linked same-day Order, device GPS, and multipart photo evidence.
+- Leave duration/session are persisted fields; approval lists and actions are reporting-tree scoped.
+- Canonical local mobile API is Nginx port `8080`.
+- Verified with Python compile, Flutter analyzer (no compile errors), Docker health/migrations, MySQL schema inspection, and live OpenAPI assertions.
+
+## 📦 Outlet Home: Material Requests and Assets (2026-07-28)
+
+- `OutletDetailScreen` provides **New MR** and an **Assets** bottom sheet containing **Asset List** and **New Asset**.
+- Navigation is outlet-scoped and does not rely only on `selectedOutletProvider`.
+- `MrScreen(outletId)` loads the latest outlet summary and active `Marketing - Procurement` Products from the server. It enforces one Product, a worded description, optional positive L/W/H/D values, and three required camera/gallery images.
+- `AssetCapitalizationScreen(outletId)` displays the server-resolved L3 warehouse and only its in-stock `Marketing - Stock` Products. Item and warehouse free-text inputs were removed.
+- `AssetListScreen(outletId)` displays existing outlet deployments and links to New Asset.
+- `MaterialRequestService` and `AssetCapitalizationService` use Dio multipart requests for images and typed outlet-scoped context/list endpoints.
+- Flutter analyzer reports no compilation errors. Existing repository lint and Flutter deprecation diagnostics remain non-blocking.
+
+## 🏭 Role-Based Procurement Portals (2026-07-28)
+
+### Vendor Technician
+- Four tabs: Recce, Ready Items, Assets, Maintenance.
+- Assigned MR and Ready Item records are Vendor-scoped and support List/Map display.
+- Recce captures actual camera/gallery evidence (exactly two images) through the procurement upload endpoint.
+- Ready Item installation uploads evidence and creates one linked Asset.
+- Technician creates Maintenance Logs and reports percentage progress with optional image evidence.
+
+### Vendor Admin
+- Four tabs: MRs, Work Orders, Assets, Maintenance; assigned MRs support List/Map display.
+- Quotation action is available only after approved Recce and submits the non-GST base amount; GST is calculated by the server from Product configuration.
+- Assigned Work Orders can be acknowledged; acknowledged work reports progress and transitions to QC Pending at 100%.
+- Maintenance supports progress and image evidence.
+
+### QC Manager
+- Tabs: Work Orders, Assets, Maintenance.
+- QC Pending Work Orders support Return (progress below 100 plus mandatory remark) and two-image QC Report completion.
+- Completed Work Orders support Recall for QC with server-side Item invalidation safeguards.
+- QC may create Maintenance Logs and validate only 100%-Completed logs.
+
+### Shared service
+- `ProcurementService` centralizes scoped lists, image uploads, state transitions, Item deployment, and Maintenance commands.
+- `ProcurementMap` renders role-scoped Outlet coordinates over OpenStreetMap without loading full entity detail.

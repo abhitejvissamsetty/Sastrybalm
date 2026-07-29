@@ -1,0 +1,32 @@
+{
+  "average_cpu_pct": 35.92,
+  "checks": {
+    "cpu": true,
+    "database_connections": true,
+    "database_latency": true,
+    "dataset_orders": true,
+    "dataset_outlets": true,
+    "error_rate": true,
+    "image_latency": true,
+    "latency": true,
+    "memory": true,
+    "throughput": true
+  },
+  "concurrency": 20,
+  "database_connection_utilization_pct": 3.97,
+  "database_query_ms": 1.59,
+  "dataset": {
+    "orders": 5000,
+    "outlets": 2000
+  },
+  "error_rate_pct": 0.0,
+  "image_p95_latency_ms": 232.32,
+  "memory_peak_mb": 631.69,
+  "p50_latency_ms": 109.14,
+  "p95_latency_ms": 294.83,
+  "passed": true,
+  "requests": 400,
+  "run_id": "PERF8755C95703",
+  "started_at": "2026-07-29T10:54:47.294778Z",
+  "throughput_rps": 151.01
+}

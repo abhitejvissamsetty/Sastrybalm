@@ -18,7 +18,6 @@ class AlertType(str, enum.Enum):
     stale_payment = "stale_payment"
     stale_order = "stale_order"
     sync_failure = "sync_failure"
-    cmms_status_change = "cmms_status_change"
     custom = "custom"
 
 
@@ -48,4 +47,3 @@ class Alert(Base):
             AlertSeverity.warning: "bg-amber-900/50 text-amber-300",
             AlertSeverity.critical: "bg-red-900/50 text-red-300",
         }.get(self.severity, "bg-slate-700 text-slate-300")
-

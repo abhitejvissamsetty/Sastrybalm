@@ -64,10 +64,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
     }
   }
 
-  Future<void> verifyOtp(String emailOrLogin, String otpCode) async {
+  Future<void> login(String username, String password) async {
     state = const AsyncValue.loading();
     try {
-      final user = await _authService.verifyOtp(emailOrLogin, otpCode);
+      final user = await _authService.login(username, password);
       await loadConfig();
       state = AsyncValue.data(user);
       _ref.read(attendanceProvider.notifier).refresh();
@@ -75,6 +75,23 @@ class AuthNotifier extends StateNotifier<AsyncValue<AppUser?>> {
       _ref.invalidate(productsProvider);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  Future<void> requestOtp(String login) => _authService.requestOtp(login);
+
+  Future<void> verifyOtp(String login, String otpCode) async {
+    state = const AsyncValue.loading();
+    try {
+      final user = await _authService.verifyOtp(login, otpCode);
+      await loadConfig();
+      state = AsyncValue.data(user);
+      _ref.read(attendanceProvider.notifier).refresh();
+      _ref.invalidate(beatsProvider);
+      _ref.invalidate(productsProvider);
+    } catch (error, stack) {
+      state = AsyncValue.error(error, stack);
       rethrow;
     }
   }

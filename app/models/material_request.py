@@ -1,8 +1,8 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import (Boolean, Column, DateTime, Enum, ForeignKey, Integer, String,
-                        Text, func)
+from sqlalchemy import (Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer,
+                        Numeric, String, Text, func)
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base
@@ -35,25 +35,37 @@ class MaterialRequest(Base):
     mr_number = Column(String(30), unique=True, nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     outlet_id = Column(Integer, ForeignKey("outlets.id", ondelete="RESTRICT"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="RESTRICT"), nullable=True, index=True)
     company_profile_id = Column(Integer, ForeignKey("company_profiles.id", ondelete="SET NULL"), nullable=True)
     category = Column(String(100), nullable=True)
     description = Column(Text, nullable=False)
 
     # Procurement-specific fields
     approx_dimensions = Column(String(255), nullable=True)
+    dimension_length = Column(Numeric(10, 2), nullable=True)
+    dimension_width = Column(Numeric(10, 2), nullable=True)
+    dimension_height = Column(Numeric(10, 2), nullable=True)
+    dimension_depth = Column(Numeric(10, 2), nullable=True)
+    dimension_unit = Column(String(20), nullable=True, default="cm")
     client_notes = Column(Text, nullable=True)
     material_specifications = Column(Text, nullable=True)
     request_type = Column(String(50), nullable=False, default="procurement")
 
     status = Column(Enum(MRStatus), nullable=False, default=MRStatus.submitted)
     sync_status = Column(Enum(MRSyncStatus), nullable=False, default=MRSyncStatus.not_applicable)
-    cmms_ref = Column(String(100), nullable=True)
-    cmms_response = Column(Text, nullable=True)
     sync_error = Column(Text, nullable=True)
     sync_retries = Column(Integer, nullable=False, default=0)
     vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True, index=True)
     submitted_at = Column(DateTime, nullable=True)
     image_url = Column(Text, nullable=True)
+    present_outlet_image_url = Column(Text, nullable=True)
+    installation_place_image_url = Column(Text, nullable=True)
+    customer_approval_letter_image_url = Column(Text, nullable=True)
+    outlet_name_snapshot = Column(String(255), nullable=True)
+    outlet_address_snapshot = Column(Text, nullable=True)
+    outlet_contact_snapshot = Column(String(255), nullable=True)
+    outlet_latitude_snapshot = Column(Float, nullable=True)
+    outlet_longitude_snapshot = Column(Float, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -63,6 +75,7 @@ class MaterialRequest(Base):
     user = relationship("User", foreign_keys=[user_id], back_populates="material_requests")
     vendor = relationship("Vendor", foreign_keys=[vendor_id])
     outlet = relationship("Outlet", foreign_keys=[outlet_id])
+    product = relationship("Product", foreign_keys=[product_id])
     company_profile = relationship("CompanyProfile", foreign_keys=[company_profile_id])
     history_logs = relationship("MaterialRequestHistoryLog", back_populates="material_request", order_by="MaterialRequestHistoryLog.created_at.desc()")
 
@@ -94,7 +107,7 @@ class MaterialRequestHistoryLog(Base):
     performed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     old_status = Column(String(50), nullable=True)
     new_status = Column(String(50), nullable=True)
-    vendor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
@@ -103,5 +116,4 @@ class MaterialRequestHistoryLog(Base):
 
     material_request = relationship("MaterialRequest", back_populates="history_logs")
     performed_by = relationship("User", foreign_keys=[performed_by_id])
-    vendor = relationship("User", foreign_keys=[vendor_id])
-
+    vendor = relationship("Vendor", foreign_keys=[vendor_id])

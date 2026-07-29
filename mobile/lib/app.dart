@@ -12,6 +12,7 @@ import 'screens/beat/outlet_detail_screen.dart';
 import 'screens/beat/outlet_create_screen.dart';
 import 'screens/visit/visit_screen.dart';
 import 'screens/orders/order_create_screen.dart';
+import 'screens/orders/create_primary_screen.dart';
 import 'screens/orders/order_list_screen.dart';
 import 'screens/orders/order_detail_screen.dart';
 import 'screens/payments/payment_collect_screen.dart';
@@ -30,8 +31,9 @@ import 'screens/procurement/vendor_tech_screen.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final listenable = ValueNotifier<AsyncValue<AppUser?>>(const AsyncValue.loading());
-  
+  final listenable =
+      ValueNotifier<AsyncValue<AppUser?>>(const AsyncValue.loading());
+
   // Listen to the authStateProvider to update GoRouter's refreshListenable
   ref.listen<AsyncValue<AppUser?>>(authStateProvider, (previous, next) {
     listenable.value = next;
@@ -47,26 +49,40 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: listenable,
     redirect: (context, state) {
       final authState = listenable.value;
-      final isLoggedIn = authState.valueOrNull != null;
+      final user = authState.valueOrNull;
+      final isLoggedIn = user != null;
       final isLoginPage = state.matchedLocation == '/login';
 
       // If still loading the initial auth state, don't redirect yet
       if (authState is AsyncLoading) return null;
 
       if (!isLoggedIn && !isLoginPage) return '/login';
-      if (isLoggedIn && isLoginPage) return '/home';
+      if (isLoggedIn && isLoginPage) return user.landingPath;
+      if (user != null && !user.canAccessPath(state.matchedLocation)) {
+        return user.landingPath;
+      }
       return null;
     },
     routes: [
       GoRoute(path: '/login', builder: (ctx, _) => const LoginScreen()),
       GoRoute(path: '/beat', builder: (ctx, _) => const BeatPlanScreen()),
-      GoRoute(path: '/outlet/new', builder: (ctx, _) => const OutletCreateScreen()),
+      GoRoute(
+          path: '/joint-working',
+          builder: (ctx, _) => const JointWorkingScreen()),
+      GoRoute(
+          path: '/outlet/new', builder: (ctx, _) => const OutletCreateScreen()),
       ShellRoute(
         builder: (ctx, state, child) => HomeScreen(child: child),
         routes: [
           GoRoute(path: '/home', builder: (ctx, _) => const DashboardTab()),
-          GoRoute(path: '/history', builder: (ctx, _) => const OrderListScreen()),
-          GoRoute(path: '/order/new', builder: (ctx, _) => const OrderCreateScreen()),
+          GoRoute(
+              path: '/history', builder: (ctx, _) => const OrderListScreen()),
+          GoRoute(
+              path: '/order/new',
+              builder: (ctx, _) => const OrderCreateScreen()),
+          GoRoute(
+              path: '/order/primary',
+              builder: (ctx, _) => const CreatePrimaryScreen()),
           GoRoute(
             path: '/order/:id',
             builder: (ctx, state) => OrderDetailScreen(
@@ -79,19 +95,46 @@ final routerProvider = Provider<GoRouter>((ref) {
               outletId: int.parse(state.pathParameters['id']!),
             ),
           ),
-          GoRoute(path: '/payment/collect', builder: (ctx, _) => const PaymentCollectScreen()),
-          GoRoute(path: '/payment/submit', builder: (ctx, _) => const PaymentSubmitScreen()),
+          GoRoute(
+              path: '/payment/collect',
+              builder: (ctx, _) => const PaymentCollectScreen()),
+          GoRoute(
+              path: '/payment/submit',
+              builder: (ctx, _) => const PaymentSubmitScreen()),
           GoRoute(path: '/expense', builder: (ctx, _) => const ExpenseScreen()),
-          GoRoute(path: '/material-request', builder: (ctx, _) => const MrScreen()),
-          GoRoute(path: '/asset-cap', builder: (ctx, _) => const AssetCapitalizationScreen()),
+          GoRoute(
+            path: '/outlet/:id/material-requests/new',
+            builder: (ctx, state) =>
+                MrScreen(outletId: int.parse(state.pathParameters['id']!)),
+          ),
+          GoRoute(
+            path: '/outlet/:id/assets',
+            builder: (ctx, state) => AssetListScreen(
+                outletId: int.parse(state.pathParameters['id']!)),
+          ),
+          GoRoute(
+            path: '/outlet/:id/assets/new',
+            builder: (ctx, state) => AssetCapitalizationScreen(
+                outletId: int.parse(state.pathParameters['id']!)),
+          ),
           GoRoute(path: '/visit', builder: (ctx, _) => const VisitScreen()),
-          GoRoute(path: '/leave/apply', builder: (ctx, _) => const LeaveApplyScreen()),
-          GoRoute(path: '/analytics/eis-mis', builder: (ctx, _) => const EisMisScreen()),
-          GoRoute(path: '/timesheet', builder: (ctx, _) => const TimesheetScreen()),
-          GoRoute(path: '/joint-working', builder: (ctx, _) => const JointWorkingScreen()),
-          GoRoute(path: '/procurement/qc', builder: (ctx, _) => const QcManagerScreen()),
-          GoRoute(path: '/procurement/vendor-admin', builder: (ctx, _) => const VendorAdminScreen()),
-          GoRoute(path: '/procurement/vendor-tech', builder: (ctx, _) => const VendorTechScreen()),
+          GoRoute(
+              path: '/leave/apply',
+              builder: (ctx, _) => const LeaveApplyScreen()),
+          GoRoute(
+              path: '/analytics/eis-mis',
+              builder: (ctx, _) => const EisMisScreen()),
+          GoRoute(
+              path: '/timesheet', builder: (ctx, _) => const TimesheetScreen()),
+          GoRoute(
+              path: '/procurement/qc',
+              builder: (ctx, _) => const QcManagerScreen()),
+          GoRoute(
+              path: '/procurement/vendor-admin',
+              builder: (ctx, _) => const VendorAdminScreen()),
+          GoRoute(
+              path: '/procurement/vendor-tech',
+              builder: (ctx, _) => const VendorTechScreen()),
         ],
       ),
     ],

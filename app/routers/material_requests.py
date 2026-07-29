@@ -1,9 +1,10 @@
 import json
 import logging
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -16,8 +17,18 @@ from app.models.procurement import VendorQuotation, WorkOrder, QuotationStatus, 
 from app.models.inventory import StockMovement
 from app.models.asset_capitalization import AssetCapitalization, ACStatus
 from app.models.user import User, UserRole
+from app.models.vendor import Vendor, VendorStatus
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
+from app.services.access_control import (
+    build_access_scope,
+    require_material_request_access,
+    require_quotation_access,
+    require_vendor_access,
+    require_work_order_access,
+    scope_material_request_query,
+    scope_user_query,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +45,8 @@ async def mr_list(
     user_id: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(MaterialRequest)
-    if current_user.role == UserRole.field_rep:
-        query = query.filter(MaterialRequest.user_id == current_user.id)
-    elif user_id:
+    query = scope_material_request_query(db.query(MaterialRequest), current_user, db)
+    if user_id:
         query = query.filter(MaterialRequest.user_id == int(user_id))
     if status:
         query = query.filter(MaterialRequest.status == status)
@@ -46,7 +55,9 @@ async def mr_list(
 
     reps = []
     if current_user.role.value in ["admin", "territory_manager"]:
-        reps = db.query(User).filter(User.role == UserRole.field_rep, User.is_active == True).order_by(User.full_name).all()
+        reps = scope_user_query(
+            db.query(User), current_user, db, include_self=False
+        ).filter(User.role == UserRole.field_rep, User.is_active == True).order_by(User.full_name).all()
 
     return templates.TemplateResponse("material_requests/list.html", {
         "request": request, "current_user": current_user,
@@ -134,24 +145,55 @@ async def mr_detail(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    q = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id)
-    item = q.first()
-    if not item:
+    try:
+        item = require_material_request_access(db, current_user, mr_id)
+    except HTTPException:
         set_flash_error(request, "Material request not found.")
         return RedirectResponse("/operations/material-requests", status_code=302)
 
     quotations = db.query(VendorQuotation).filter(VendorQuotation.material_request_id == mr_id).all()
-    available_vendors = db.query(User).filter(
-        User.role.in_([UserRole.vendor_admin, UserRole.vendor_technician]),
-        User.is_active == True
-    ).order_by(User.full_name).all()
+    access_scope = build_access_scope(current_user, db)
+    vendor_query = db.query(Vendor).filter(Vendor.status == VendorStatus.active)
+    if not access_scope.unrestricted:
+        vendor_query = vendor_query.filter(
+            Vendor.id.in_(access_scope.vendor_ids or {-1})
+        )
+    available_vendors = vendor_query.order_by(Vendor.name).all()
 
     can_map_vendor = _can_manage_vendor_mapping(current_user)
+
+    # 1. Fetch old deployed assets for the outlet
+    from app.models.asset_capitalization import AssetCapitalization, ACStatus
+    outlet_assets = db.query(AssetCapitalization).filter(
+        AssetCapitalization.outlet_id == item.outlet_id,
+        AssetCapitalization.status == ACStatus.deployed
+    ).all()
+
+    procurement_assets = [a for a in outlet_assets if a.procurement_item_id is not None or "converted" in (a.notes or "").lower()]
+    stocked_assets = [a for a in outlet_assets if a not in procurement_assets]
+
+    # 2. Lifecycle Stepper Pipeline State
+    has_recce = len(item.recces or []) > 0
+    has_quote = len(quotations) > 0
+    has_wo = len(item.work_orders or []) > 0
+    has_procurement_item = any(len(wo.procurement_items or []) > 0 for wo in (item.work_orders or []))
+    has_asset = item.status == MRStatus.completed or len(procurement_assets) > 0
+
+    lifecycle_stepper = [
+        {"name": "Recce", "key": "recce", "completed": has_recce, "active": item.status == MRStatus.vendor_assigned},
+        {"name": "Supplier Quotation", "key": "quote", "completed": has_quote, "active": item.status == MRStatus.recce_completed},
+        {"name": "Work Order", "key": "wo", "completed": has_wo, "active": item.status == MRStatus.quotation_approved},
+        {"name": "Procurement Item", "key": "item", "completed": has_procurement_item, "active": item.status == MRStatus.work_order_issued},
+        {"name": "Asset Capitalization", "key": "asset", "completed": has_asset, "active": item.status == MRStatus.completed},
+    ]
 
     return templates.TemplateResponse("material_requests/detail.html", {
         "request": request, "current_user": current_user,
         "item": item, "quotations": quotations, "available_vendors": available_vendors,
         "can_map_vendor": can_map_vendor,
+        "procurement_assets": procurement_assets,
+        "stocked_assets": stocked_assets,
+        "lifecycle_stepper": lifecycle_stepper,
         "MRStatus": MRStatus, "MRSyncStatus": MRSyncStatus,
         **get_flash(request),
     })
@@ -165,8 +207,9 @@ async def mr_assign_vendor(
     vendor_id: Optional[str] = Form(default=None),
     notes: Optional[str] = Form(default=None),
 ):
-    mr = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
-    if not mr:
+    try:
+        mr = require_material_request_access(db, current_user, mr_id)
+    except HTTPException:
         set_flash_error(request, "Material request not found.")
         return RedirectResponse("/operations/material-requests", status_code=302)
 
@@ -177,12 +220,15 @@ async def mr_assign_vendor(
 
     # Check if Work Order is already completed / QC approved
     for wo in mr.work_orders:
-        if wo.qc_status == QCStatus.passed or wo.status == WorkOrderStatus.concluded:
+        if wo.qc_status == QCStatus.passed or wo.status == WorkOrderStatus.completed:
             set_flash_error(request, "Cannot reassign vendor after QC Manager approval / Work Order completion.")
             return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
 
     v_id_int = int(vendor_id) if vendor_id and str(vendor_id).isdigit() else None
-    vendor = db.query(User).filter(User.id == v_id_int).first() if v_id_int else None
+    vendor = (
+        require_vendor_access(db, current_user, v_id_int)
+        if v_id_int else None
+    )
 
     old_v_id = mr.vendor_id
     is_reassignment = old_v_id is not None and old_v_id != v_id_int
@@ -193,7 +239,7 @@ async def mr_assign_vendor(
         record_material_request_history_log,
         trigger_vendor_material_request_notification,
     )
-    v_name = vendor.full_name if vendor else "Unassigned"
+    v_name = vendor.name if vendor else "Unassigned"
     action_type = "vendor_reassigned" if is_reassignment else "vendor_assigned"
     record_material_request_history_log(
         db=db,
@@ -221,8 +267,9 @@ async def mr_update_status(
     db: Session = Depends(get_db),
     new_status: str = Form(...),
 ):
-    item = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
-    if not item:
+    try:
+        item = require_material_request_access(db, current_user, mr_id)
+    except HTTPException:
         set_flash_error(request, "Material request not found.")
         return RedirectResponse("/operations/material-requests", status_code=302)
 
@@ -261,7 +308,7 @@ async def mr_update_status(
 @router.post("/{mr_id}/quote")
 async def mr_submit_quote(
     mr_id: int, request: Request,
-    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.vendor_admin, UserRole.vendor_technician)),
+    current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.vendor_admin)),
     db: Session = Depends(get_db),
     quote_amount: str = Form(...),
     lead_time_days: int = Form(7),
@@ -269,10 +316,24 @@ async def mr_submit_quote(
     invoice_photo: Optional[UploadFile] = File(default=None),
 ):
     """Vendor places quotation on an Approved Material Request."""
-    mr = db.query(MaterialRequest).filter(MaterialRequest.id == mr_id).first()
-    if not mr:
+    try:
+        mr = require_material_request_access(db, current_user, mr_id)
+    except HTTPException:
         set_flash_error(request, "Material Request not found.")
         return RedirectResponse("/operations/material-requests", status_code=302)
+    if current_user.role != UserRole.admin and (
+        not current_user.vendor_id or current_user.vendor_id != mr.vendor_id
+    ):
+        set_flash_error(request, "This Material Request belongs to another Vendor.")
+        return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
+    approved_recce = next((r for r in reversed(mr.recces or []) if r.status == "Approved"), None)
+    if not approved_recce:
+        set_flash_error(request, "An approved Recce is required before quotation.")
+        return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
+    vendor_id = current_user.vendor_id or mr.vendor_id
+    base_amount = Decimal(quote_amount)
+    gst_percent = Decimal(str(mr.product.gst_rate or 0)) if mr.product else Decimal("0")
+    gst_amount = (base_amount * gst_percent / Decimal("100")).quantize(Decimal("0.01"))
 
     invoice_photo_url = None
     if invoice_photo and invoice_photo.filename:
@@ -290,12 +351,16 @@ async def mr_submit_quote(
 
     quote = VendorQuotation(
         material_request_id=mr_id,
-        vendor_id=current_user.id,
-        quote_amount=Decimal(quote_amount),
+        vendor_id=vendor_id,
+        recce_id=approved_recce.id,
+        quote_amount=base_amount + gst_amount,
+        base_amount=base_amount, gst_percent=gst_percent,
+        gst_amount=gst_amount, total_amount=base_amount + gst_amount,
         lead_time_days=lead_time_days,
         status=QuotationStatus.pending,
         notes=notes or None,
         invoice_photo_url=invoice_photo_url,
+        submitted_at=datetime.utcnow(),
     )
     db.add(quote)
     db.commit()
@@ -308,7 +373,7 @@ async def mr_submit_quote(
         performed_by_id=current_user.id,
         old_status=mr.status.value,
         new_status=mr.status.value,
-        vendor_id=current_user.id,
+        vendor_id=vendor_id,
         notes=f"Quotation of ₹{Decimal(quote_amount):.2f} submitted by Vendor {current_user.full_name}"
     )
 
@@ -324,8 +389,15 @@ async def quote_review(
     decision: str = Form(...), # approved, rejected, held
 ):
     """Admin/Manager approves quotation and generates Work Order."""
-    quote = db.query(VendorQuotation).filter(VendorQuotation.id == quote_id).first()
-    if not quote:
+    if current_user.role != UserRole.admin and current_user.level not in {"L3", "L4"}:
+        set_flash_error(request, "Only L3/L4 managers may review quotations.")
+        return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
+    try:
+        quote = require_quotation_access(db, current_user, quote_id, for_update=True)
+    except HTTPException:
+        set_flash_error(request, "Quotation not found.")
+        return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
+    if quote.material_request_id != mr_id:
         set_flash_error(request, "Quotation not found.")
         return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
 
@@ -333,14 +405,21 @@ async def quote_review(
     from app.services.channel_partner_notification import record_material_request_history_log
 
     if decision.lower() == "approved":
+        existing_wo = db.query(WorkOrder).filter(WorkOrder.quotation_id == quote.id).first()
+        if existing_wo:
+            set_flash_success(request, f"Work Order {existing_wo.wo_number} already exists.")
+            return RedirectResponse(f"/operations/material-requests/{mr_id}", status_code=302)
         quote.status = QuotationStatus.approved
+        quote.approved_by_id = current_user.id
+        quote.approved_at = datetime.utcnow()
         import uuid
         wo = WorkOrder(
             quotation_id=quote.id,
             material_request_id=mr_id,
             vendor_id=quote.vendor_id,
             wo_number=f"WO-{uuid.uuid4().hex[:6].upper()}",
-            status=WorkOrderStatus.issued,
+            outlet_id=mr.outlet_id if mr else None,
+            status=WorkOrderStatus.assigned,
             qc_status=QCStatus.pending,
         )
         db.add(wo)
@@ -393,8 +472,9 @@ async def work_order_qc(
     qc_photo: Optional[UploadFile] = File(default=None),
 ):
     """Conclude Work Order, perform QC with Photo Inspection, Itemize Stock Inward, and Convert to Marketing Asset."""
-    wo = db.query(WorkOrder).filter(WorkOrder.id == wo_id).first()
-    if not wo:
+    try:
+        wo = require_work_order_access(db, current_user, wo_id)
+    except HTTPException:
         set_flash_error(request, "Work order not found.")
         return RedirectResponse("/operations/material-requests", status_code=302)
 
@@ -424,7 +504,7 @@ async def work_order_qc(
 
     if qc_result.lower() == "passed":
         wo.qc_status = QCStatus.passed
-        wo.status = WorkOrderStatus.concluded
+        wo.status = WorkOrderStatus.completed
 
         if mr:
             old_st = mr.status.value

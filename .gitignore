@@ -1,6 +1,8 @@
 # Environment
 .env
 .env.local
+.env.*
+!.env.example
 
 # Python
 __pycache__/
@@ -19,6 +21,7 @@ migrations/versions/*.py
 
 # Uploads
 app/static/uploads/
+var/backups/
 
 # macOS
 .DS_Store

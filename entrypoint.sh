@@ -16,16 +16,26 @@ for i in $(seq 1 60); do
     sleep 2
 done
 
-# ── Step 1: Run database migrations ONCE before Gunicorn workers fork ──────
+# A scheduler container waits for the web container to migrate and become
+# healthy, then runs only background jobs.
+if [ "${1:-}" = "scheduler" ]; then
+    echo "Starting dedicated scheduler..."
+    exec python -m app.scheduler_runner
+fi
+
+# ── Step 1: Run versioned migrations ONCE before Gunicorn workers fork ──────
 echo "Running database migrations (pre-fork, single process)..."
-python db_migrate.py || {
-    echo "WARNING: db_migrate.py failed, but proceeding to start app..."
-}
+alembic upgrade head
 echo "Database migrations completed."
 
 # ── Step 2: Launch Gunicorn with Uvicorn workers ────────────────────────────
+PROMETHEUS_MULTIPROC_DIR="${PROMETHEUS_MULTIPROC_DIR:-/tmp/prometheus}"
+export PROMETHEUS_MULTIPROC_DIR
+mkdir -p "${PROMETHEUS_MULTIPROC_DIR}"
+find "${PROMETHEUS_MULTIPROC_DIR}" -mindepth 1 -maxdepth 1 -type f -delete
 echo "Starting Gunicorn..."
 exec gunicorn \
+    --config /app/gunicorn.conf.py \
     --bind 0.0.0.0:8090 \
     --workers 4 \
     --timeout 120 \

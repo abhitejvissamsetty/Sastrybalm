@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:uuid/uuid.dart';
 import '../config/api_config.dart';
+import 'retry_policy.dart';
 
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
@@ -12,6 +14,8 @@ class ApiClient {
   final _storage = const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
+  static const _uuid = Uuid();
+  final _retryPolicy = RetryPolicy();
 
   /// Broadcast stream: emits `true` whenever the server returns a 401.
   /// AuthNotifier listens to this and calls logout() so GoRouter redirects.
@@ -36,6 +40,10 @@ class ApiClient {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          if (const {'POST', 'PUT', 'PATCH'}.contains(options.method) &&
+              !options.headers.containsKey('Idempotency-Key')) {
+            options.headers['Idempotency-Key'] = _uuid.v4();
+          }
           return handler.next(options);
         },
         onError: (DioException error, handler) async {
@@ -49,6 +57,33 @@ class ApiClient {
             await _storage.delete(key: 'jwt_token');
             // Notify listeners (AuthNotifier) so the app navigates to /login
             _unauthorizedController.add(true);
+          }
+          final isTransient = error.type == DioExceptionType.connectionError ||
+              error.type == DioExceptionType.connectionTimeout ||
+              error.type == DioExceptionType.receiveTimeout ||
+              (error.response?.statusCode ?? 0) >= 500;
+          if (isTransient &&
+              error.requestOptions.extra['_boundedRetry'] != true) {
+            try {
+              final retryOptions = error.requestOptions.copyWith(
+                extra: {
+                  ...error.requestOptions.extra,
+                  '_boundedRetry': true,
+                },
+              );
+              final response = await _retryPolicy.execute(
+                () => _dio.fetch(retryOptions),
+                shouldRetry: (failure) =>
+                    failure is DioException &&
+                    (failure.type == DioExceptionType.connectionError ||
+                        failure.type == DioExceptionType.connectionTimeout ||
+                        failure.type == DioExceptionType.receiveTimeout ||
+                        (failure.response?.statusCode ?? 0) >= 500),
+              );
+              return handler.resolve(response);
+            } catch (_) {
+              // Return the original failure after the bounded retry policy.
+            }
           }
           return handler.next(error);
         },

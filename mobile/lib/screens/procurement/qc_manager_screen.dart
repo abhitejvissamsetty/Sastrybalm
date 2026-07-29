@@ -1,276 +1,226 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/auth_provider.dart';
+import '../../services/image_picker_service.dart';
+import 'vendor_admin_screen.dart';
 
 class QcManagerScreen extends ConsumerStatefulWidget {
   const QcManagerScreen({super.key});
-
   @override
   ConsumerState<QcManagerScreen> createState() => _QcManagerScreenState();
 }
 
 class _QcManagerScreenState extends ConsumerState<QcManagerScreen> {
-  int _selectedTab = 0;
-  bool _loading = false;
-  List<dynamic> _vendors = [];
-  List<dynamic> _workOrders = [];
-  List<dynamic> _assets = [];
-
+  int _tab = 0;
+  bool _loading = true;
+  List<dynamic> _workOrders = [], _assets = [], _maintenanceLogs = [];
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    _load();
   }
 
-  Future<void> _fetchData() async {
+  Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final client = ref.read(apiClientProvider);
-      final vendorsRes = await client.dio.get('/procurement/vendors');
-      final woRes = await client.dio.get('/procurement/work-orders');
-      final itemsRes = await client.dio.get('/procurement/items');
-
+      final s = ref.read(procurementServiceProvider);
+      final v =
+          await Future.wait([s.workOrders(), s.assets(), s.maintenanceLogs()]);
       if (mounted) {
         setState(() {
-          _vendors = vendorsRes.data['items'] as List;
-          _workOrders = woRes.data['items'] as List;
-          _assets = itemsRes.data['items'] as List;
-          _loading = false;
+          _workOrders = v[0];
+          _assets = v[1];
+          _maintenanceLogs = v[2];
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) _message('Unable to load QC records: $e');
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _message(String t) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t)));
+  Future<String?> _text(String title, String label) {
+    final c = TextEditingController();
+    return showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+                title: Text(title),
+                content: TextField(
+                    controller: c,
+                    maxLines: 3,
+                    decoration: InputDecoration(labelText: label)),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel')),
+                  ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, c.text.trim()),
+                      child: const Text('Continue'))
+                ]));
+  }
+
+  Future<List<String>?> _images() async {
+    final paths = <String>[];
+    final picker = ImagePickerService();
+    for (var i = 0; i < 2; i++) {
+      final f = await picker.showImageSourceDialog(context);
+      if (f == null) return null;
+      paths.add(f.path);
+    }
+    return Future.wait(
+        paths.map(ref.read(procurementServiceProvider).uploadImage));
+  }
+
+  Future<void> _completeQc(Map<String, dynamic> wo) async {
+    final remark = await _text('QC Report', 'QC remark');
+    if (remark == null || remark.isEmpty) return;
+    final schedule = await _text(
+            'Maintenance Schedule', 'Recommended maintenance schedule') ??
+        '';
+    final images = await _images();
+    if (images == null) return;
+    try {
+      await ref.read(procurementServiceProvider).completeQc(wo['id'], {
+        'final_dimensions': wo['recce']?['dimensions'] ?? 'Not specified',
+        'final_specifications':
+            wo['recce']?['material_specifications'] ?? 'As approved',
+        'qc_notes': remark,
+        'maintenance_schedule': schedule,
+        'image_urls': images,
+      });
+      _message('QC completed and batch-controlled Item created.');
+      await _load();
+    } catch (e) {
+      _message('QC completion failed: $e');
     }
   }
 
-  Future<void> _processQcInspection(Map<String, dynamic> wo) async {
-    final dimsCtrl = TextEditingController(text: wo['recce']?['dimensions'] ?? '10ft x 4ft');
-    final specsCtrl = TextEditingController(text: wo['recce']?['material_specifications'] ?? 'Acrylic 3mm LED');
-    final notesCtrl = TextEditingController();
-    final batchCtrl = TextEditingController(text: 'BATCH-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}');
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('QC Verification & Batch Allocation'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Work Order: ${wo['wo_number']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              TextField(controller: dimsCtrl, decoration: const InputDecoration(labelText: 'Final Verified Dimensions')),
-              const SizedBox(height: 10),
-              TextField(controller: specsCtrl, decoration: const InputDecoration(labelText: 'Final Material Specifications')),
-              const SizedBox(height: 10),
-              TextField(controller: batchCtrl, decoration: const InputDecoration(labelText: 'Batch Number Allocation')),
-              const SizedBox(height: 10),
-              TextField(controller: notesCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'QC Review Notes & Comments')),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(child: const Text('Cancel'), onPressed: () => Navigator.pop(ctx, false)),
-          ElevatedButton(child: const Text('Approve & Convert to Item'), onPressed: () => Navigator.pop(ctx, true)),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        final client = ref.read(apiClientProvider);
-        await client.dio.post('/procurement/work-orders/${wo['id']}/qc-complete', data: {
-          'final_dimensions': dimsCtrl.text.trim(),
-          'final_specifications': specsCtrl.text.trim(),
-          'qc_notes': notesCtrl.text.trim(),
-          'batch_number': batchCtrl.text.trim(),
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Work Order verified & Item Batch created!')),
-          );
-          _fetchData();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('QC Inspection error: $e')));
-        }
-      }
+  Future<void> _returnProgress(Map<String, dynamic> wo) async {
+    final value = await _text('Return Work Order', 'Progress below 100');
+    if (value == null || int.tryParse(value) == null) return;
+    final reason = await _text('QC Remark', 'Mandatory return reason');
+    if (reason == null || reason.isEmpty) return;
+    try {
+      await ref
+          .read(procurementServiceProvider)
+          .reportWorkOrderProgress(wo['id'], int.parse(value), reason);
+      await _load();
+    } catch (e) {
+      _message('QC return failed: $e');
     }
   }
 
-  Future<void> _addMaintenanceLog(int assetId) async {
-    final notesCtrl = TextEditingController();
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New Asset Maintenance Log'),
-        content: TextField(
-          controller: notesCtrl,
-          maxLines: 3,
-          decoration: const InputDecoration(labelText: 'Maintenance Notes & Inspection Summary'),
-        ),
-        actions: [
-          TextButton(child: const Text('Cancel'), onPressed: () => Navigator.pop(ctx, false)),
-          ElevatedButton(child: const Text('Submit Log'), onPressed: () => Navigator.pop(ctx, true)),
-        ],
-      ),
-    );
+  Future<void> _recall(Map<String, dynamic> wo) async {
+    final reason = await _text('Recall for QC', 'Recall reason');
+    if (reason == null || reason.isEmpty) return;
+    try {
+      await ref.read(procurementServiceProvider).recallQc(wo['id'], reason);
+      await _load();
+    } catch (e) {
+      _message('Recall failed: $e');
+    }
+  }
 
-    if (confirm == true && notesCtrl.text.trim().isNotEmpty) {
-      try {
-        final client = ref.read(apiClientProvider);
-        await client.dio.post('/procurement/assets/$assetId/maintenance-logs', data: {
-          'notes': notesCtrl.text.trim(),
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Maintenance log submitted!')),
-          );
-        }
-      } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
+  Future<void> _maintenance(Map<String, dynamic> asset) async {
+    final issue = await _text('Create Maintenance Log', 'Issue description');
+    if (issue == null || issue.isEmpty) return;
+    try {
+      await ref
+          .read(procurementServiceProvider)
+          .createMaintenance(asset['id'], issue, []);
+      await _load();
+    } catch (e) {
+      _message('Maintenance creation failed: $e');
+    }
+  }
+
+  Future<void> _validate(Map<String, dynamic> log) async {
+    try {
+      await ref.read(procurementServiceProvider).validateMaintenance(log['id']);
+      await _load();
+    } catch (e) {
+      _message('Validation failed: $e');
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('QC Manager Portal'),
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                _buildTabPill(0, 'Vendors & Work Orders'),
-                const SizedBox(width: 8),
-                _buildTabPill(1, 'Assets & Maintenance'),
-              ],
-            ),
-          ),
-          Expanded(
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(title: const Text('QC Manager Portal')),
+      body: Column(children: [
+        SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.all(8),
+            child: SegmentedButton<int>(segments: const [
+              ButtonSegment(value: 0, label: Text('Work Orders')),
+              ButtonSegment(value: 1, label: Text('Assets')),
+              ButtonSegment(value: 2, label: Text('Maintenance'))
+            ], selected: {
+              _tab
+            }, onSelectionChanged: (v) => setState(() => _tab = v.first))),
+        Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF09090B)))
-                : Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: _selectedTab == 0 ? _buildWorkOrdersTab() : _buildAssetsTab(),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabPill(int index, String label) {
-    final selected = _selectedTab == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTab = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF09090B) : const Color(0xFFF4F4F5),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF09090B),
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWorkOrdersTab() {
-    if (_workOrders.isEmpty) {
-      return const Center(child: Text('No pending Work Orders for QC inspection.'));
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView(
+                        padding: const EdgeInsets.all(12),
+                        children: _cards()))),
+      ]));
+  List<Widget> _cards() {
+    final records = [_workOrders, _assets, _maintenanceLogs][_tab];
+    if (records.isEmpty) {
+      return [
+        const SizedBox(
+            height: 300, child: Center(child: Text('No QC records.')))
+      ];
     }
-    return ListView.separated(
-      itemCount: _workOrders.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (ctx, i) {
-        final wo = _workOrders[i];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE4E4E7)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(wo['wo_number'] ?? 'WO-${wo['id']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: const Color(0xFFF4F4F5), borderRadius: BorderRadius.circular(8)),
-                    child: Text(wo['status'].toString().toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text('Outlet: ${wo['outlet']?['name'] ?? 'Assigned Store'}', style: const TextStyle(color: Color(0xFF71717A), fontSize: 12)),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF09090B)),
-                  onPressed: () => _processQcInspection(wo),
-                  child: const Text('Perform QC Inspection & Allocate Batch ID'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAssetsTab() {
-    if (_assets.isEmpty) {
-      return const Center(child: Text('No Assets available.'));
-    }
-    return ListView.separated(
-      itemCount: _assets.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (ctx, i) {
-        final asset = _assets[i];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE4E4E7)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(asset['item_name'] ?? 'Asset Item', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 4),
-              Text('Batch Code: ${asset['item_code'] ?? 'N/A'}', style: const TextStyle(color: Color(0xFF71717A), fontSize: 12)),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.build_outlined, size: 16),
-                label: const Text('Create Maintenance Log'),
-                onPressed: () => _addMaintenanceLog(asset['id']),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    return records.map((raw) {
+      final r = raw as Map<String, dynamic>;
+      String title, subtitle;
+      List<Widget> actions = [];
+      if (_tab == 0) {
+        title = r['wo_number'];
+        subtitle = '${r['status']} • ${r['progress_percent']}%';
+        if (r['status'] == 'QC Pending') {
+          actions = [
+            TextButton(
+                onPressed: () => _returnProgress(r),
+                child: const Text('Return')),
+            TextButton(
+                onPressed: () => _completeQc(r), child: const Text('QC Report'))
+          ];
+        }
+        if (r['status'] == 'Completed') {
+          actions = [
+            TextButton(
+                onPressed: () => _recall(r), child: const Text('Recall QC'))
+          ];
+        }
+      } else if (_tab == 1) {
+        title = r['ac_number'];
+        subtitle = '${r['asset_state']} • ${r['outlet_name'] ?? ''}';
+        actions = [
+          TextButton(
+              onPressed: () => _maintenance(r),
+              child: const Text('Maintenance'))
+        ];
+      } else {
+        title = 'Maintenance #${r['id']}';
+        subtitle = '${r['status']} • ${r['progress_percent']}%';
+        if (r['status'] == 'Completed') {
+          actions = [
+            TextButton(
+                onPressed: () => _validate(r), child: const Text('Validate'))
+          ];
+        }
+      }
+      return Card(
+          child: ListTile(
+              title: Text(title),
+              subtitle: Text(subtitle),
+              trailing:
+                  Row(mainAxisSize: MainAxisSize.min, children: actions)));
+    }).toList();
   }
 }

@@ -19,5 +19,5 @@ docker exec safar-db mysql -uroot -prootpassword -e "CREATE DATABASE safar_db;"
 ### 3. Run Migrations
 Run this command inside the app container to create the necessary tables and seed initial data:
 ```bash
-docker exec safar-app python db_migrate.py
+docker compose exec app alembic upgrade head
 ```

@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/currency_formatter.dart';
 import '../orders/order_create_screen.dart';
 
-final orderDetailProvider = FutureProvider.family.autoDispose<Map<String, dynamic>, int>((ref, orderId) async {
+final orderDetailProvider = FutureProvider.family
+    .autoDispose<Map<String, dynamic>, int>((ref, orderId) async {
   final service = ref.watch(orderServiceProvider);
   return service.getOrder(orderId);
 });
@@ -52,7 +53,7 @@ class OrderDetailScreen extends ConsumerWidget {
               statusColor = const Color(0xFFEF4444); // Red
               break;
             default:
-              statusColor = theme.colorScheme.onSurface.withOpacity(0.6);
+              statusColor = theme.colorScheme.onSurface.withValues(alpha: 0.6);
           }
 
           return SafeArea(
@@ -71,11 +72,12 @@ class OrderDetailScreen extends ConsumerWidget {
                             color: theme.colorScheme.surface,
                             borderRadius: BorderRadius.circular(24),
                             border: Border.all(
-                              color: theme.colorScheme.primary.withOpacity(0.08),
+                              color: theme.colorScheme.primary
+                                  .withValues(alpha: 0.08),
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.02),
+                                color: Colors.black.withValues(alpha: 0.02),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -86,28 +88,34 @@ class OrderDetailScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     orderNo,
-                                    style: theme.textTheme.titleMedium?.copyWith(
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 18,
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: statusColor.withOpacity(0.08),
+                                      color:
+                                          statusColor.withValues(alpha: 0.08),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: statusColor.withOpacity(0.15),
+                                        color:
+                                            statusColor.withValues(alpha: 0.15),
                                         width: 1,
                                       ),
                                     ),
                                     child: Text(
                                       status.toUpperCase(),
-                                      style: theme.textTheme.labelSmall?.copyWith(
+                                      style:
+                                          theme.textTheme.labelSmall?.copyWith(
                                         color: statusColor,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 10,
@@ -127,7 +135,10 @@ class OrderDetailScreen extends ConsumerWidget {
                               const SizedBox(height: 6),
                               Row(
                                 children: [
-                                  Icon(Icons.calendar_today_rounded, size: 14, color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                                  Icon(Icons.calendar_today_rounded,
+                                      size: 14,
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.4)),
                                   const SizedBox(width: 6),
                                   Text(
                                     date,
@@ -139,7 +150,8 @@ class OrderDetailScreen extends ConsumerWidget {
                               ),
                               const SizedBox(height: 14),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     'Grand Total',
@@ -177,20 +189,26 @@ class OrderDetailScreen extends ConsumerWidget {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: items.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 10),
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final item = items[index];
-                            final prodName = item['product_name'] ?? 'Unknown Product';
+                            final prodName =
+                                item['product_name'] ?? 'Unknown Product';
                             final qty = item['quantity'] ?? 1;
-                            final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
-                            final lineTotal = (item['line_total'] as num?)?.toDouble() ?? (price * qty);
+                            final price =
+                                (item['unit_price'] as num?)?.toDouble() ?? 0.0;
+                            final lineTotal =
+                                (item['line_total'] as num?)?.toDouble() ??
+                                    (price * qty);
 
                             return Container(
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.surface,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: theme.colorScheme.primary.withOpacity(0.06),
+                                  color: theme.colorScheme.primary
+                                      .withValues(alpha: 0.06),
                                 ),
                               ),
                               padding: const EdgeInsets.all(16),
@@ -200,19 +218,24 @@ class OrderDetailScreen extends ConsumerWidget {
                                   Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: theme.colorScheme.primary.withOpacity(0.06),
+                                      color: theme.colorScheme.primary
+                                          .withValues(alpha: 0.06),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: Icon(Icons.inventory_2_outlined, color: theme.colorScheme.primary, size: 20),
+                                    child: Icon(Icons.inventory_2_outlined,
+                                        color: theme.colorScheme.primary,
+                                        size: 20),
                                   ),
                                   const SizedBox(width: 14),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           prodName,
-                                          style: theme.textTheme.titleMedium?.copyWith(
+                                          style: theme.textTheme.titleMedium
+                                              ?.copyWith(
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -222,7 +245,8 @@ class OrderDetailScreen extends ConsumerWidget {
                                         const SizedBox(height: 4),
                                         Text(
                                           '${CurrencyFormatter.format(price)} × $qty',
-                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
                                             fontSize: 12,
                                           ),
                                         ),
@@ -232,7 +256,8 @@ class OrderDetailScreen extends ConsumerWidget {
                                   const SizedBox(width: 12),
                                   Text(
                                     CurrencyFormatter.format(lineTotal),
-                                    style: theme.textTheme.titleMedium?.copyWith(
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
                                     ),
@@ -260,7 +285,8 @@ class OrderDetailScreen extends ConsumerWidget {
                               color: theme.colorScheme.surface,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: theme.colorScheme.primary.withOpacity(0.06),
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.06),
                               ),
                             ),
                             padding: const EdgeInsets.all(16),
@@ -277,16 +303,18 @@ class OrderDetailScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                
+
                 // Submit order action block
                 if (status.toLowerCase() == 'draft')
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surface,
                       border: Border(
                         top: BorderSide(
-                          color: theme.colorScheme.primary.withOpacity(0.08),
+                          color:
+                              theme.colorScheme.primary.withValues(alpha: 0.08),
                           width: 1,
                         ),
                       ),
@@ -296,6 +324,7 @@ class OrderDetailScreen extends ConsumerWidget {
                         try {
                           final service = ref.read(orderServiceProvider);
                           await service.submitOrder(orderId);
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Order submitted successfully'),
@@ -305,6 +334,7 @@ class OrderDetailScreen extends ConsumerWidget {
                           );
                           ref.invalidate(orderDetailProvider(orderId));
                         } catch (e) {
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Submission failed: $e'),

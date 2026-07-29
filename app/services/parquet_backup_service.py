@@ -1,13 +1,153 @@
 import io
-import os
+import hashlib
+import hmac
+import json
 import logging
 from datetime import datetime, date, timedelta, time
 from typing import Dict, Any, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 from app.utils.s3_service import get_s3_config
+from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+PARQUET_PREFIX = "rolling_backups/parquet"
+
+
+def _canonical_manifest_bytes(manifest: Dict[str, Any]) -> bytes:
+    unsigned = {key: value for key, value in manifest.items() if key != "signature"}
+    return json.dumps(
+        unsigned, sort_keys=True, separators=(",", ":"), default=str
+    ).encode("utf-8")
+
+
+def _manifest_signature(manifest: Dict[str, Any]) -> str:
+    if len(settings.backup_encryption_key) < 32:
+        raise RuntimeError("BACKUP_ENCRYPTION_KEY is required to sign Parquet manifests.")
+    return hmac.new(
+        settings.backup_encryption_key.encode("utf-8"),
+        _canonical_manifest_bytes(manifest),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _s3_client(config: Dict[str, Any]):
+    import boto3
+
+    endpoint_url = config.get("s3_endpoint_url")
+    if endpoint_url and not endpoint_url.startswith("http"):
+        endpoint_url = f"https://{endpoint_url}"
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint_url or None,
+        aws_access_key_id=config.get("s3_access_key_id"),
+        aws_secret_access_key=config.get("s3_secret_access_key"),
+        region_name=config.get("s3_region_name") or "us-west-004",
+    )
+
+
+def verify_parquet_backup(
+    client, bucket: str, backup_date: date
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Download, authenticate, checksum, and decode a complete backup set."""
+    date_str = backup_date.strftime("%Y-%m-%d")
+    manifest_key = f"{PARQUET_PREFIX}/{date_str}/manifest.json"
+    raw_manifest = client.get_object(Bucket=bucket, Key=manifest_key)["Body"].read()
+    manifest = json.loads(raw_manifest)
+    supplied_signature = manifest.get("signature", "")
+    expected_signature = _manifest_signature(manifest)
+    if not hmac.compare_digest(supplied_signature, expected_signature):
+        raise RuntimeError("Parquet backup manifest signature verification failed.")
+
+    import pyarrow.parquet as pq
+
+    recovered = {}
+    for item in manifest["files"]:
+        body = client.get_object(Bucket=bucket, Key=item["object_key"])["Body"].read()
+        digest = hashlib.sha256(body).hexdigest()
+        if not hmac.compare_digest(digest, item["sha256"]):
+            raise RuntimeError(
+                f"Parquet checksum verification failed for {item['object_key']}."
+            )
+        if len(body) != item["size_bytes"]:
+            raise RuntimeError(
+                f"Parquet size verification failed for {item['object_key']}."
+            )
+        table = pq.read_table(io.BytesIO(body))
+        rows = table.to_pylist()
+        if len(rows) != item["record_count"]:
+            raise RuntimeError(
+                f"Parquet row-count verification failed for {item['object_key']}."
+            )
+        recovered[item["table_name"]] = rows
+    return recovered
+
+
+def restore_verified_parquet_backup(
+    db: Session,
+    recovered: Dict[str, List[Dict[str, Any]]],
+    model_by_table: Dict[str, Any],
+) -> Dict[str, int]:
+    """Restore verified rows into empty target tables in manifest/model order."""
+    restored = {}
+    try:
+        for table_name, rows in recovered.items():
+            model = model_by_table.get(table_name)
+            if model is None:
+                continue
+            if db.query(model).limit(1).first() is not None:
+                raise RuntimeError(
+                    f"Restore target table {table_name} is not empty."
+                )
+            normalized_rows = []
+            for row in rows:
+                normalized = dict(row)
+                for column in model.__table__.columns:
+                    value = normalized.get(column.name)
+                    if not isinstance(value, str):
+                        continue
+                    try:
+                        python_type = column.type.python_type
+                    except (AttributeError, NotImplementedError):
+                        continue
+                    if python_type is datetime:
+                        normalized[column.name] = datetime.fromisoformat(value)
+                    elif python_type is date:
+                        normalized[column.name] = date.fromisoformat(value)
+                normalized_rows.append(normalized)
+            if normalized_rows:
+                db.bulk_insert_mappings(model, normalized_rows)
+            restored[table_name] = len(rows)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return restored
+
+
+def enforce_parquet_object_retention(
+    client, bucket: str, now: Optional[date] = None
+) -> int:
+    """Delete only complete date prefixes older than the long-term retention."""
+    today = now or datetime.utcnow().date()
+    cutoff = today - timedelta(days=settings.parquet_backup_retention_days)
+    response = client.list_objects_v2(Bucket=bucket, Prefix=f"{PARQUET_PREFIX}/")
+    keys_to_delete = []
+    for item in response.get("Contents", []):
+        key = item["Key"]
+        parts = key.split("/")
+        if len(parts) < 4:
+            continue
+        try:
+            object_date = datetime.strptime(parts[2], "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if object_date < cutoff:
+            keys_to_delete.append({"Key": key})
+    if keys_to_delete:
+        client.delete_objects(Bucket=bucket, Delete={"Objects": keys_to_delete})
+    return len(keys_to_delete)
 
 
 def model_to_dict(obj: Any) -> Dict[str, Any]:
@@ -58,8 +198,13 @@ def export_table_to_parquet_bytes(db: Session, model_class: Any, end_cutoff_date
         buf.seek(0)
         return buf.getvalue(), record_count
     except Exception as exc:
-        logger.error(f"[PARQUET EXPORT ERROR] Failed to export table {model_class.__tablename__} to Parquet: {exc}")
-        return b"", 0
+        logger.exception(
+            "[PARQUET EXPORT ERROR] Failed to export table %s",
+            model_class.__tablename__,
+        )
+        raise RuntimeError(
+            f"Parquet export failed for {model_class.__tablename__}"
+        ) from exc
 
 
 def run_daily_parquet_rolling_backup(db: Session, target_date: Optional[date] = None) -> Dict[str, Any]:
@@ -110,75 +255,102 @@ def run_daily_parquet_rolling_backup(db: Session, target_date: Optional[date] = 
     s3_access_key = config.get("s3_access_key_id")
     s3_secret_key = config.get("s3_secret_access_key")
     s3_region = config.get("s3_region_name") or "us-west-004"
-    s3_public_prefix = config.get("s3_public_url_prefix")
-
     uploaded_files = []
+    uploaded_keys = []
     total_records_exported = 0
+    if not (s3_bucket and s3_access_key and s3_secret_key):
+        raise RuntimeError("Permanent S3 configuration is incomplete.")
+    s3_client = _s3_client(config)
 
-    for model in target_models:
-        table_name = model.__tablename__
-        parquet_bytes, count = export_table_to_parquet_bytes(db, model, end_cutoff_datetime)
-        object_key = f"rolling_backups/parquet/{date_str}/{table_name}.parquet"
-        file_size_bytes = len(parquet_bytes)
-        total_records_exported += count
+    try:
+        for model in target_models:
+            table_name = model.__tablename__
+            parquet_bytes, count = export_table_to_parquet_bytes(
+                db, model, end_cutoff_datetime
+            )
+            object_key = f"{PARQUET_PREFIX}/{date_str}/{table_name}.parquet"
+            file_size_bytes = len(parquet_bytes)
+            digest = hashlib.sha256(parquet_bytes).hexdigest()
+            total_records_exported += count
 
-        s3_url = None
-        if is_s3_enabled and s3_bucket and s3_access_key and s3_secret_key and parquet_bytes:
+            if not parquet_bytes:
+                raise RuntimeError(f"Empty Parquet payload for {object_key}.")
+            s3_client.put_object(
+                Bucket=s3_bucket,
+                Key=object_key,
+                Body=parquet_bytes,
+                ContentType="application/vnd.apache.parquet",
+                ServerSideEncryption="AES256",
+                Metadata={"sha256": digest, "record-count": str(count)},
+            )
+            uploaded_keys.append(object_key)
+            stored = s3_client.head_object(Bucket=s3_bucket, Key=object_key)
+            if stored.get("ContentLength") != file_size_bytes:
+                raise RuntimeError(
+                    f"Stored object size mismatch for {object_key}: "
+                    f"{stored.get('ContentLength')} != {file_size_bytes}"
+                )
+            stored_digest = (stored.get("Metadata") or {}).get("sha256")
+            if not stored_digest or not hmac.compare_digest(stored_digest, digest):
+                raise RuntimeError(
+                    f"Stored object checksum metadata mismatch for {object_key}."
+                )
+
+            uploaded_files.append({
+                "table_name": table_name,
+                "object_key": object_key,
+                "record_count": count,
+                "size_bytes": file_size_bytes,
+                "sha256": digest,
+                "storage_type": "S3 (Permanent Bucket, private)",
+            })
+
+        manifest = {
+            "format_version": 1,
+            "backup_date": date_str,
+            "cutoff_datetime": end_cutoff_datetime.isoformat(),
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "files": uploaded_files,
+        }
+        manifest["signature"] = _manifest_signature(manifest)
+        manifest_bytes = json.dumps(
+            manifest, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        manifest_key = f"{PARQUET_PREFIX}/{date_str}/manifest.json"
+        s3_client.put_object(
+            Bucket=s3_bucket,
+            Key=manifest_key,
+            Body=manifest_bytes,
+            ContentType="application/json",
+            ServerSideEncryption="AES256",
+            Metadata={"sha256": hashlib.sha256(manifest_bytes).hexdigest()},
+        )
+        uploaded_keys.append(manifest_key)
+        # A backup is complete only when it can immediately survive a full
+        # authenticated download/decode verification.
+        verify_parquet_backup(s3_client, s3_bucket, cutoff_date)
+    except Exception as exc:
+        logger.exception("[PARQUET ROLLING BACKUP ERROR] Incomplete backup removed")
+        if uploaded_keys:
             try:
-                import boto3
-                endpoint_url = s3_endpoint
-                if endpoint_url and not endpoint_url.startswith("http"):
-                    endpoint_url = f"https://{endpoint_url}"
-
-                s3_client = boto3.client(
-                    "s3",
-                    endpoint_url=endpoint_url or None,
-                    aws_access_key_id=s3_access_key,
-                    aws_secret_access_key=s3_secret_key,
-                    region_name=s3_region,
-                )
-
-                s3_client.put_object(
+                s3_client.delete_objects(
                     Bucket=s3_bucket,
-                    Key=object_key,
-                    Body=parquet_bytes,
-                    ContentType="application/vnd.apache.parquet",
+                    Delete={"Objects": [{"Key": key} for key in uploaded_keys]},
                 )
-
-                if s3_public_prefix:
-                    s3_url = f"{s3_public_prefix.rstrip('/')}/{object_key}"
-                else:
-                    ep = (endpoint_url or "").rstrip("/")
-                    if ep:
-                        s3_url = f"{ep}/{s3_bucket}/{object_key}"
-                    else:
-                        s3_url = f"https://{s3_bucket}.s3.{s3_region}.backblazeb2.com/{object_key}"
-                
-                logger.info(f"[PARQUET ROLLING BACKUP] Uploaded '{object_key}' ({count} rows, {file_size_bytes} bytes) to Permanent Bucket '{s3_bucket}'")
-            except Exception as exc:
-                logger.error(f"[PARQUET ROLLING BACKUP S3 ERROR] Failed uploading '{object_key}': {exc}")
-
-        # Always save local disk copy as fallback/mirror
-        local_dir = os.path.join("app", "static", "uploads", "rolling_backups", "parquet", date_str)
-        os.makedirs(local_dir, exist_ok=True)
-        local_path = os.path.join(local_dir, f"{table_name}.parquet")
-        with open(local_path, "wb") as f:
-            f.write(parquet_bytes)
-
-        uploaded_files.append({
-            "table_name": table_name,
-            "object_key": object_key,
-            "record_count": count,
-            "size_bytes": file_size_bytes,
-            "s3_url": s3_url or f"/static/uploads/rolling_backups/parquet/{date_str}/{table_name}.parquet",
-            "storage_type": "S3 (Permanent Bucket)" if s3_url else "Local Disk Storage",
-        })
+            except Exception:
+                logger.exception("Failed cleaning incomplete Parquet backup prefix")
+        raise RuntimeError(
+            "Parquet upload/integrity verification failed; no records were archived."
+        ) from exc
 
     # Stage 1: Soft-archive backed up records in SQL database
     soft_archived_count = soft_archive_backed_up_records(db, end_cutoff_datetime)
 
     # Stage 2: Hard-purge expired records older than retention window (default 90 days)
     purge_res = run_hard_purge_expired_records(db)
+    retained_object_deletions = enforce_parquet_object_retention(
+        s3_client, s3_bucket
+    )
 
     result = {
         "status": "success",
@@ -190,6 +362,9 @@ def run_daily_parquet_rolling_backup(db: Session, target_date: Optional[date] = 
         "soft_archived_count": soft_archived_count,
         "hard_purged_count": purge_res.get("total_purged", 0),
         "retention_days": purge_res.get("retention_days", 90),
+        "parquet_retention_days": settings.parquet_backup_retention_days,
+        "retained_object_deletions": retained_object_deletions,
+        "manifest_key": f"{PARQUET_PREFIX}/{date_str}/manifest.json",
         "files": uploaded_files,
         "executed_at": datetime.utcnow().isoformat(),
     }

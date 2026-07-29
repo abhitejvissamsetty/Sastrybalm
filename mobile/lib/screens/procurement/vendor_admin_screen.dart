@@ -1,254 +1,224 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/image_picker_service.dart';
+import '../../services/procurement_service.dart';
+import 'procurement_map.dart';
+
+final procurementServiceProvider =
+    Provider((ref) => ProcurementService(ref.watch(apiClientProvider)));
 
 class VendorAdminScreen extends ConsumerStatefulWidget {
   const VendorAdminScreen({super.key});
-
   @override
   ConsumerState<VendorAdminScreen> createState() => _VendorAdminScreenState();
 }
 
 class _VendorAdminScreenState extends ConsumerState<VendorAdminScreen> {
-  int _selectedTab = 0;
-  bool _loading = false;
-  List<dynamic> _materialRequests = [];
-  List<dynamic> _workOrders = [];
-
+  int _tab = 0;
+  bool _loading = true;
+  bool _mapView = false;
+  List<dynamic> _mrs = [], _workOrders = [], _assets = [], _maintenance = [];
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    _load();
   }
 
-  Future<void> _fetchData() async {
+  Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final client = ref.read(apiClientProvider);
-      final mrRes = await client.dio.get('/material-requests');
-      final woRes = await client.dio.get('/procurement/work-orders');
+      final service = ref.read(procurementServiceProvider);
+      final values = await Future.wait([
+        service.materialRequests(),
+        service.workOrders(),
+        service.assets(),
+        service.maintenanceLogs(),
+      ]);
       if (mounted) {
         setState(() {
-          _materialRequests = mrRes.data['items'] as List;
-          _workOrders = woRes.data['items'] as List;
-          _loading = false;
+          _mrs = values[0];
+          _workOrders = values[1];
+          _assets = values[2];
+          _maintenance = values[3];
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) _message('Unable to load Vendor records: $e');
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _message(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  Future<String?> _prompt(String title, String label,
+      {String initial = ''}) async {
+    final controller = TextEditingController(text: initial);
+    return showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+              title: Text(title),
+              content: TextField(
+                  controller: controller,
+                  maxLines: 3,
+                  decoration: InputDecoration(labelText: label)),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel')),
+                ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+                    child: const Text('Submit'))
+              ],
+            ));
+  }
+
+  Future<void> _quotation(Map<String, dynamic> mr) async {
+    final base = await _prompt('Supplier Quotation', 'Non-GST Base Amount');
+    if (base == null || double.tryParse(base) == null) return;
+    final notes =
+        await _prompt('Quotation Notes', 'Terms, lead time, and notes') ?? '';
+    try {
+      await ref.read(procurementServiceProvider).submitQuotation({
+        'material_request_id': mr['id'],
+        'base_amount': double.parse(base),
+        'lead_time_days': 7,
+        'notes': notes,
+      });
+      _message('Quotation submitted for manager approval.');
+      await _load();
+    } catch (e) {
+      _message('Quotation failed: $e');
     }
   }
 
-  Future<void> _submitQuotation(Map<String, dynamic> mr) async {
-    final amountCtrl = TextEditingController();
-    final leadTimeCtrl = TextEditingController(text: '7');
-    final recceNotesCtrl = TextEditingController(text: 'Counter-recce specs confirmed on site.');
-    final notesCtrl = TextEditingController();
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Create Supplier Quotation'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Original MR Specs: ${mr['material_specifications'] ?? 'Standard'}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              const SizedBox(height: 4),
-              Text('Approx Dims: ${mr['approx_dimensions'] ?? 'N/A'}', style: const TextStyle(color: Color(0xFF71717A), fontSize: 12)),
-              const SizedBox(height: 12),
-              TextField(controller: amountCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Quotation Amount (INR)')),
-              const SizedBox(height: 10),
-              TextField(controller: leadTimeCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Lead Time (Days)')),
-              const SizedBox(height: 10),
-              TextField(controller: recceNotesCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Counter-Recce Comparison Notes')),
-              const SizedBox(height: 10),
-              TextField(controller: notesCtrl, decoration: const InputDecoration(labelText: 'General Terms & Notes')),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(child: const Text('Cancel'), onPressed: () => Navigator.pop(ctx, false)),
-          ElevatedButton(child: const Text('Submit Quotation'), onPressed: () => Navigator.pop(ctx, true)),
-        ],
-      ),
-    );
-
-    if (confirm == true && amountCtrl.text.trim().isNotEmpty) {
-      try {
-        final client = ref.read(apiClientProvider);
-        await client.dio.post('/procurement/quotations', data: {
-          'material_request_id': mr['id'],
-          'quote_amount': double.parse(amountCtrl.text.trim()),
-          'lead_time_days': int.parse(leadTimeCtrl.text.trim()),
-          'counter_recce_notes': recceNotesCtrl.text.trim(),
-          'notes': notesCtrl.text.trim(),
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Supplier Quotation submitted successfully!')));
-          _fetchData();
-        }
-      } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+  Future<void> _woAction(Map<String, dynamic> wo) async {
+    final status = wo['status'];
+    try {
+      if (status == 'Assigned' || status == 'Issued') {
+        await ref.read(procurementServiceProvider).acknowledge(wo['id']);
+      } else if (status == 'Acknowledged' || status == 'In Manufacturing') {
+        final value = await _prompt(
+            'Report Work Order Progress', 'Progress percentage',
+            initial: '${wo['progress_percent'] ?? 0}');
+        if (value == null || int.tryParse(value) == null) return;
+        await ref.read(procurementServiceProvider).reportWorkOrderProgress(
+            wo['id'], int.parse(value), 'Vendor progress update');
+      } else {
+        return;
       }
+      await _load();
+    } catch (e) {
+      _message('Work Order update failed: $e');
     }
   }
 
-  Future<void> _submitWoQc(Map<String, dynamic> wo) async {
-    final photoCtrl = TextEditingController(text: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158');
-    final notesCtrl = TextEditingController();
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Submit Work Order for QC Inspection'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: photoCtrl, decoration: const InputDecoration(labelText: 'Manufactured Product Photo URL')),
-            const SizedBox(height: 10),
-            TextField(controller: notesCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Manufacturing Completion Notes')),
-          ],
-        ),
-        actions: [
-          TextButton(child: const Text('Cancel'), onPressed: () => Navigator.pop(ctx, false)),
-          ElevatedButton(child: const Text('Submit to QC Pending'), onPressed: () => Navigator.pop(ctx, true)),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        final client = ref.read(apiClientProvider);
-        await client.dio.post('/procurement/work-orders/${wo['id']}/submit-qc', data: {
-          'manufactured_photo_url': photoCtrl.text.trim(),
-          'notes': notesCtrl.text.trim(),
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Work Order status updated to QC Pending!')));
-          _fetchData();
-        }
-      } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
+  Future<void> _maintenanceProgress(Map<String, dynamic> log) async {
+    final value = await _prompt('Maintenance Progress', 'Progress percentage',
+        initial: '${log['progress_percent'] ?? 0}');
+    if (value == null || int.tryParse(value) == null) return;
+    if (!mounted) return;
+    try {
+      final image = await ImagePickerService().showImageSourceDialog(context);
+      if (!mounted) return;
+      final urls = image == null
+          ? <String>[]
+          : [
+              await ref.read(procurementServiceProvider).uploadImage(image.path)
+            ];
+      await ref.read(procurementServiceProvider).reportMaintenance(
+          log['id'], int.parse(value), 'Vendor maintenance update',
+          imageUrls: urls);
+      await _load();
+    } catch (e) {
+      _message('Progress update failed: $e');
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(title: const Text('Vendor Admin Portal'), elevation: 0),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                _buildTabPill(0, 'Material Requests'),
-                const SizedBox(width: 8),
-                _buildTabPill(1, 'Work Orders'),
-              ],
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Vendor Admin Portal'), actions: [
+          if (_tab == 0)
+            IconButton(
+              onPressed: () => setState(() => _mapView = !_mapView),
+              icon: Icon(_mapView ? Icons.view_list : Icons.map_outlined),
             ),
-          ),
+        ]),
+        body: Column(children: [
+          SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(8),
+              child: SegmentedButton<int>(segments: const [
+                ButtonSegment(value: 0, label: Text('MRs')),
+                ButtonSegment(value: 1, label: Text('Work Orders')),
+                ButtonSegment(value: 2, label: Text('Assets')),
+                ButtonSegment(value: 3, label: Text('Maintenance')),
+              ], selected: {
+                _tab
+              }, onSelectionChanged: (v) => setState(() => _tab = v.first))),
           Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF09090B)))
-                : Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: _selectedTab == 0 ? _buildMrTab() : _buildWoTab(),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabPill(int index, String label) {
-    final selected = _selectedTab == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTab = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF09090B) : const Color(0xFFF4F4F5),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF09090B),
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMrTab() {
-    if (_materialRequests.isEmpty) return const Center(child: Text('No assigned Material Requests.'));
-    return ListView.separated(
-      itemCount: _materialRequests.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (ctx, i) {
-        final mr = _materialRequests[i];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE4E4E7)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(mr['mr_number'] ?? 'MR-${mr['id']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 4),
-              Text(mr['description'] ?? 'No description', style: const TextStyle(color: Color(0xFF71717A), fontSize: 12)),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () => _submitQuotation(mr),
-                child: const Text('Create Supplier Quotation'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildWoTab() {
-    if (_workOrders.isEmpty) return const Center(child: Text('No active Work Orders.'));
-    return ListView.separated(
-      itemCount: _workOrders.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (ctx, i) {
-        final wo = _workOrders[i];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE4E4E7)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(wo['wo_number'] ?? 'WO-${wo['id']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 4),
-              Text('Status: ${wo['status']}', style: const TextStyle(color: Color(0xFF71717A), fontSize: 12)),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () => _submitWoQc(wo),
-                child: const Text('Mark Manufacturing Done & Submit to QC'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _mapView && _tab == 0
+                      ? ProcurementMap(records: _mrs)
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          child: ListView(
+                              padding: const EdgeInsets.all(12),
+                              children: _cards()),
+                        )),
+        ]),
+      );
+  List<Widget> _cards() {
+    final records = [_mrs, _workOrders, _assets, _maintenance][_tab];
+    if (records.isEmpty) {
+      return [
+        const SizedBox(
+            height: 300,
+            child: Center(child: Text('No records in this stage.')))
+      ];
+    }
+    return records.map((raw) {
+      final r = raw as Map<String, dynamic>;
+      final title = _tab == 0
+          ? r['mr_number']
+          : _tab == 1
+              ? r['wo_number']
+              : _tab == 2
+                  ? r['ac_number']
+                  : 'Maintenance #${r['id']}';
+      final subtitle = _tab == 0
+          ? '${r['status']} • ${r['product_name'] ?? ''}'
+          : _tab == 1
+              ? '${r['status']} • ${r['progress_percent']}%'
+              : _tab == 2
+                  ? '${r['asset_state']} • ${r['outlet_name'] ?? ''}'
+                  : '${r['status']} • ${r['progress_percent']}%';
+      VoidCallback? action;
+      String? label;
+      if (_tab == 0 && r['recce']?['status'] == 'Approved') {
+        action = () => _quotation(r);
+        label = 'Submit Quotation';
+      }
+      if (_tab == 1 &&
+          ['Assigned', 'Issued', 'Acknowledged', 'In Manufacturing']
+              .contains(r['status'])) {
+        action = () => _woAction(r);
+        label = ['Assigned', 'Issued'].contains(r['status'])
+            ? 'Acknowledge'
+            : 'Report Progress';
+      }
+      if (_tab == 3 && r['status'] != 'Validated') {
+        action = () => _maintenanceProgress(r);
+        label = 'Report Progress';
+      }
+      return Card(
+          child: ListTile(
+              title: Text('$title'),
+              subtitle: Text(subtitle),
+              trailing: action == null
+                  ? null
+                  : TextButton(onPressed: action, child: Text(label!))));
+    }).toList();
   }
 }

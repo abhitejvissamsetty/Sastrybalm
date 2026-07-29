@@ -6,17 +6,56 @@ class MasterService {
   final ApiClient _client;
   MasterService(this._client);
 
+  Future<List<dynamic>> _fetchAllPages(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    String itemsKey = 'items',
+  }) async {
+    const perPage = 200;
+    var page = 1;
+    final all = <dynamic>[];
+    while (true) {
+      final response = await _client.dio.get(
+        path,
+        queryParameters: {
+          ...?queryParameters,
+          'page': page,
+          'per_page': perPage,
+        },
+      );
+      final data = response.data as Map<String, dynamic>;
+      final items = (data[itemsKey] as List?) ?? const [];
+      all.addAll(items);
+      final total = data['total'] as int? ?? all.length;
+      if (items.isEmpty || all.length >= total) break;
+      page++;
+    }
+    return all;
+  }
+
   Future<Map<String, dynamic>> fetchBeatPlan(int beatId) async {
-    final response = await _client.dio.get(
-      '/beats/daily-plan',
-      queryParameters: {'beat_id': beatId},
-    );
+    final response = await _client.dio.get('/beats/daily-plan',
+        queryParameters: {'beat_id': beatId, 'page': 1, 'per_page': 200});
     final data = response.data as Map<String, dynamic>;
+    final outlets = <dynamic>[...(data['outlets'] as List? ?? const [])];
+    var page = 2;
+    final total = data['total'] as int? ?? outlets.length;
+    while (outlets.length < total) {
+      final next = await _client.dio.get('/beats/daily-plan',
+          queryParameters: {
+            'beat_id': beatId,
+            'page': page,
+            'per_page': 200
+          });
+      final items =
+          (next.data as Map<String, dynamic>)['outlets'] as List? ?? const [];
+      if (items.isEmpty) break;
+      outlets.addAll(items);
+      page++;
+    }
     return {
       'beat': data['beat'] != null ? Beat.fromJson(data['beat']) : null,
-      'outlets': (data['outlets'] as List)
-          .map((o) => Outlet.fromJson(o))
-          .toList(),
+      'outlets': outlets.map((o) => Outlet.fromJson(o)).toList(),
     };
   }
 
@@ -33,15 +72,16 @@ class MasterService {
     return items.map((o) => Outlet.fromJson(o)).toList();
   }
 
-  Future<List<Product>> fetchProducts() async {
-    final response = await _client.dio.get('/products');
-    final items = response.data['items'] as List;
+  Future<List<Product>> fetchProducts({int? warehouseId}) async {
+    final items = await _fetchAllPages(
+      '/products',
+      queryParameters: {if (warehouseId != null) 'warehouse_id': warehouseId},
+    );
     return items.map((p) => Product.fromJson(p)).toList();
   }
 
   Future<List<Beat>> fetchBeats() async {
-    final response = await _client.dio.get('/beats');
-    final items = response.data['items'] as List;
+    final items = await _fetchAllPages('/beats');
     return items.map((b) => Beat.fromJson(b)).toList();
   }
 
@@ -102,14 +142,14 @@ class MasterService {
   }
 
   Future<List<Beat>> fetchL1Beats() async {
-    final response = await _client.dio.get('/beats/l1-positions');
-    final items = response.data['items'] as List;
+    final items = await _fetchAllPages('/beats/l1-positions');
     return items.map((b) => Beat.fromJson(b)).toList();
   }
 
-  Future<Map<String, dynamic>> requestOutletEdit(int outletId, Map<String, dynamic> data) async {
-    final response = await _client.dio.post('/outlets/$outletId/edit-request', data: data);
+  Future<Map<String, dynamic>> requestOutletEdit(
+      int outletId, Map<String, dynamic> data) async {
+    final response =
+        await _client.dio.post('/outlets/$outletId/edit-request', data: data);
     return response.data;
   }
 }
-

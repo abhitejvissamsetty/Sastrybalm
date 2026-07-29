@@ -50,6 +50,35 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
     }
   }
 
+  Future<void> _showAssetActions() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(children: [
+          const ListTile(
+              title: Text('Outlet Assets'),
+              subtitle: Text('View deployed assets or deploy warehouse stock')),
+          ListTile(
+            leading: const Icon(Icons.inventory_2_outlined),
+            title: const Text('Asset List'),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              context.push('/outlet/${widget.outletId}/assets');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.add_box_outlined),
+            title: const Text('New Asset'),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              context.push('/outlet/${widget.outletId}/assets/new');
+            },
+          ),
+        ]),
+      ),
+    );
+  }
+
   Future<void> _checkIn() async {
     final outlet = ref.read(selectedOutletProvider);
     if (outlet == null) return;
@@ -77,14 +106,16 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
             onPressed: () => Navigator.pop(ctx, 'follow_up'),
             child: const Padding(
               padding: EdgeInsets.symmetric(vertical: 8.0),
-              child: Text('Follow-up / Feedback', style: TextStyle(fontSize: 16)),
+              child:
+                  Text('Follow-up / Feedback', style: TextStyle(fontSize: 16)),
             ),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, 'cold_call'),
             child: const Padding(
               padding: EdgeInsets.symmetric(vertical: 8.0),
-              child: Text('Cold Call / Lead Gen', style: TextStyle(fontSize: 16)),
+              child:
+                  Text('Cold Call / Lead Gen', style: TextStyle(fontSize: 16)),
             ),
           ),
         ],
@@ -111,17 +142,22 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
       };
 
       _startTimerIfNeeded();
-      ref.read(attendanceProvider.notifier).refresh();
+      await ref.read(attendanceProvider.notifier).refresh();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Checked In! Distance: ${record.distanceFromOutlet?.toStringAsFixed(0) ?? '?'} meters'),
+          content: Text(
+              'Checked In! Distance: ${record.distanceFromOutlet?.toStringAsFixed(0) ?? '?'} meters'),
           backgroundColor: Colors.green.shade700,
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Check in failed: $e'), backgroundColor: Colors.red.shade700),
+        SnackBar(
+            content: Text('Check in failed: $e'),
+            backgroundColor: Colors.red.shade700),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -133,19 +169,21 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
     try {
       final service = ref.read(visitServiceProvider);
       final response = await service.checkOut(visit.id);
-      
+
       final activeVisits = ref.read(activeVisitProvider);
-      final newVisits = Map<int, VisitRecord>.from(activeVisits)..remove(widget.outletId);
+      final newVisits = Map<int, VisitRecord>.from(activeVisits)
+        ..remove(widget.outletId);
       ref.read(activeVisitProvider.notifier).state = newVisits;
 
       _timer?.cancel();
       _elapsed = Duration.zero;
 
-      ref.read(attendanceProvider.notifier).refresh();
+      await ref.read(attendanceProvider.notifier).refresh();
 
       final flagged = response['flagged'] == true;
       final duration = response['duration_minutes'] ?? 0;
 
+      if (!mounted) return;
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -164,9 +202,76 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Check out failed: $e'), backgroundColor: Colors.red.shade700),
+        SnackBar(
+            content: Text('Check out failed: $e'),
+            backgroundColor: Colors.red.shade700),
       );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _completeNoOrder(VisitRecord visit) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('No Order Reason'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Reason',
+            hintText: 'Why was no order placed?',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              final value = controller.text.trim();
+              if (value.isNotEmpty) Navigator.pop(ctx, value);
+            },
+            child: const Text('Complete Visit'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) {
+      controller.dispose();
+      return;
+    }
+    controller.dispose();
+    if (reason == null) return;
+
+    setState(() => _loading = true);
+    try {
+      final service = ref.read(visitServiceProvider);
+      await service.checkOut(visit.id, noOrderReason: reason);
+      final visits = Map<int, VisitRecord>.from(ref.read(activeVisitProvider))
+        ..remove(widget.outletId);
+      ref.read(activeVisitProvider.notifier).state = visits;
+      _timer?.cancel();
+      ref.read(attendanceProvider.notifier).refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Visit completed with No Order Reason.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Could not complete visit: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -214,18 +319,23 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
                           children: [
                             const Row(
                               children: [
-                                Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 20),
+                                Icon(Icons.warning_amber_rounded,
+                                    color: Color(0xFFDC2626), size: 20),
                                 SizedBox(width: 8),
                                 Text(
                                   'Mandatory Check Failed',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDC2626), fontSize: 14),
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFDC2626),
+                                      fontSize: 14),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Missing: ${outlet.missingFields.join(', ')}. Please update outlet details below to trigger Edit Approval flow.',
-                              style: const TextStyle(color: Color(0xFF7F1D1D), fontSize: 12),
+                              style: const TextStyle(
+                                  color: Color(0xFF7F1D1D), fontSize: 12),
                             ),
                           ],
                         ),
@@ -233,7 +343,8 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
                     ],
                     Card(
                       elevation: 2,
-                      shadowColor: theme.colorScheme.shadow.withOpacity(0.04),
+                      shadowColor:
+                          theme.colorScheme.shadow.withValues(alpha: 0.04),
                       child: Padding(
                         padding: const EdgeInsets.all(18.0),
                         child: Column(
@@ -251,9 +362,11 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary.withOpacity(0.1),
+                                    color: theme.colorScheme.primary
+                                        .withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
@@ -267,13 +380,17 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Text('Code: ${outlet.code}', style: theme.textTheme.bodyMedium),
+                            Text('Code: ${outlet.code}',
+                                style: theme.textTheme.bodyMedium),
                             const Divider(height: 24),
-                            _buildInfoRow(context, Icons.person_outline_rounded, 'Owner', outlet.ownerName ?? 'Not Available'),
+                            _buildInfoRow(context, Icons.person_outline_rounded,
+                                'Owner', outlet.ownerName ?? 'Not Available'),
                             const SizedBox(height: 10),
-                            _buildInfoRow(context, Icons.phone_android_rounded, 'Contact', outlet.mobile ?? 'Not Available'),
+                            _buildInfoRow(context, Icons.phone_android_rounded,
+                                'Contact', outlet.mobile ?? 'Not Available'),
                             const SizedBox(height: 10),
-                            _buildInfoRow(context, Icons.location_on_rounded, 'Address', outlet.address ?? 'Not Available'),
+                            _buildInfoRow(context, Icons.location_on_rounded,
+                                'Address', outlet.address ?? 'Not Available'),
                           ],
                         ),
                       ),
@@ -282,25 +399,30 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
                     if (isVisiting) ...[
                       Card(
                         elevation: 2,
-                        shadowColor: theme.colorScheme.shadow.withOpacity(0.04),
+                        shadowColor:
+                            theme.colorScheme.shadow.withValues(alpha: 0.04),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: Colors.green.shade400, width: 1.0),
+                          side: BorderSide(
+                              color: Colors.green.shade400, width: 1.0),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(18.0),
                           child: Column(
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.timer_outlined, color: Colors.green.shade600),
+                                      Icon(Icons.timer_outlined,
+                                          color: Colors.green.shade600),
                                       const SizedBox(width: 8),
                                       Text(
                                         'Active Visit Timer',
-                                        style: theme.textTheme.titleMedium?.copyWith(
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.green.shade600,
                                         ),
@@ -355,10 +477,18 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
                           ),
                           _buildActivityButton(
                             context,
-                            title: 'Material Req',
+                            title: 'No Order Reason',
+                            icon: Icons.comments_disabled_rounded,
+                            color: Colors.orange.shade700,
+                            onTap: () => _completeNoOrder(visit),
+                          ),
+                          _buildActivityButton(
+                            context,
+                            title: 'New MR',
                             icon: Icons.assignment_rounded,
                             color: Colors.amber.shade700,
-                            onTap: () => context.push('/material-request'),
+                            onTap: () => context.push(
+                                '/outlet/${widget.outletId}/material-requests/new'),
                           ),
                           _buildActivityButton(
                             context,
@@ -369,10 +499,10 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
                           ),
                           _buildActivityButton(
                             context,
-                            title: 'Asset Cap',
+                            title: 'Assets',
                             icon: Icons.inventory_2_rounded,
                             color: Colors.indigo.shade600,
-                            onTap: () => context.push('/asset-cap'),
+                            onTap: () => _showAssetActions(),
                           ),
                         ],
                       ),
@@ -390,7 +520,8 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
     );
   }
 
-  Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value) {
+  Widget _buildInfoRow(
+      BuildContext context, IconData icon, String label, String value) {
     final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,7 +556,7 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
     final theme = Theme.of(context);
     return Card(
       elevation: 2,
-      shadowColor: theme.colorScheme.shadow.withOpacity(0.04),
+      shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.04),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
@@ -437,7 +568,7 @@ class _OutletDetailScreenState extends ConsumerState<OutletDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 24),

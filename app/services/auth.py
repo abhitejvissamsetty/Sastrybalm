@@ -1,8 +1,8 @@
 import logging
 import os
-import random
+import secrets
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
@@ -19,12 +19,20 @@ from app.utils.backup_service import restore_sql_backup
 
 
 def is_system_onboarded(db: Session) -> bool:
-    """Check if the system has completed onboarding (active admin with encrypted password)."""
+    """Check if the system has completed onboarding (active admin or user with encrypted password)."""
     try:
+        if db.query(User).count() == 0:
+            return False
         admin = db.query(User).filter(User.role == UserRole.admin, User.is_active == True).first()
+        if not admin:
+            admin = db.query(User).filter(User.role == UserRole.admin).first()
+        if not admin:
+            admin = db.query(User).filter(User.is_active == True).first()
+        if not admin:
+            admin = db.query(User).first()
         return bool(admin and admin.hashed_password and admin.hashed_password.strip() != "" and admin.hashed_password != "PENDING_ONBOARDING")
     except Exception as e:
-        logger.warning(f"is_system_onboarded check exception: {e}")
+        logger.error(f"is_system_onboarded check exception: {e}", exc_info=True)
         return False
 
 
@@ -41,7 +49,7 @@ def complete_system_onboarding(
     # 1. Restore backup data if provided
     if backup_file_path and os.path.exists(backup_file_path):
         try:
-            restore_sql_backup(backup_file_path)
+            restore_sql_backup(backup_file_path, db=db)
         except Exception as e:
             logger.error("Error restoring backup during onboarding: %s", e)
 
@@ -91,112 +99,122 @@ def authenticate_user(db: Session, login: str, password: str) -> Optional[User]:
     if not user or not user.is_active:
         return None
 
-    if user.role == UserRole.admin:
-        if user.hashed_password and verify_password(password, user.hashed_password):
-            return user
-        logger.warning("Failed admin login attempt for '%s'", login)
-        return None
-
-    # For non-admin users, passwords are not used — authentication is via OTP
-    logger.info("Non-admin user '%s' attempted password login. Direct password auth disabled — use OTP authentication.", login)
+    if user.hashed_password and verify_password(password, user.hashed_password):
+        return user
+    logger.warning("Failed login attempt for user_id=%s", user.id)
     return None
 
 
-def generate_and_send_user_otp(db: Session, login_or_email: str) -> Dict[str, Any]:
-    """Generate a 6-digit OTP code, log it to Admin Alerts, and dispatch via email."""
-    user = (
+OTP_REQUEST_LIMIT = 3
+OTP_ATTEMPT_LIMIT = 5
+OTP_TTL_MINUTES = 10
+OTP_THROTTLE_MINUTES = 15
+
+
+def _find_login_user(db: Session, login: str) -> Optional[User]:
+    return (
         db.query(User)
-        .filter((User.email == login_or_email) | (User.username == login_or_email) | (User.phone == login_or_email))
+        .filter(
+            (User.email == login)
+            | (User.username == login)
+            | (User.phone == login)
+        )
         .first()
     )
+
+
+def generate_and_send_user_otp(db: Session, login_or_email: str) -> Dict[str, Any]:
+    """Issue a hashed, rate-limited OTP and deliver it only through SMTP."""
+    user = _find_login_user(db, login_or_email)
     if not user or not user.is_active:
         return {"success": False, "error": "Registered user account not found or inactive."}
-
     if user.role == UserRole.admin:
         return {"success": False, "error": "System Admin must authenticate via password."}
 
-    user_email = user.email or f"{user.username}@safar.local"
-    otp_code = f"{random.randint(100000, 999999)}"
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    throttle_since = datetime.utcnow() - timedelta(minutes=OTP_THROTTLE_MINUTES)
+    recent_count = (
+        db.query(UserOTP)
+        .filter(
+            UserOTP.user_id == user.id,
+            UserOTP.created_at >= throttle_since,
+        )
+        .count()
+    )
+    if recent_count >= OTP_REQUEST_LIMIT:
+        return {
+            "success": False,
+            "error": "Too many OTP requests. Please wait before trying again.",
+        }
 
-    # Deactivate prior unused OTPs for this user
-    db.query(UserOTP).filter(UserOTP.user_id == user.id, UserOTP.is_used == False).update({"is_used": True})
-
-    otp_record = UserOTP(
+    otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
+    db.query(UserOTP).filter(
+        UserOTP.user_id == user.id,
+        UserOTP.is_used.is_(False),
+    ).update({"is_used": True})
+    record = UserOTP(
         user_id=user.id,
-        email=user_email,
-        otp_code=otp_code,
-        expires_at=expires_at,
+        email=user.email,
+        otp_code=hash_password(otp_code),
+        failed_attempts=0,
+        expires_at=datetime.utcnow() + timedelta(minutes=OTP_TTL_MINUTES),
         is_used=False,
     )
-    db.add(otp_record)
+    db.add(record)
+    db.flush()
 
-    # Create an Alert record bound to the specific user (visible to user & Admin)
-    admin_alert = Alert(
-        severity=AlertSeverity.info,
-        alert_type=AlertType.custom,
-        title=f"Login OTP for {user.full_name or user.username}",
-        message=f"OTP verification code for user '{user.username}' ({user_email}): {otp_code} (Valid for 10 minutes)",
-        user_id=user.id,
+    body_html = (
+        "<h2>Safar verification code</h2>"
+        f"<p>Hello {user.full_name or user.username},</p>"
+        f"<p>Your one-time login code is <strong>{otp_code}</strong>.</p>"
+        f"<p>It expires in {OTP_TTL_MINUTES} minutes. Do not share it.</p>"
     )
-    db.add(admin_alert)
+    delivered = send_email_via_db_smtp(
+        to_email=user.email,
+        subject="Your Safar login verification code",
+        body_html=body_html,
+        db=db,
+    )
+    if not delivered:
+        db.rollback()
+        return {"success": False, "error": "OTP email delivery failed. Please contact support."}
+
     db.commit()
-
-    # Send HTML Email if SMTP configured
-    sent = False
-    if user.email and "@" in user.email:
-        subject = f"Your Safar Login OTP: {otp_code}"
-        body_html = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-          <h2 style="color: #4f46e5; margin-top: 0;">Safar SFA Verification Code</h2>
-          <p style="font-size: 15px; color: #334155;">Hello <strong>{user.full_name or user.username}</strong>,</p>
-          <p style="font-size: 14px; color: #475569;">Use the following 6-digit One-Time Password (OTP) to securely log in to your Safar SFA portal:</p>
-          <div style="background-color: #f1f5f9; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
-            <span style="font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #1e1b4b;">{otp_code}</span>
-          </div>
-          <p style="font-size: 13px; color: #64748b;">This OTP code is valid for <strong>10 minutes</strong>. Do not share this code with anyone.</p>
-        </div>
-        """
-        sent = send_email_via_db_smtp(to_email=user.email, subject=subject, body_html=body_html, db=db)
-
-    logger.info("OTP generated for user '%s': %s (Email sent: %s)", user.username, otp_code, sent)
-
+    logger.info("OTP issued and delivered for user_id=%s", user.id)
     return {
         "success": True,
-        "message": f"OTP code sent to {user_email}.",
-        "email": user_email,
-        "username": user.username,
-        "otp_code": otp_code,
-        "email_sent": sent,
+        "message": "OTP verification code sent.",
+        "email": user.email,
+        "email_sent": True,
     }
 
 
 def verify_user_otp(db: Session, email_or_login: str, otp_code: str) -> Optional[User]:
-    """Verify an active 6-digit OTP code for user login."""
-    user = (
-        db.query(User)
-        .filter((User.email == email_or_login) | (User.username == email_or_login) | (User.phone == email_or_login))
-        .first()
-    )
-    if not user or not user.is_active:
+    """Verify the latest active OTP with a fixed attempt limit."""
+    user = _find_login_user(db, email_or_login)
+    if not user or not user.is_active or user.role == UserRole.admin:
         return None
-
-    now = datetime.utcnow()
     record = (
         db.query(UserOTP)
         .filter(
             UserOTP.user_id == user.id,
-            UserOTP.otp_code == otp_code,
-            UserOTP.is_used == False,
-            UserOTP.expires_at >= now,
+            UserOTP.is_used.is_(False),
+            UserOTP.expires_at >= datetime.utcnow(),
         )
         .order_by(UserOTP.created_at.desc())
         .first()
     )
-
     if not record:
         return None
-
+    if record.failed_attempts >= OTP_ATTEMPT_LIMIT:
+        record.is_used = True
+        db.commit()
+        return None
+    if not verify_password(otp_code, record.otp_code):
+        record.failed_attempts += 1
+        if record.failed_attempts >= OTP_ATTEMPT_LIMIT:
+            record.is_used = True
+        db.commit()
+        return None
     record.is_used = True
     db.commit()
     return user

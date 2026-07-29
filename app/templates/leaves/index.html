@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Leave Management — Safar SFA{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Page Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-xl">
+    <div>
+      <h1 class="text-2xl font-bold text-white tracking-tight">Leave Management</h1>
+      <p class="text-slate-400 text-sm mt-1">Review and approve field sales representative leave applications based on organizational hierarchy (L1/L2 → L3/L4, L3 → L4 Only).</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/leaves" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold {% if not status_filter %}bg-indigo-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %} transition-colors">All</a>
+      <a href="/leaves?status_filter=pending" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold {% if status_filter == 'pending' %}bg-amber-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %} transition-colors">Pending</a>
+      <a href="/leaves?status_filter=approved" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold {% if status_filter == 'approved' %}bg-emerald-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %} transition-colors">Approved</a>
+      <a href="/leaves?status_filter=rejected" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold {% if status_filter == 'rejected' %}bg-rose-600 text-white{% else %}bg-slate-800 text-slate-300 hover:bg-slate-700{% endif %} transition-colors">Rejected</a>
+    </div>
+  </div>
+
+  <!-- Leave Applications Table -->
+  <div class="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-xl shadow-xl">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm text-slate-300">
+        <thead class="bg-slate-800/80 text-xs font-semibold uppercase text-slate-400 border-b border-slate-700/60">
+          <tr>
+            <th class="px-6 py-4">ID</th>
+            <th class="px-6 py-4">Applicant & Level</th>
+            <th class="px-6 py-4">Leave Type</th>
+            <th class="px-6 py-4">Leave Date</th>
+            <th class="px-6 py-4">Reason & Duration</th>
+            <th class="px-6 py-4">Status</th>
+            <th class="px-6 py-4 text-right">Actions / Approval Authority</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800/60">
+          {% if not leaves %}
+          <tr>
+            <td colspan="7" class="px-6 py-12 text-center text-slate-500">
+              No leave applications found.
+            </td>
+          </tr>
+          {% endif %}
+          {% for l in leaves %}
+          <tr class="hover:bg-slate-800/40 transition-colors">
+            <td class="px-6 py-4 font-mono text-xs text-slate-400">#{{ l.id }}</td>
+            <td class="px-6 py-4">
+              <div class="flex items-center gap-2">
+                <span class="font-semibold text-white">{{ l.user.full_name if l.user else 'User #' ~ l.user_id }}</span>
+                {% if l.user %}
+                  <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-slate-800 text-indigo-400 border border-indigo-500/30">
+                    {{ l.user.level }}
+                  </span>
+                {% endif %}
+              </div>
+              <div class="text-xs text-slate-500 mt-0.5">{{ l.user.email if l.user else '' }}</div>
+            </td>
+            <td class="px-6 py-4">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase">
+                {{ l.leave_type.value }}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-slate-300 font-mono text-xs">
+              {% if l.start_date == l.end_date %}
+                {{ l.start_date }}
+              {% else %}
+                {{ l.start_date }} → {{ l.end_date }}
+              {% endif %}
+              <div class="text-xs text-slate-500">
+                {{ 'Half Day' if l.duration == 'half' else 'Full Day' }}
+                {% if l.half_day_session %}· {{ l.half_day_session.replace('_', ' ').title() }}{% endif %}
+              </div>
+            </td>
+            <td class="px-6 py-4 max-w-xs">
+              <p class="text-xs text-slate-300 truncate" title="{{ l.reason }}">{{ l.reason or 'No reason provided' }}</p>
+            </td>
+            <td class="px-6 py-4">
+              {% if l.status.value == 'pending' %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Pending
+                </span>
+              {% elif l.status.value == 'approved' %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Approved
+                </span>
+              {% else %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                  <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Rejected
+                </span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 text-right">
+              {% if l.status.value == 'pending' %}
+                {% if l.can_approve %}
+                  <div class="flex items-center justify-end gap-2">
+                    <form action="/leaves/{{ l.id }}/approve" method="POST">
+                      <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm">
+                        Approve
+                      </button>
+                    </form>
+                    <form action="/leaves/{{ l.id }}/reject" method="POST">
+                      <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600/80 hover:bg-rose-600 text-white transition-colors shadow-sm">
+                        Reject
+                      </button>
+                    </form>
+                  </div>
+                {% else %}
+                  <span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-slate-800 text-amber-400 border border-amber-500/20" title="Only authorized higher-level managers can approve this leave.">
+                    {% if l.user and l.user.level == 'L3' %}
+                      🔒 Requires L4 Approval Only
+                    {% else %}
+                      🔒 Requires L3 / L4 Approval
+                    {% endif %}
+                  </span>
+                {% endif %}
+              {% else %}
+                <span class="text-xs text-slate-500">Processed</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% from "shared/pagination.html" import render %}
+  {{ render(pagination, "/leaves?status_filter=" ~ (status_filter or "")) }}
+</div>
+{% endblock %}

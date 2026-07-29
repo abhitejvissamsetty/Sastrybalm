@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../providers/beat_provider.dart';
-import '../../models/outlet.dart';
 import '../../services/attendance_service.dart';
 
 class OutletCreateScreen extends ConsumerStatefulWidget {
@@ -63,7 +62,8 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
     if (_formKey.currentState?.validate() != true) return;
     if (_selectedBeatId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a beat to assign this outlet.')),
+        const SnackBar(
+            content: Text('Please select a beat to assign this outlet.')),
       );
       return;
     }
@@ -76,11 +76,18 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
         name: _nameCtrl.text.trim(),
         beatId: _selectedBeatId!,
         code: _codeCtrl.text.trim().isNotEmpty ? _codeCtrl.text.trim() : null,
-        ownerName: _ownerCtrl.text.trim().isNotEmpty ? _ownerCtrl.text.trim() : null,
-        mobile: _mobileCtrl.text.trim().isNotEmpty ? _mobileCtrl.text.trim() : null,
-        address: _addressCtrl.text.trim().isNotEmpty ? _addressCtrl.text.trim() : null,
-        pincode: _pincodeCtrl.text.trim().isNotEmpty ? _pincodeCtrl.text.trim() : null,
-        gstin: _gstinCtrl.text.trim().isNotEmpty ? _gstinCtrl.text.trim() : null,
+        ownerName:
+            _ownerCtrl.text.trim().isNotEmpty ? _ownerCtrl.text.trim() : null,
+        mobile:
+            _mobileCtrl.text.trim().isNotEmpty ? _mobileCtrl.text.trim() : null,
+        address: _addressCtrl.text.trim().isNotEmpty
+            ? _addressCtrl.text.trim()
+            : null,
+        pincode: _pincodeCtrl.text.trim().isNotEmpty
+            ? _pincodeCtrl.text.trim()
+            : null,
+        gstin:
+            _gstinCtrl.text.trim().isNotEmpty ? _gstinCtrl.text.trim() : null,
         channel: _selectedChannel,
         shopType: _selectedShopType,
         gpsLat: _attachGps ? _currentPosition?.latitude : null,
@@ -194,7 +201,9 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
                       controller: _nameCtrl,
                       label: 'Outlet Name *',
                       hint: 'e.g. Apex Pharmacy',
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Outlet name is required' : null,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Outlet name is required'
+                          : null,
                     ),
                     const SizedBox(height: 14),
 
@@ -207,16 +216,22 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
                         return _buildDropdownField<int?>(
                           value: _selectedBeatId,
                           label: 'Assign Beat *',
-                          items: beats.map((b) => DropdownMenuItem<int?>(
-                            value: b.id,
-                            child: Text('${b.name} (${b.code})', overflow: TextOverflow.ellipsis),
-                          )).toList(),
+                          items: beats
+                              .map((b) => DropdownMenuItem<int?>(
+                                    value: b.id,
+                                    child: Text('${b.name} (${b.code})',
+                                        overflow: TextOverflow.ellipsis),
+                                  ))
+                              .toList(),
                           onChanged: (v) => setState(() => _selectedBeatId = v),
-                          validator: (v) => v == null ? 'Beat assignment is required' : null,
+                          validator: (v) =>
+                              v == null ? 'Beat assignment is required' : null,
                         );
                       },
-                      loading: () => const LinearProgressIndicator(color: Color(0xFF09090B)),
-                      error: (e, _) => Text('Error loading beats: $e', style: const TextStyle(color: Colors.red)),
+                      loading: () => const LinearProgressIndicator(
+                          color: Color(0xFF09090B)),
+                      error: (e, _) => Text('Error loading beats: $e',
+                          style: const TextStyle(color: Colors.red)),
                     ),
                     const SizedBox(height: 14),
 
@@ -276,12 +291,19 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
                       value: _selectedChannel,
                       label: 'Channel (Optional)',
                       items: const [
-                        DropdownMenuItem(value: null, child: Text('None / Default')),
-                        DropdownMenuItem(value: 'GT', child: Text('General Trade (GT)')),
-                        DropdownMenuItem(value: 'MT', child: Text('Modern Trade (MT)')),
-                        DropdownMenuItem(value: 'pharmacy', child: Text('Pharmacy')),
-                        DropdownMenuItem(value: 'horeca', child: Text('HoReCa')),
-                        DropdownMenuItem(value: 'institutional', child: Text('Institutional')),
+                        DropdownMenuItem(
+                            value: null, child: Text('None / Default')),
+                        DropdownMenuItem(
+                            value: 'GT', child: Text('General Trade (GT)')),
+                        DropdownMenuItem(
+                            value: 'MT', child: Text('Modern Trade (MT)')),
+                        DropdownMenuItem(
+                            value: 'pharmacy', child: Text('Pharmacy')),
+                        DropdownMenuItem(
+                            value: 'horeca', child: Text('HoReCa')),
+                        DropdownMenuItem(
+                            value: 'institutional',
+                            child: Text('Institutional')),
                         DropdownMenuItem(value: 'other', child: Text('Other')),
                       ],
                       onChanged: (v) => setState(() => _selectedChannel = v),
@@ -293,12 +315,18 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
                       value: _selectedShopType,
                       label: 'Shop Type (Optional)',
                       items: const [
-                        DropdownMenuItem(value: null, child: Text('None / Default')),
-                        DropdownMenuItem(value: 'kirana', child: Text('Kirana Store')),
-                        DropdownMenuItem(value: 'medical', child: Text('Medical / Chemist')),
-                        DropdownMenuItem(value: 'general', child: Text('General Store')),
-                        DropdownMenuItem(value: 'supermarket', child: Text('Supermarket')),
-                        DropdownMenuItem(value: 'hardware', child: Text('Hardware Store')),
+                        DropdownMenuItem(
+                            value: null, child: Text('None / Default')),
+                        DropdownMenuItem(
+                            value: 'kirana', child: Text('Kirana Store')),
+                        DropdownMenuItem(
+                            value: 'medical', child: Text('Medical / Chemist')),
+                        DropdownMenuItem(
+                            value: 'general', child: Text('General Store')),
+                        DropdownMenuItem(
+                            value: 'supermarket', child: Text('Supermarket')),
+                        DropdownMenuItem(
+                            value: 'hardware', child: Text('Hardware Store')),
                         DropdownMenuItem(value: 'other', child: Text('Other')),
                       ],
                       onChanged: (v) => setState(() => _selectedShopType = v),
@@ -322,12 +350,18 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: _currentPosition != null ? const Color(0xFFEFF6FF) : const Color(0xFFFEF2F2),
+                        color: _currentPosition != null
+                            ? const Color(0xFFEFF6FF)
+                            : const Color(0xFFFEF2F2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        _currentPosition != null ? Icons.my_location_rounded : Icons.location_off_rounded,
-                        color: _currentPosition != null ? const Color(0xFF2563EB) : const Color(0xFFDC2626),
+                        _currentPosition != null
+                            ? Icons.my_location_rounded
+                            : Icons.location_off_rounded,
+                        color: _currentPosition != null
+                            ? const Color(0xFF2563EB)
+                            : const Color(0xFFDC2626),
                         size: 22,
                       ),
                     ),
@@ -337,7 +371,9 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _currentPosition != null ? 'GPS Location Acquired' : 'GPS Coordinates Pending',
+                            _currentPosition != null
+                                ? 'GPS Location Acquired'
+                                : 'GPS Coordinates Pending',
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -351,7 +387,9 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
                                 : 'Ensure device location is enabled for shop tagging.',
                             style: TextStyle(
                               fontSize: 11,
-                              color: _currentPosition != null ? const Color(0xFF2563EB) : const Color(0xFF71717A),
+                              color: _currentPosition != null
+                                  ? const Color(0xFF2563EB)
+                                  : const Color(0xFF71717A),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -361,7 +399,7 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
                     if (_currentPosition != null)
                       Switch.adaptive(
                         value: _attachGps,
-                        activeColor: const Color(0xFF09090B),
+                        activeThumbColor: const Color(0xFF09090B),
                         onChanged: (v) => setState(() => _attachGps = v),
                       ),
                   ],
@@ -387,12 +425,14 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.check_circle_rounded, size: 20),
                   label: Text(
                     _isSubmitting ? 'Creating Outlet...' : 'Create Outlet Now',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 14),
                   ),
                   onPressed: _isSubmitting ? null : _submitForm,
                 ),
@@ -430,13 +470,20 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
           keyboardType: keyboardType,
           maxLines: maxLines,
           validator: validator,
-          style: const TextStyle(fontSize: 13, color: Color(0xFF09090B), fontWeight: FontWeight.w600),
+          style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF09090B),
+              fontWeight: FontWeight.w600),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFA1A1AA), fontWeight: FontWeight.w400),
+            hintStyle: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFFA1A1AA),
+                fontWeight: FontWeight.w400),
             filled: true,
             fillColor: const Color(0xFFF4F4F5),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide.none,
@@ -467,16 +514,20 @@ class _OutletCreateScreenState extends ConsumerState<OutletCreateScreen> {
         ),
         const SizedBox(height: 6),
         DropdownButtonFormField<T>(
-          value: value,
+          initialValue: value,
           items: items,
           onChanged: onChanged,
           validator: validator,
           isExpanded: true,
-          style: const TextStyle(fontSize: 13, color: Color(0xFF09090B), fontWeight: FontWeight.w600),
+          style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF09090B),
+              fontWeight: FontWeight.w600),
           decoration: InputDecoration(
             filled: true,
             fillColor: const Color(0xFFF4F4F5),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide.none,

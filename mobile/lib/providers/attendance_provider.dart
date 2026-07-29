@@ -4,14 +4,14 @@ import '../models/user.dart';
 import '../services/attendance_service.dart';
 import 'auth_provider.dart';
 
-import 'package:dio/dio.dart';
-
 final attendanceServiceProvider = Provider((ref) {
   final client = ref.watch(apiClientProvider);
   return AttendanceService(client);
 });
 
-final attendanceProvider = StateNotifierProvider<AttendanceNotifier, AsyncValue<AttendanceState>>((ref) {
+final attendanceProvider =
+    StateNotifierProvider<AttendanceNotifier, AsyncValue<AttendanceState>>(
+        (ref) {
   final notifier = AttendanceNotifier(ref.read(attendanceServiceProvider), ref);
   ref.listen<AsyncValue<AppUser?>>(authStateProvider, (prev, next) {
     if (next.value != null) {
@@ -25,7 +25,8 @@ class AttendanceNotifier extends StateNotifier<AsyncValue<AttendanceState>> {
   final AttendanceService _service;
   final Ref _ref;
 
-  AttendanceNotifier(this._service, this._ref) : super(AsyncValue.data(AttendanceState.notCheckedIn())) {
+  AttendanceNotifier(this._service, this._ref)
+      : super(AsyncValue.data(AttendanceState.notCheckedIn())) {
     refresh();
   }
 

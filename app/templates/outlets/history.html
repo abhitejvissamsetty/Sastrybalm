@@ -49,6 +49,8 @@
       {% endfor %}
     </div>
   </div>
+  {% from "shared/pagination.html" import render %}
+  {{ render(pagination, "/master-data/outlets/" ~ item.id ~ "/history?x=1") }}
 
 </div>
 {% endblock %}

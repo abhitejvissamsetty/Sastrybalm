@@ -11,6 +11,7 @@ from app.models import position         # imports user_positions; references Bea
 from app.models import beat             # imports position_beats; references Position, Outlet via string
 from app.models import outlet           # references Beat, Geography
 from app.models import outlet_version   # snapshots of outlet edits
+from app.models import order            # defines Order, OrderItem
 from app.models import payment          # references Order, Outlet, User
 from app.models import expense          # references User
 from app.models import attendance       # references User
@@ -28,3 +29,6 @@ from app.models import inventory
 from app.models import webhook
 from app.models import beat_type
 from app.models import leave
+from app.models import scheduler_state
+from app.models import idempotency
+from app.models import audit

@@ -8,32 +8,38 @@ from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.observability import (
+    configure_observability,
+    metrics_response,
+    observe_request,
+)
+from app.services.audit import audit_request
 
 from app.routers import auth, dashboard, geography, positions, beats, outlets, products, users, company, onboarding
 from app.routers import orders, payments, expenses, timesheets, tracking, analytics, material_requests
-from app.routers import asset_capitalizations, vendors, attendance, approvals, flags, inventory
+from app.routers import asset_capitalizations, vendors, attendance, approvals, flags, inventory, retailing, procurement
 from app.routers import settings as settings_router
 from app.routers.api import auth as api_auth
 from app.routers.api import master as api_master
 from app.routers.api import operations as api_operations
-from app.routers.api import webhooks as api_webhooks
 from app.routers.api import leaves as api_leaves
 from app.routers.api import journey_plan as api_journey_plan
 from app.routers.api import procurement_workflow as api_procurement_workflow
-from app.scheduler import start_scheduler, scheduler
-from app.services.startup_validation import validate_admin_and_s3_config
+from app.services.startup_validation import (
+    readiness_checks,
+    validate_admin_and_s3_config,
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Migrations are run by entrypoint.sh BEFORE Gunicorn forks workers.
-    # Workers only need to validate config and start the scheduler.
+    # Background jobs run in the dedicated scheduler container/process.
+    settings.validate_runtime_security()
     try:
         validate_admin_and_s3_config()
     except Exception as e:
         print(f"Lifespan startup validation error: {e}")
-    start_scheduler()
     yield
-    scheduler.shutdown(wait=False)
 
 
 
@@ -41,14 +47,38 @@ app = FastAPI(
     title=settings.app_name,
     description="Field Sales Force Automation — Admin Dashboard & Mobile API",
     version="1.0.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
+    docs_url="/api/docs" if settings.enable_api_docs else None,
+    redoc_url="/api/redoc" if settings.enable_api_docs else None,
     lifespan=lifespan,
 )
+configure_observability()
+app.middleware("http")(observe_request)
+app.middleware("http")(audit_request)
+
+
+@app.get("/health/live", include_in_schema=False)
+async def liveness():
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", include_in_schema=False)
+async def readiness():
+    checks = readiness_checks()
+    ready = all(checks.values())
+    return JSONResponse(
+        {"status": "ready" if ready else "not_ready", "checks": checks},
+        status_code=200 if ready else 503,
+    )
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics(request: Request):
+    return metrics_response(request)
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex="https?://.*",
+    allow_origins=settings.trusted_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -58,7 +88,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,
     max_age=86400 * 7,
-    https_only=False,
+    https_only=settings.secure_cookies,
     same_site="lax",
 )
 
@@ -72,7 +102,12 @@ from app.services.auth import is_system_onboarded
 async def enforce_onboarding_middleware(request: Request, call_next):
     path = request.url.path
     # Exempt static files, API calls, and the onboarding route itself
-    if path.startswith("/static") or path.startswith("/onboarding") or path.startswith("/api/"):
+    if (
+        path.startswith("/static")
+        or path.startswith("/onboarding")
+        or path.startswith("/api/")
+        or path.startswith("/health/")
+    ):
         return await call_next(request)
 
     db = SessionLocal()
@@ -88,6 +123,32 @@ async def enforce_onboarding_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def prevent_browser_caching_middleware(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if not path.startswith("/static"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0, private"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(self), geolocation=(self), microphone=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "base-uri 'self'; frame-ancestors 'none'; object-src 'none'; "
+        "img-src 'self' data: blob: https:; "
+        "font-src 'self' data: https:; "
+        "style-src 'self' 'unsafe-inline' https:; "
+        "script-src 'self' 'unsafe-inline'; "
+        "connect-src 'self' https:; form-action 'self'"
+    )
+    if settings.secure_cookies:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 _templates = Jinja2Templates(directory="app/templates")
 from app.utils.timezone import format_ist
 _templates.env.filters["format_ist"] = format_ist
@@ -101,6 +162,7 @@ app.include_router(dashboard.router)
 app.include_router(geography.router)
 app.include_router(positions.router)
 app.include_router(beats.router)
+app.include_router(retailing.router)
 app.include_router(outlets.router)
 app.include_router(products.router)
 app.include_router(warehouses.router)
@@ -117,6 +179,7 @@ app.include_router(timesheets.router)
 app.include_router(tracking.router)
 app.include_router(analytics.router)
 app.include_router(material_requests.router)
+app.include_router(procurement.router)
 app.include_router(asset_capitalizations.router)
 app.include_router(vendors.router)
 app.include_router(attendance.router)
@@ -220,59 +283,11 @@ async def legacy_vendors(request: Request, rest: str = ""):
 app.include_router(api_auth.router)
 app.include_router(api_master.router)
 app.include_router(api_operations.router)
-app.include_router(api_webhooks.router)
 app.include_router(api_leaves.router)
+from app.routers import admin_leaves
+app.include_router(admin_leaves.router)
 app.include_router(api_journey_plan.router)
 app.include_router(api_procurement_workflow.router)
-
-
-@app.post("/api/auth/login")
-async def debug_api_auth_login(request: Request):
-    from app.database import SessionLocal
-    from app.services.auth import authenticate_user
-    from app.utils.security import create_access_token
-
-    try:
-        body = await request.json()
-        print("DEBUG LOGIN PAYLOAD:", body)
-    except Exception as e:
-        body = await request.body()
-        print("DEBUG LOGIN PAYLOAD (raw):", body.decode("utf-8"))
-        return JSONResponse({"success": False, "message": "Invalid JSON"}, status_code=400)
-    
-    login_id = body.get("mobile") or body.get("username")
-    password = body.get("password")
-    
-    if not login_id or not password:
-        return JSONResponse({"success": False, "message": "Username/mobile and password required"}, status_code=400)
-        
-    db = SessionLocal()
-    try:
-        user = authenticate_user(db, login_id, password)
-        if not user:
-            print(f"Auth failed for user {login_id}")
-            return JSONResponse({"success": False, "message": "Invalid credentials"}, status_code=401)
-        
-        token = create_access_token({"sub": str(user.id), "role": user.role.value})
-        response_data = {
-            "success": True,
-            "data": {
-                "access_token": token,
-                "token_type": "bearer",
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "full_name": user.full_name,
-                    "role": user.role.value
-                }
-            }
-        }
-        print("Auth success, response data:", response_data)
-        return JSONResponse(response_data)
-    finally:
-        db.close()
-
-
 
 
 @app.exception_handler(401)
@@ -298,7 +313,10 @@ async def forbidden_handler(request: Request, exc):
     finally:
         db.close()
     return _templates.TemplateResponse(
-        "errors/403.html", {"request": request, "current_user": user, "detail": detail}, status_code=403
+        request=request,
+        name="errors/403.html",
+        context={"current_user": user, "detail": detail},
+        status_code=403,
     )
 
 
@@ -312,5 +330,8 @@ async def not_found_handler(request: Request, exc):
     finally:
         db.close()
     return _templates.TemplateResponse(
-        "errors/404.html", {"request": request, "current_user": user}, status_code=404
+        request=request,
+        name="errors/404.html",
+        context={"current_user": user},
+        status_code=404,
     )

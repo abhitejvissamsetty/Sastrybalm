@@ -1,6 +1,5 @@
 import os
 import re
-import shutil
 import logging
 from typing import Optional
 
@@ -88,22 +87,31 @@ async def onboarding_submit(
 
     # Handle backup restoration choice
     if restore_choice == "existing" and selected_backup:
-        candidate = os.path.join(BACKUP_DIR, selected_backup)
-        if os.path.exists(candidate) and (candidate.endswith(".sql") or candidate.endswith(".zip")):
+        candidate = os.path.join(BACKUP_DIR, os.path.basename(selected_backup))
+        if (
+            os.path.basename(selected_backup) == selected_backup
+            and os.path.exists(candidate)
+            and candidate.endswith(".sql.enc")
+        ):
             target_backup_filepath = candidate
         else:
             err = f"Selected backup file '{selected_backup}' not found."
 
     elif restore_choice == "upload" and backup_file and backup_file.filename:
-        if not (backup_file.filename.endswith(".sql") or backup_file.filename.endswith(".zip")):
-            err = "Uploaded backup file must be a .sql database dump."
+        if not backup_file.filename.endswith(".sql.enc"):
+            err = "Uploaded backup must be an encrypted .sql.enc Safar backup."
         else:
             os.makedirs(BACKUP_DIR, exist_ok=True)
-            upload_filename = f"safar_upload_{backup_file.filename}"
+            upload_filename = f"safar_upload_{os.path.basename(backup_file.filename)}"
             upload_filepath = os.path.join(BACKUP_DIR, upload_filename)
-            with open(upload_filepath, "wb") as buffer:
-                shutil.copyfileobj(backup_file.file, buffer)
-            target_backup_filepath = upload_filepath
+            contents = await backup_file.read()
+            if not contents or len(contents) > 1024 * 1024 * 1024:
+                err = "Encrypted backup must be non-empty and no larger than 1 GB."
+            else:
+                with open(upload_filepath, "wb") as buffer:
+                    buffer.write(contents)
+                os.chmod(upload_filepath, 0o600)
+                target_backup_filepath = upload_filepath
 
     if err:
         return templates.TemplateResponse("auth/onboarding.html", {
@@ -123,11 +131,12 @@ async def onboarding_submit(
             password=password,
             backup_file_path=target_backup_filepath,
         )
-    except ValueError as ve:
+    except (ValueError, Exception) as exc:
+        logger.error("Onboarding error: %s", exc, exc_info=True)
         return templates.TemplateResponse("auth/onboarding.html", {
             "request": request,
             "existing_backups": list_existing_backups(),
-            "error": str(ve),
+            "error": f"Onboarding failed: {exc}",
             "form_data": form_data,
         })
 

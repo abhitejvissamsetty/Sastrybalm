@@ -6,18 +6,12 @@ from app.models.company import PaymentMode
 class CompanyProfileCreate(BaseModel):
     code: str
     name: str
-    cmms_base_url: Optional[str] = None
-    cmms_api_key: Optional[str] = None      # plain; encrypted before storage
-    connect_base_url: Optional[str] = None
-    connect_api_key: Optional[str] = None
 
 
 class CompanyProfileResponse(BaseModel):
     id: int
     code: str
     name: str
-    cmms_base_url: Optional[str]
-    connect_base_url: Optional[str]
     is_active: bool
 
     model_config = {"from_attributes": True}

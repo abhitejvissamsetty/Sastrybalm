@@ -74,9 +74,17 @@ Chart.defaults.borderColor = "#1e293b";
 let revenueChart, visitsChart;
 
 async function loadData() {
-  const res  = await fetch(`/analytics/reps/data?days=${DAYS}`);
-  const data = await res.json();
-  const reps = data.reps;
+  const reps = [];
+  let page = 1;
+  let total = 0;
+  do {
+    const res = await fetch(`/analytics/reps/data?days=${DAYS}&page=${page}&per_page=100`);
+    const data = await res.json();
+    reps.push(...(data.reps || []));
+    total = data.total || reps.length;
+    page += 1;
+  } while (reps.length < total);
+  reps.sort((a, b) => b.revenue - a.revenue);
 
   if (reps.length === 0) {
     document.getElementById("scorecard-body").innerHTML =

@@ -41,6 +41,131 @@
     {% endif %}
   </div>
 
+  <!-- Visual 5-Stage Lifecycle Stepper -->
+  <div class="glass-panel rounded-3xl p-6 border border-white/10 space-y-3">
+    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Procurement Fulfillment Pipeline Lifecycle</h3>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
+      {% for step in lifecycle_stepper %}
+        <div class="p-3 rounded-2xl border text-center transition-all 
+          {% if step.completed %}bg-emerald-500/10 border-emerald-500/30 text-emerald-300
+          {% elif step.active %}bg-indigo-500/10 border-indigo-500/30 text-indigo-300 ring-2 ring-indigo-500/40
+          {% else %}bg-slate-900/60 border-white/5 text-slate-500{% endif %}">
+          <div class="w-6 h-6 rounded-full mx-auto flex items-center justify-center text-[10px] font-black mb-1.5 
+            {% if step.completed %}bg-emerald-500 text-slate-950
+            {% elif step.active %}bg-indigo-500 text-white animate-pulse
+            {% else %}bg-slate-800 text-slate-500{% endif %}">
+            {% if step.completed %}✓{% else %}{{ loop.index }}{% endif %}
+          </div>
+          <p class="text-xs font-bold truncate">{{ step.name }}</p>
+          <p class="text-[10px] opacity-75 mt-0.5">
+            {% if step.completed %}Completed{% elif step.active %}In Progress{% else %}Pending{% endif %}
+          </p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- L1 Requirements & Old Outlet Assets Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- L1 Rep Requirements Card -->
+    <div class="md:col-span-2 glass-panel rounded-3xl p-6 border border-white/10 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold text-indigo-300 uppercase tracking-widest">L1 Rep Detailed Requirements</h3>
+        <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-bold border border-indigo-500/30">
+          {{ item.request_type|title }}
+        </span>
+      </div>
+
+      <p class="text-sm font-bold text-white leading-relaxed">{{ item.description or item.item_details or '—' }}</p>
+      <div class="text-xs text-slate-300">
+        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Requested Product</span>
+        <span class="font-medium text-white">{{ item.product.name if item.product else item.category or 'Legacy request' }}</span>
+        {% if item.product and item.product.sku %}<span class="font-mono text-slate-400"> ({{ item.product.sku }})</span>{% endif %}
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 pt-2 text-xs text-slate-300 border-t border-white/5">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Approx Dimensions</span>
+          <span class="font-medium text-white">{{ item.approx_dimensions or 'Not specified' }}</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Material Specifications</span>
+          <span class="font-medium text-white">{{ item.material_specifications or 'Not specified' }}</span>
+        </div>
+      </div>
+
+      {% if item.client_notes %}
+        <div class="pt-2 border-t border-white/5">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Client / Site Notes</span>
+          <p class="text-xs text-slate-300 italic mt-0.5">"{{ item.client_notes }}"</p>
+        </div>
+      {% endif %}
+
+      {% if item.present_outlet_image_url or item.image_url or item.installation_place_image_url or item.customer_approval_letter_image_url %}
+        <div class="pt-2 border-t border-white/5 flex flex-wrap gap-2">
+          {% if item.present_outlet_image_url or item.image_url %}
+          <button type="button" onclick="openImageViewer('{{ item.present_outlet_image_url or item.image_url }}', 'Present Outlet Image')" 
+                  class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-xs font-semibold text-indigo-400 hover:text-white transition-all">
+            <span>Present Outlet</span>
+          </button>
+          {% endif %}
+          {% if item.installation_place_image_url %}
+          <button type="button" onclick="openImageViewer('{{ item.installation_place_image_url }}', 'Installation Place Image')" class="px-3 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-xs font-semibold text-indigo-400">Installation Place</button>
+          {% endif %}
+          {% if item.customer_approval_letter_image_url %}
+          <button type="button" onclick="openImageViewer('{{ item.customer_approval_letter_image_url }}', 'Customer Approval Letter')" class="px-3 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-xs font-semibold text-indigo-400">Approval Letter</button>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Old Active Deployed Assets Card for Outlet -->
+    <div class="glass-panel rounded-3xl p-6 border border-white/10 space-y-4">
+      <div>
+        <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Active Outlet Assets</h3>
+        <p class="text-[11px] text-slate-400 mt-0.5">Deployed at {{ item.outlet.name if item.outlet else 'Outlet' }}</p>
+      </div>
+
+      <div class="space-y-3 max-h-64 overflow-y-auto pr-1">
+        <!-- Procurement Category Assets -->
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Procurement Category ({{ procurement_assets|length }})</span>
+          {% if procurement_assets %}
+            <div class="space-y-1.5">
+              {% for ast in procurement_assets %}
+                <div class="p-2 rounded-xl bg-slate-900/80 border border-white/5 text-xs">
+                  <p class="font-bold text-white truncate">{{ ast.item_name }}</p>
+                  <p class="text-[10px] text-slate-400">Qty: {{ ast.quantity }} • Deployed {{ ast.created_at.strftime('%Y-%m-%d') if ast.created_at else '—' }}</p>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-xs text-slate-500 italic">No old procurement assets.</p>
+          {% endif %}
+        </div>
+
+        <!-- Stocked Category Assets -->
+        <div class="pt-2 border-t border-white/5">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Stocked Category ({{ stocked_assets|length }})</span>
+          {% if stocked_assets %}
+            <div class="space-y-1.5">
+              {% for ast in stocked_assets %}
+                <div class="p-2 rounded-xl bg-slate-900/80 border border-white/5 text-xs">
+                  <p class="font-bold text-white truncate">{{ ast.item_name }}</p>
+                  <p class="text-[10px] text-slate-400">Qty: {{ ast.quantity }} • Deployed {{ ast.created_at.strftime('%Y-%m-%d') if ast.created_at else '—' }}</p>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-xs text-slate-500 italic">No old stocked assets.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
   <!-- Header & Item Details Grid -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
     <!-- Item Details Card -->
@@ -60,7 +185,7 @@
       </div>
       {% if item.vendor %}
       <div>
-        <p class="text-sm font-bold text-white">{{ item.vendor.full_name }}</p>
+        <p class="text-sm font-bold text-white">{{ item.vendor.name }}</p>
         <p class="text-xs text-indigo-300">{{ item.vendor.email or item.vendor.mobile or 'Vendor Account' }}</p>
       </div>
       {% else %}
@@ -75,7 +200,7 @@
             <select name="vendor_id" required class="w-full text-xs rounded-lg bg-slate-900 border border-slate-700 text-white px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500">
               <option value="">Select Vendor…</option>
               {% for v in available_vendors %}
-              <option value="{{ v.id }}" {% if item.vendor_id == v.id %}selected{% endif %}>{{ v.full_name }} ({{ v.email or v.username }})</option>
+              <option value="{{ v.id }}" {% if item.vendor_id == v.id %}selected{% endif %}>{{ v.name }} ({{ v.email or v.mobile or 'No contact' }})</option>
               {% endfor %}
             </select>
             <button type="submit" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors">Assign</button>
@@ -149,7 +274,7 @@
             </button>
             {% endif %}
             <div>
-              <span class="text-sm font-bold text-white">Vendor: {{ q.vendor.full_name if q.vendor else 'Vendor' }}</span>
+              <span class="text-sm font-bold text-white">Vendor: {{ q.vendor.name if q.vendor else 'Vendor' }}</span>
               <span class="ml-2 text-xs font-mono text-emerald-400 font-bold">₹{{ "%.2f"|format(q.quote_amount) }}</span>
               <span class="ml-2 text-xs text-slate-400">({{ q.lead_time_days }} days lead time)</span>
             </div>
@@ -289,7 +414,7 @@
               {% endif %}
             </td>
             <td class="px-4 py-3 text-xs text-slate-300 whitespace-nowrap">
-              {{ log.vendor.full_name if log.vendor else 'Unassigned' }}
+              {{ log.vendor.name if log.vendor else 'Unassigned' }}
             </td>
             <td class="px-4 py-3 text-xs text-slate-400">
               {{ log.notes or '—' }}

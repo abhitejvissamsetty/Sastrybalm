@@ -9,6 +9,10 @@ class Product {
   final double? mrp;
   final double gstRate;
   final bool mustSell;
+  final bool isStockableItem;
+  final String categoryScope;
+  final int? warehouseId;
+  final int warehouseStockQty;
 
   Product({
     required this.id,
@@ -21,20 +25,31 @@ class Product {
     this.mrp,
     required this.gstRate,
     required this.mustSell,
+    this.isStockableItem = true,
+    this.categoryScope = "Sale",
+    this.warehouseId,
+    this.warehouseStockQty = 0,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) => Product(
-    id: json['id'],
-    name: json['name'],
-    erpId: json['erp_id'],
-    sku: json['sku'],
-    division: json['division'],
-    primaryCategory: json['primary_category'],
-    secondaryCategory: json['secondary_category'],
-    mrp: (json['mrp'] as num?)?.toDouble(),
-    gstRate: (json['gst_rate'] as num?)?.toDouble() ?? 0.0,
-    mustSell: json['must_sell'] ?? false,
-  );
+        id: json['id'],
+        name: json['name'],
+        erpId: json['erp_id'],
+        sku: json['sku'],
+        division: json['division'],
+        primaryCategory: json['primary_category'],
+        secondaryCategory: json['secondary_category'],
+        mrp: (json['mrp'] as num?)?.toDouble(),
+        gstRate: (json['gst_rate'] as num?)?.toDouble() ?? 0.0,
+        mustSell: json['must_sell'] ?? false,
+        isStockableItem: json['is_stockable_item'] == 1 ||
+            json['is_stockable_item'] == true ||
+            json['is_stockable_item'] == null,
+        categoryScope:
+            json['category_scope'] ?? json['category_type'] ?? "Sale",
+        warehouseId: json['warehouse_id'] as int?,
+        warehouseStockQty: (json['warehouse_stock_qty'] as num?)?.toInt() ?? 0,
+      );
 }
 
 class OrderItem {
@@ -60,12 +75,12 @@ class OrderItem {
   }
 
   Map<String, dynamic> toJson() => {
-    'product_id': productId,
-    'quantity': quantity,
-    'unit_price': unitPrice,
-    'gst_rate': gstRate,
-    'discount_pct': discountPct,
-  };
+        'product_id': productId,
+        'quantity': quantity,
+        'unit_price': unitPrice,
+        'gst_rate': gstRate,
+        'discount_pct': discountPct,
+      };
 }
 
 class Order {
@@ -86,11 +101,11 @@ class Order {
   });
 
   factory Order.fromJson(Map<String, dynamic> json) => Order(
-    id: json['id'],
-    orderNumber: json['order_number'],
-    status: json['status'],
-    outletName: json['outlet_name'],
-    totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0.0,
-    orderDate: json['order_date'],
-  );
+        id: json['id'],
+        orderNumber: json['order_number'],
+        status: json['status'],
+        outletName: json['outlet_name'],
+        totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0.0,
+        orderDate: json['order_date'],
+      );
 }

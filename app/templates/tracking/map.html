@@ -156,11 +156,19 @@ function toggleLayer(name, btn) {
 }
 
 async function loadData() {
-  const url = `/tracking/map/data?map_date=${MAP_DATE}&user_id=${USER_ID}`;
-  const res  = await fetch(url);
-  const data = await res.json();
-
-  const { checkins, visits, outlets } = data;
+  const checkins = [], visits = [], outlets = [];
+  let page = 1;
+  let total = 0;
+  do {
+    const url = `/tracking/map/data?map_date=${MAP_DATE}&user_id=${USER_ID}&page=${page}&per_page=100`;
+    const res = await fetch(url);
+    const data = await res.json();
+    checkins.push(...(data.checkins || []));
+    visits.push(...(data.visits || []));
+    outlets.push(...(data.outlets || []));
+    total = data.total || Math.max(checkins.length, visits.length, outlets.length);
+    page += 1;
+  } while ((page - 1) * 100 < total);
   const repSet = {};
 
   // --- Check-in markers ---

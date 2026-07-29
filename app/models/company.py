@@ -21,22 +21,7 @@ class CompanyProfile(Base):
     code = Column(String(100), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=False)
 
-    # ZAP Integration
-    zap_base_url = Column(String(500))
-    zap_api_key_encrypted = Column(Text)  # format: api_key:api_secret (encrypted)
-    zap_backend_company = Column(String(255))
-
-    # CMMS Integration
-    cmms_base_url = Column(String(500))
-    cmms_api_key_encrypted = Column(Text)
-    cmms_backend_company = Column(String(255))
-
-    # CONNECT Integration
-    connect_base_url = Column(String(500))
-    connect_api_key_encrypted = Column(Text)
-    connect_backend_company = Column(String(255))
-
-    # Tags: JSON array e.g. ["ZAP-READY","CMMS-READY","CONNECT-READY"]
+    # Optional internal labels.
     tags = Column(Text, default="[]")
 
     is_active = Column(Boolean, default=True, nullable=False)
@@ -71,27 +56,8 @@ class CompanyProfile(Base):
     def has_tag(self, tag: str) -> bool:
         return tag in self.get_tags()
 
-    @property
-    def is_zap_ready(self) -> bool:
-        return self.has_tag("ZAP-READY")
-
-    @property
-    def is_cmms_ready(self) -> bool:
-        return self.has_tag("CMMS-READY")
-
-    @property
-    def is_connect_ready(self) -> bool:
-        return self.has_tag("CONNECT-READY")
-
     def tag_badges(self) -> list[dict]:
-        badge_map = {
-            "ZAP-READY": "bg-emerald-900/50 text-emerald-300",
-            "CMMS-READY": "bg-blue-900/50 text-blue-300",
-            "CONNECT-READY": "bg-purple-900/50 text-purple-300",
-            "ZAP-ERROR": "bg-red-900/50 text-red-300",
-            "CMMS-ERROR": "bg-red-900/50 text-red-300",
-            "CONNECT-ERROR": "bg-red-900/50 text-red-300",
-        }
+        badge_map = {}
         return [
             {"name": t, "cls": badge_map.get(t, "bg-slate-700 text-slate-300")}
             for t in self.get_tags()
@@ -113,6 +79,14 @@ class SystemConfiguration(Base):
     # Global payment settings
     payment_mode = Column(SAEnum(PaymentMode), nullable=True, default=PaymentMode.cash_only)
     denomination_mandatory = Column(Boolean, default=False, nullable=False)
+
+    # SMTP credentials are encrypted before database persistence.
+    smtp_host = Column(String(255), nullable=True)
+    smtp_port = Column(Integer, default=587, nullable=False)
+    smtp_user = Column(String(255), nullable=True)
+    smtp_password = Column(Text, nullable=True)
+    smtp_from = Column(String(255), nullable=True)
+    smtp_use_tls = Column(Boolean, default=True, nullable=False)
 
     # Order Auto-Approval Cutoff Setting
     auto_approval_cutoff_hours = Column(Integer, default=24, nullable=False)

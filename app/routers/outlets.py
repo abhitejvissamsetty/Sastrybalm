@@ -15,6 +15,11 @@ from app.models.user import User, UserRole
 from app.utils.csv_import import parse_csv_bytes
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
+from app.services.access_control import (
+    build_access_scope,
+    require_outlet_access,
+    scope_outlet_query,
+)
 
 router = APIRouter(prefix="/master-data/outlets", tags=["outlets"])
 templates = Jinja2Templates(directory="app/templates")
@@ -54,6 +59,24 @@ def _snapshot_outlet_version(db: Session, outlet: Outlet, user_id: Optional[int]
     return version
 
 
+def _scoped_form_options(db: Session, user: User):
+    scope = build_access_scope(user, db)
+    beat_query = db.query(Beat).filter(Beat.is_active == True)
+    territory_query = db.query(Geography).filter(
+        Geography.level == GeoLevel.territory,
+        Geography.is_active == True,
+    )
+    if not scope.unrestricted:
+        beat_query = beat_query.filter(Beat.id.in_(scope.beat_ids or {-1}))
+        territory_query = territory_query.filter(
+            Geography.id.in_(scope.geography_ids or {-1})
+        )
+    return (
+        beat_query.order_by(Beat.name).all(),
+        territory_query.order_by(Geography.name).all(),
+    )
+
+
 @router.get("", response_class=HTMLResponse)
 async def outlet_list(
     request: Request,
@@ -64,10 +87,8 @@ async def outlet_list(
     beat_id: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(Outlet)
-    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
-    if allowed_geo_ids is not None:
-        query = query.filter(Outlet.territory_id.in_(allowed_geo_ids))
+    query = scope_outlet_query(db.query(Outlet), current_user, db)
+    access_scope = build_access_scope(current_user, db)
 
     if q:
         query = query.filter(Outlet.name.ilike(f"%{q}%") | Outlet.mobile.ilike(f"%{q}%") | Outlet.code.ilike(f"%{q}%"))
@@ -78,14 +99,20 @@ async def outlet_list(
     selected_beat = None
     if beat_id:
         try:
-            selected_beat = db.query(Beat).filter(Beat.id == int(beat_id)).first()
+            selected_beat = db.query(Beat).filter(
+                Beat.id == int(beat_id),
+                Beat.id.in_(access_scope.beat_ids or {-1})
+                if not access_scope.unrestricted else True,
+            ).first()
         except ValueError:
             pass
     query = query.order_by(Outlet.name)
     pagination = paginate(query, page)
     beats_query = db.query(Beat).filter(Beat.is_active == True)
-    if allowed_geo_ids is not None:
-        beats_query = beats_query.filter(Beat.territory_id.in_(allowed_geo_ids))
+    if not access_scope.unrestricted:
+        beats_query = beats_query.filter(
+            Beat.id.in_(access_scope.beat_ids or {-1})
+        )
     beats = beats_query.order_by(Beat.name).all()
     return templates.TemplateResponse("outlets/list.html", {
         "request": request, "current_user": current_user,
@@ -103,8 +130,7 @@ async def outlet_new(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-    territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
+    beats, territories = _scoped_form_options(db, current_user)
     return templates.TemplateResponse("outlets/form.html", {
         "request": request, "current_user": current_user,
         "item": None, "beats": beats, "territories": territories, "error": None,
@@ -133,8 +159,7 @@ async def outlet_create(
     gps_lng: Optional[str] = Form(default=None),
     photo: Optional[UploadFile] = File(default=None),
 ):
-    beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-    territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
+    beats, territories = _scoped_form_options(db, current_user)
 
     # Generate code if blank
     if not code or not code.strip():
@@ -174,6 +199,24 @@ async def outlet_create(
             "error": "Beat is mandatory for active outlets.",
         })
 
+    access_scope = build_access_scope(current_user, db)
+    selected_beat = db.query(Beat).filter(
+        Beat.id == int(beat_id), Beat.is_active == True
+    ).first()
+    if (
+        not selected_beat
+        or (
+            not access_scope.unrestricted
+            and selected_beat.id not in access_scope.beat_ids
+        )
+    ):
+        return templates.TemplateResponse("outlets/form.html", {
+            "request": request, "current_user": current_user,
+            "item": None, "beats": beats, "territories": territories,
+            "ChannelType": ChannelType, "ShopType": ShopType,
+            "error": "Selected Beat is outside your authorized scope.",
+        }, status_code=404)
+
     photo_url = None
     if photo and photo.filename:
         file_bytes = await photo.read()
@@ -199,8 +242,8 @@ async def outlet_create(
         external_id=external_id or None,
         gstin=gstin or None,
         pincode=pincode or None,
-        beat_id=int(beat_id) if beat_id else None,
-        territory_id=int(territory_id) if territory_id else None,
+        beat_id=selected_beat.id,
+        territory_id=selected_beat.territory_id,
         gps_lat=float(gps_lat) if gps_lat else None,
         gps_lng=float(gps_lng) if gps_lng else None,
         photo_url=photo_url,
@@ -218,10 +261,7 @@ async def outlet_detail(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
-    if not item:
-        set_flash_error(request, "Outlet not found.")
-        return RedirectResponse("/master-data/outlets", status_code=302)
+    item = require_outlet_access(db, current_user, outlet_id)
     from app.models.order import Order, OrderStatus
     from app.models.timesheet import VisitRecord
     recent_orders = (
@@ -244,12 +284,8 @@ async def outlet_edit(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
-    if not item:
-        set_flash_error(request, "Outlet not found.")
-        return RedirectResponse("/master-data/outlets", status_code=302)
-    beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-    territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
+    item = require_outlet_access(db, current_user, outlet_id)
+    beats, territories = _scoped_form_options(db, current_user)
     return templates.TemplateResponse("outlets/form.html", {
         "request": request, "current_user": current_user,
         "item": item, "beats": beats, "territories": territories, "error": None,
@@ -278,19 +314,25 @@ async def outlet_update(
     gps_lng: Optional[str] = Form(default=None),
     photo: Optional[UploadFile] = File(default=None),
 ):
-    item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
-    if not item:
-        set_flash_error(request, "Outlet not found.")
-        return RedirectResponse("/master-data/outlets", status_code=302)
-
-    allowed_geo_ids = get_user_allowed_geography_ids(current_user, db)
-    if allowed_geo_ids is not None:
-        if item.territory_id and item.territory_id not in allowed_geo_ids:
-            set_flash_error(request, "Access denied. You can only edit outlets in your assigned geography.")
-            return RedirectResponse("/master-data/outlets", status_code=302)
-
-    beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-    territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
+    item = require_outlet_access(db, current_user, outlet_id)
+    beats, territories = _scoped_form_options(db, current_user)
+    access_scope = build_access_scope(current_user, db)
+    selected_beat = db.query(Beat).filter(
+        Beat.id == int(beat_id), Beat.is_active == True
+    ).first() if beat_id else None
+    if (
+        not selected_beat
+        or (
+            not access_scope.unrestricted
+            and selected_beat.id not in access_scope.beat_ids
+        )
+    ):
+        return templates.TemplateResponse("outlets/form.html", {
+            "request": request, "current_user": current_user,
+            "item": item, "beats": beats, "territories": territories,
+            "ChannelType": ChannelType, "ShopType": ShopType,
+            "error": "Selected Beat is outside your authorized scope.",
+        }, status_code=404)
 
     # Unique code check
     if code and db.query(Outlet).filter(Outlet.code == code.upper(), Outlet.id != outlet_id).first():
@@ -321,8 +363,8 @@ async def outlet_update(
         proposed_payload = json.dumps({
             "name": name, "code": code.upper() if code else None, "owner_name": owner_name,
             "mobile": mobile, "address": address, "channel": channel, "shop_type": shop_type,
-            "gstin": gstin, "pincode": pincode, "beat_id": int(beat_id) if beat_id else None,
-            "territory_id": int(territory_id) if territory_id else None,
+            "gstin": gstin, "pincode": pincode, "beat_id": selected_beat.id,
+            "territory_id": selected_beat.territory_id,
             "gps_lat": float(gps_lat) if gps_lat else None, "gps_lng": float(gps_lng) if gps_lng else None
         })
         flag = AutoFlag(
@@ -353,8 +395,8 @@ async def outlet_update(
     item.external_id = external_id or None
     item.gstin = gstin or None
     item.pincode = pincode or None
-    item.beat_id = int(beat_id) if beat_id else None
-    item.territory_id = int(territory_id) if territory_id else None
+    item.beat_id = selected_beat.id
+    item.territory_id = selected_beat.territory_id
     item.gps_lat = float(gps_lat) if gps_lat else None
     item.gps_lng = float(gps_lng) if gps_lng else None
     db.commit()
@@ -365,17 +407,24 @@ async def outlet_update(
 @router.get("/{outlet_id}/history", response_class=HTMLResponse)
 async def outlet_history(
     outlet_id: int, request: Request,
+    page: int = Query(default=1, ge=1),
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
+    item = require_outlet_access(db, current_user, outlet_id)
     if not item:
         set_flash_error(request, "Outlet not found.")
         return RedirectResponse("/master-data/outlets", status_code=302)
-    versions = db.query(OutletVersion).filter(OutletVersion.outlet_id == outlet_id).order_by(OutletVersion.version_number.desc()).all()
+    pagination = paginate(
+        db.query(OutletVersion)
+        .filter(OutletVersion.outlet_id == outlet_id)
+        .order_by(OutletVersion.version_number.desc()),
+        page,
+    )
     return templates.TemplateResponse("outlets/history.html", {
         "request": request, "current_user": current_user,
-        "item": item, "versions": versions, **get_flash(request),
+        "item": item, "versions": pagination.items,
+        "pagination": pagination, **get_flash(request),
     })
 
 
@@ -385,7 +434,7 @@ async def outlet_revert(
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
+    item = require_outlet_access(db, current_user, outlet_id)
     ver = db.query(OutletVersion).filter(OutletVersion.id == version_id, OutletVersion.outlet_id == outlet_id).first()
     if not item or not ver:
         set_flash_error(request, "Version snapshot not found.")
@@ -423,15 +472,14 @@ async def outlet_toggle(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Outlet).filter(Outlet.id == outlet_id).first()
-    if item:
-        if item.status == OutletStatus.active:
-            item.status = OutletStatus.inactive
-            set_flash_success(request, f"'{item.name}' deactivated.")
-        else:
-            item.status = OutletStatus.active
-            set_flash_success(request, f"'{item.name}' activated.")
-        db.commit()
+    item = require_outlet_access(db, current_user, outlet_id)
+    if item.status == OutletStatus.active:
+        item.status = OutletStatus.inactive
+        set_flash_success(request, f"'{item.name}' deactivated.")
+    else:
+        item.status = OutletStatus.active
+        set_flash_success(request, f"'{item.name}' activated.")
+    db.commit()
     return RedirectResponse("/master-data/outlets", status_code=302)
 
 
@@ -459,7 +507,16 @@ async def outlet_import(
             errors.append(f"Row {i}: code '{code}' already exists")
             continue
         beat_code = row.get("beat_code", "").upper()
-        beat = db.query(Beat).filter(Beat.code == beat_code).first() if beat_code else None
+        access_scope = build_access_scope(current_user, db)
+        beat_query = db.query(Beat).filter(Beat.code == beat_code)
+        if not access_scope.unrestricted:
+            beat_query = beat_query.filter(
+                Beat.id.in_(access_scope.beat_ids or {-1})
+            )
+        beat = beat_query.first() if beat_code else None
+        if beat_code and not beat:
+            errors.append(f"Row {i}: Beat is outside your authorized scope")
+            continue
         try:
             lat = float(row["gps_lat"]) if row.get("gps_lat") else None
             lng = float(row["gps_lng"]) if row.get("gps_lng") else None
@@ -467,7 +524,9 @@ async def outlet_import(
             lat = lng = None
         db.add(Outlet(
             name=name, code=code, mobile=row.get("mobile") or None,
-            beat_id=beat.id if beat else None, address=row.get("address") or None,
+            beat_id=beat.id if beat else None,
+            territory_id=beat.territory_id if beat else None,
+            address=row.get("address") or None,
             gps_lat=lat, gps_lng=lng, channel=row.get("channel") or None,
             status=OutletStatus.active,
         ))
@@ -487,7 +546,9 @@ async def outlet_export(
     current_user: User = Depends(require_web_auth),
     db: Session = Depends(get_db),
 ):
-    outlets = db.query(Outlet).order_by(Outlet.name).all()
+    outlets = scope_outlet_query(
+        db.query(Outlet), current_user, db
+    ).order_by(Outlet.name).all()
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["id", "name", "code", "mobile", "beat", "territory", "address", "gps_lat", "gps_lng", "channel", "status"])

@@ -10,7 +10,8 @@ class EisMisScreen extends ConsumerStatefulWidget {
   ConsumerState<EisMisScreen> createState() => _EisMisScreenState();
 }
 
-class _EisMisScreenState extends ConsumerState<EisMisScreen> with SingleTickerProviderStateMixin {
+class _EisMisScreenState extends ConsumerState<EisMisScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   Map<String, dynamic>? _eisData;
   Map<String, dynamic>? _misData;
@@ -71,7 +72,8 @@ class _EisMisScreenState extends ConsumerState<EisMisScreen> with SingleTickerPr
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF09090B)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF09090B)))
           : TabBarView(
               controller: _tabController,
               children: [
@@ -91,7 +93,8 @@ class _EisMisScreenState extends ConsumerState<EisMisScreen> with SingleTickerPr
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Employee Information System', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          const Text('Employee Information System',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 14),
           GridView.count(
             crossAxisCount: 2,
@@ -101,12 +104,28 @@ class _EisMisScreenState extends ConsumerState<EisMisScreen> with SingleTickerPr
             mainAxisSpacing: 12,
             childAspectRatio: 1.3,
             children: [
-              _buildStatCard('Secondary Orders', '${_eisData!['secondary_orders_count']}', Icons.receipt_long_outlined),
-              _buildStatCard('Primary Orders', '${_eisData!['primary_orders_count']}', Icons.shopping_bag_outlined),
-              _buildStatCard('Payments', '${_eisData!['payments_count']}', Icons.payments_outlined),
-              _buildStatCard('Material Requests', '${_eisData!['material_requests_count']}', Icons.inventory_2_outlined),
-              _buildStatCard('Attendance Days', '${_eisData!['attendance_days_count']} Days', Icons.calendar_today_outlined),
-              _buildStatCard('Productivity KPI', '${_eisData!['productivity_kpi']}', Icons.trending_up_rounded),
+              _buildStatCard(
+                  'Secondary Orders',
+                  '${_eisData!['secondary_orders_count']}',
+                  Icons.receipt_long_outlined),
+              _buildStatCard(
+                  'Primary Orders',
+                  '${_eisData!['primary_orders_count']}',
+                  Icons.shopping_bag_outlined),
+              _buildStatCard('Payments', '${_eisData!['payments_count']}',
+                  Icons.payments_outlined),
+              _buildStatCard(
+                  'Material Requests',
+                  '${_eisData!['material_requests_count']}',
+                  Icons.inventory_2_outlined),
+              _buildStatCard(
+                  'Attendance Days',
+                  '${_eisData!['attendance_days_count']} Days',
+                  Icons.calendar_today_outlined),
+              _buildStatCard(
+                  'Productivity KPI',
+                  '${_eisData!['productivity_kpi']}',
+                  Icons.trending_up_rounded),
             ],
           ),
         ],
@@ -119,7 +138,8 @@ class _EisMisScreenState extends ConsumerState<EisMisScreen> with SingleTickerPr
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(20),
-          child: Text('MIS Analytics are restricted to Territory Managers & Regional Leaders.'),
+          child: Text(
+              'MIS Analytics are restricted to Territory Managers & Regional Leaders.'),
         ),
       );
     }
@@ -128,7 +148,8 @@ class _EisMisScreenState extends ConsumerState<EisMisScreen> with SingleTickerPr
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Managerial Information System (Team)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          const Text('Managerial Information System (Team)',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 14),
           GridView.count(
             crossAxisCount: 2,
@@ -138,12 +159,30 @@ class _EisMisScreenState extends ConsumerState<EisMisScreen> with SingleTickerPr
             mainAxisSpacing: 12,
             childAspectRatio: 1.3,
             children: [
-              _buildStatCard('Team Primary Orders', '${_misData!['team_primary_orders']}', Icons.shopping_bag_rounded),
-              _buildStatCard('Team Secondary Orders', '${_misData!['team_secondary_orders']}', Icons.receipt_rounded),
-              _buildStatCard('Payments Collected', '${_misData!['team_payments_collected']}', Icons.payments_rounded),
-              _buildStatCard('Material Requests', '${_misData!['team_material_requests']}', Icons.inventory_rounded),
-              _buildStatCard('Outlets Managed', '${_misData!['total_outlets_managed']}', Icons.storefront_rounded),
-              _buildStatCard('Team KPI Rating', '${_misData!['team_productivity_kpi']}', Icons.leaderboard_rounded),
+              _buildStatCard(
+                  'Team Primary Orders',
+                  '${_misData!['team_primary_orders']}',
+                  Icons.shopping_bag_rounded),
+              _buildStatCard(
+                  'Team Secondary Orders',
+                  '${_misData!['team_secondary_orders']}',
+                  Icons.receipt_rounded),
+              _buildStatCard(
+                  'Payments Collected',
+                  '${_misData!['team_payments_collected']}',
+                  Icons.payments_rounded),
+              _buildStatCard(
+                  'Material Requests',
+                  '${_misData!['team_material_requests']}',
+                  Icons.inventory_rounded),
+              _buildStatCard(
+                  'Outlets Managed',
+                  '${_misData!['total_outlets_managed']}',
+                  Icons.storefront_rounded),
+              _buildStatCard(
+                  'Team KPI Rating',
+                  '${_misData!['team_productivity_kpi']}',
+                  Icons.leaderboard_rounded),
             ],
           ),
         ],
@@ -165,9 +204,14 @@ class _EisMisScreenState extends ConsumerState<EisMisScreen> with SingleTickerPr
         children: [
           Icon(icon, color: const Color(0xFF09090B), size: 20),
           const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF09090B))),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF09090B))),
           const SizedBox(height: 2),
-          Text(title, style: const TextStyle(fontSize: 11, color: Color(0xFF71717A))),
+          Text(title,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF71717A))),
         ],
       ),
     );

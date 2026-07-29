@@ -59,12 +59,14 @@ class _DenominationInputState extends State<DenominationInput> {
                     },
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: theme.colorScheme.primary.withOpacity(0.05),
+                      fillColor:
+                          theme.colorScheme.primary.withValues(alpha: 0.05),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 12),
                     ),
                   ),
                 ),
@@ -81,7 +83,9 @@ class _DenominationInputState extends State<DenominationInput> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Total Denoms', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            Text('Total Denoms',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
             Text(
               '₹${_totalFromDenoms.toStringAsFixed(0)}',
               style: TextStyle(
@@ -99,7 +103,10 @@ class _DenominationInputState extends State<DenominationInput> {
               diff > 0
                   ? 'Excess: ₹${diff.abs().toStringAsFixed(0)}'
                   : 'Short: ₹${diff.abs().toStringAsFixed(0)}',
-              style: TextStyle(color: Colors.red.shade600, fontSize: 12, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: Colors.red.shade600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold),
             ),
           ),
       ],

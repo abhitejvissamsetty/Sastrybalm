@@ -1,0 +1,20 @@
+{
+  "dataset": {
+    "outlets_minimum": 2000,
+    "orders_minimum": 5000
+  },
+  "http": {
+    "p95_latency_ms_max": 1000,
+    "image_p95_latency_ms_max": 300,
+    "error_rate_pct_max": 0,
+    "throughput_rps_min": 15
+  },
+  "database": {
+    "representative_query_ms_max": 250,
+    "connection_utilization_pct_max": 70
+  },
+  "resources": {
+    "average_cpu_pct_max": 85,
+    "memory_peak_mb_max": 768
+  }
+}

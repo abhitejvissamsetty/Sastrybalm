@@ -124,8 +124,8 @@
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">Secret Signing Key (Optional)</label>
-          <input type="text" name="secret_key" placeholder="whsec_secret_key_12345"
+          <label class="block text-xs font-medium text-slate-300 mb-1">Secret Signing Key <span class="text-red-400">*</span></label>
+          <input type="password" name="secret_key" minlength="32" required placeholder="At least 32 random characters"
                  class="w-full rounded-lg bg-slate-950 border border-slate-700 text-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
 
@@ -139,6 +139,8 @@
       </form>
     </div>
   </div>
+  {% from "shared/pagination.html" import render %}
+  {{ render(pagination, "/settings/webhooks?x=1") }}
 
 </div>
 {% endblock %}

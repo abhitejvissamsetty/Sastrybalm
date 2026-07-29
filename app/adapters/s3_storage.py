@@ -90,7 +90,10 @@ def upload_file_to_s3(
 
     bucket = s3_config.get("s3_bucket")
     if not bucket or not s3_config.get("s3_access_key"):
-        # Fallback to local media saving
+        from app.config import settings
+        if settings.is_production:
+            return False, "Object storage is required in production."
+        # Development-only fallback to local media saving
         local_dir = os.path.join("app", "static", "uploads")
         os.makedirs(local_dir, exist_ok=True)
         local_path = os.path.join(local_dir, os.path.basename(object_name))
@@ -131,6 +134,9 @@ def generate_presigned_url(object_name: str, expiration_seconds: int = 3600, s3_
 
     bucket = s3_config.get("s3_bucket")
     if not bucket:
+        from app.config import settings
+        if settings.is_production:
+            raise RuntimeError("Object storage is required in production.")
         return f"/static/uploads/{os.path.basename(object_name)}"
 
     try:
@@ -143,4 +149,7 @@ def generate_presigned_url(object_name: str, expiration_seconds: int = 3600, s3_
         return url
     except Exception as e:
         logger.error(f"Error generating presigned URL for '{object_name}': {e}")
+        from app.config import settings
+        if settings.is_production:
+            raise RuntimeError("Unable to generate object download URL.") from e
         return f"/static/uploads/{os.path.basename(object_name)}"

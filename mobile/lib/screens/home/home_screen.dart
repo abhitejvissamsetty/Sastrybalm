@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../providers/sync_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   final Widget child;
@@ -112,9 +111,9 @@ class HomeScreen extends ConsumerWidget {
     int badgeCount = 0,
   }) {
     final isSelected = index == selectedIndex;
-    const activeColor = Color(0xFF09090B);    // Zinc 950
-    const inactiveColor = Color(0xFF71717A);  // Zinc 500
-    const activeBg = Color(0xFFF4F4F5);       // Zinc 100
+    const activeColor = Color(0xFF09090B); // Zinc 950
+    const inactiveColor = Color(0xFF71717A); // Zinc 500
+    const activeBg = Color(0xFFF4F4F5); // Zinc 100
 
     return Expanded(
       child: InkWell(

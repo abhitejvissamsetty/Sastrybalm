@@ -153,6 +153,8 @@
       </form>
     </div>
   </div>
+  {% from "shared/pagination.html" import render %}
+  {{ render(pagination, "/settings/warehouses?x=1") }}
 
 </div>
 {% endblock %}

@@ -10,7 +10,10 @@ class UserOTP(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     email = Column(String(255), nullable=False, index=True)
-    otp_code = Column(String(6), nullable=False)
+    # Stores a one-way bcrypt hash. The longer column remains compatible with
+    # legacy rows while preventing newly issued OTPs from being recovered.
+    otp_code = Column(String(255), nullable=False)
+    failed_attempts = Column(Integer, default=0, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     is_used = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

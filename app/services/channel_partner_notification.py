@@ -199,7 +199,7 @@ def trigger_instant_order_notification(db: Session, order: Order) -> None:
     """
     Triggers instant order notification for channel partner(s) attached to order's geography
     UPON ORDER APPROVAL (status = 'confirmed').
-    Dispatches via partner's assigned notification delivery service (Email SMTP, WhatsApp API, Webhook, Both).
+    Records delivery through the partner's assigned in-app, WhatsApp, or webhook channel.
     """
     if not order or not order.outlet or not order.outlet.geography_id:
         return
@@ -223,6 +223,27 @@ def trigger_instant_order_notification(db: Session, order: Order) -> None:
     ).all()
 
     for cp in cps:
+        from app.models.scheduler_state import NotificationDelivery
+        from sqlalchemy.exc import IntegrityError
+        try:
+            with db.begin_nested():
+                db.add(NotificationDelivery(
+                    event_type="order.confirmed",
+                    entity_type="order",
+                    entity_id=order.id,
+                    recipient_type="channel_partner",
+                    recipient_id=cp.id,
+                    status="sent",
+                ))
+                db.flush()
+        except IntegrityError:
+            logger.info(
+                "Skipping duplicate approved-order notification for order %s "
+                "and channel partner %s",
+                order.order_number,
+                cp.id,
+            )
+            continue
         logger.info(
             f"[APPROVED ORDER NOTIFICATION] Order {order.order_number} (Amount: ₹{order.total_amount:.2f}) "
             f"Approved! Dispatched via {cp.notification_channel_label} to Channel Partner '{cp.name}' "
@@ -263,14 +284,14 @@ def trigger_vendor_material_request_notification(db: Session, mr, is_reassignmen
     if not mr or not mr.vendor_id:
         return
 
-    from app.models.user import User
-    vendor = db.query(User).filter(User.id == mr.vendor_id).first()
+    from app.models.vendor import Vendor
+    vendor = db.query(Vendor).filter(Vendor.id == mr.vendor_id).first()
     if not vendor:
         return
 
     event_type = "REASSIGNED" if is_reassignment else "ASSIGNED"
     logger.info(
         f"[VENDOR MR NOTIFICATION - {event_type}] Material Request {mr.mr_number} "
-        f"assigned to Vendor '{vendor.full_name}' (Email: {vendor.email or 'N/A'}, Mobile: {vendor.mobile or 'N/A'}). "
+        f"assigned to Vendor '{vendor.name}' (Email: {vendor.email or 'N/A'}, Mobile: {vendor.mobile or 'N/A'}). "
         f"Notification dispatched via preferred channel."
     )

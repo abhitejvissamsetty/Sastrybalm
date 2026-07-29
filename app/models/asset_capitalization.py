@@ -1,8 +1,4 @@
-"""
-Asset Capitalization — Records of marketing materials being hosted at outlets.
-No approval needed — goes direct to CMMS queue.
-Rep or Vendor Technician picks the item from CMMS-assigned warehouse.
-"""
+"""Asset capitalization records for materials deployed at outlets."""
 import enum
 
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Text
@@ -37,8 +33,10 @@ class AssetCapitalization(Base):
     ac_number = Column(String(30), unique=True, nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     outlet_id = Column(Integer, ForeignKey("outlets.id", ondelete="RESTRICT"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="RESTRICT"), nullable=True, index=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id", ondelete="RESTRICT"), nullable=True, index=True)
     company_profile_id = Column(Integer, ForeignKey("company_profiles.id", ondelete="SET NULL"), nullable=True)
-    # Item details (from CMMS)
+    # Item details
     item_name = Column(String(255), nullable=False)
     item_code = Column(String(100), nullable=True)
     quantity = Column(Integer, nullable=False, default=1)
@@ -50,7 +48,6 @@ class AssetCapitalization(Base):
     # Status & sync
     status = Column(Enum(ACStatus), nullable=False, default=ACStatus.pending)
     sync_status = Column(Enum(ACSyncStatus), nullable=False, default=ACSyncStatus.not_applicable)
-    cmms_ref = Column(String(100), nullable=True)
     sync_error = Column(Text, nullable=True)
     # Procurement link & QC validation
     procurement_item_id = Column(Integer, ForeignKey("procurement_items.id", ondelete="SET NULL"), nullable=True)
@@ -60,11 +57,14 @@ class AssetCapitalization(Base):
     notes = Column(Text, nullable=True)
     image_url = Column(Text, nullable=True)
     deployed_at = Column(DateTime, nullable=True)
+    asset_state = Column(String(30), nullable=False, default="Installed")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", foreign_keys=[user_id])
     outlet = relationship("Outlet", foreign_keys=[outlet_id])
+    product = relationship("Product", foreign_keys=[product_id])
+    warehouse = relationship("Warehouse", foreign_keys=[warehouse_id])
     company_profile = relationship("CompanyProfile", foreign_keys=[company_profile_id])
     vendor = relationship("Vendor", foreign_keys=[vendor_id])
     vendor_employee = relationship("VendorEmployee", foreign_keys=[vendor_employee_id])
@@ -93,9 +93,31 @@ class AssetMaintenanceLog(Base):
     asset_id = Column(Integer, ForeignKey("asset_capitalizations.id", ondelete="CASCADE"), nullable=False, index=True)
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text, nullable=False)
+    issue_description = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False, default="In Progress", index=True)
+    progress_percent = Column(Integer, nullable=False, default=0)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="SET NULL"), nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    validated_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    validated_at = Column(DateTime, nullable=True)
     photo_url = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     asset = relationship("AssetCapitalization", backref="maintenance_logs")
     created_by = relationship("User", foreign_keys=[created_by_id])
+    vendor = relationship("Vendor", foreign_keys=[vendor_id])
+    validated_by = relationship("User", foreign_keys=[validated_by_id])
 
+
+class MaintenanceProgressLog(Base):
+    __tablename__ = "maintenance_progress_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    maintenance_log_id = Column(Integer, ForeignKey("asset_maintenance_logs.id", ondelete="CASCADE"), nullable=False, index=True)
+    progress_percent = Column(Integer, nullable=False)
+    remarks = Column(Text, nullable=True)
+    reported_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    maintenance_log = relationship("AssetMaintenanceLog", backref="progress_logs")
+    reported_by = relationship("User", foreign_keys=[reported_by_id])

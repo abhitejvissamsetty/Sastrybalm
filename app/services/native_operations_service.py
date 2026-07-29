@@ -12,22 +12,57 @@ logger = logging.getLogger(__name__)
 
 
 def confirm_order_natively(order: Order, db: Session) -> Order:
-    """Natively confirms an order without third-party API dependencies."""
-    order.status = OrderStatus.confirmed
-    order.sync_status = SyncStatus.synced
-    order.sync_error = None
-    order.sync_retries = 0
-    if not order.connect_ref:
-        order.connect_ref = f"ORD-NATIVE-{order.id}"
+    """Confirm once and atomically deduct stock for company orders."""
+    locked_order = (
+        db.query(Order)
+        .filter(Order.id == order.id)
+        .with_for_update()
+        .one()
+    )
+    if locked_order.status in {
+        OrderStatus.confirmed,
+        OrderStatus.dispatched,
+        OrderStatus.delivered,
+    }:
+        return locked_order
+    if locked_order.status not in {OrderStatus.draft, OrderStatus.submitted}:
+        raise ValueError(
+            f"Order in {locked_order.status.value} state cannot be confirmed."
+        )
+
+    if locked_order.is_company_order:
+        if not locked_order.warehouse_id:
+            raise ValueError("Company order has no warehouse for stock deduction.")
+        from app.services.inventory_service import record_stock_movement
+
+        for item in locked_order.items:
+            record_stock_movement(
+                db=db,
+                product_id=item.product_id,
+                warehouse_id=locked_order.warehouse_id,
+                movement_type="OUTWARD",
+                quantity=item.quantity,
+                reference_no=locked_order.order_number,
+                notes=f"Confirmed company order {locked_order.order_number}",
+                created_by_id=locked_order.user_id,
+                commit=False,
+            )
+
+    locked_order.status = OrderStatus.confirmed
+    locked_order.sync_status = SyncStatus.synced
+    locked_order.sync_error = None
+    locked_order.sync_retries = 0
     db.commit()
-    db.refresh(order)
-    logger.info("Order %s natively confirmed locally", order.order_number)
+    db.refresh(locked_order)
+    logger.info(
+        "Order %s natively confirmed locally", locked_order.order_number
+    )
 
     # Trigger instant notification upon approval
     from app.services.channel_partner_notification import trigger_instant_order_notification
-    trigger_instant_order_notification(db, order)
+    trigger_instant_order_notification(db, locked_order)
 
-    return order
+    return locked_order
 
 
 def record_payment_natively(payment: Payment, db: Session) -> Payment:
@@ -40,13 +75,10 @@ def record_payment_natively(payment: Payment, db: Session) -> Payment:
 
 
 def approve_material_request_natively(mr: MaterialRequest, db: Session) -> MaterialRequest:
-    """Natively approves a material request."""
-    mr.status = MRStatus.approved
+    """Mark native synchronization successful without skipping workflow states."""
     mr.sync_status = MRSyncStatus.synced
     mr.sync_error = None
     mr.sync_retries = 0
-    if not mr.cmms_ref:
-        mr.cmms_ref = f"MR-NATIVE-{mr.id}"
     db.commit()
     db.refresh(mr)
     logger.info("Material request %s natively approved locally", mr.mr_number)
@@ -59,8 +91,6 @@ def deploy_asset_capitalization_natively(ac: AssetCapitalization, db: Session) -
     ac.sync_status = ACSyncStatus.synced
     ac.sync_error = None
     ac.sync_retries = 0
-    if not ac.cmms_ref:
-        ac.cmms_ref = f"AC-NATIVE-{ac.id}"
     db.commit()
     db.refresh(ac)
     logger.info("Asset capitalization %s natively deployed locally", ac.ac_number)

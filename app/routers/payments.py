@@ -1,18 +1,26 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db, require_web_auth, require_web_roles
-from app.models.order import Order, FlowType, OrderStatus, PaymentSettlementStatus
+from app.models.order import Order, OrderStatus, PaymentSettlementStatus
 from app.models.outlet import Outlet, OutletStatus
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
 from app.utils.ref_generator import payment_ref
+from app.services.access_control import (
+    require_order_access,
+    require_outlet_access,
+    require_payment_access,
+    scope_order_query,
+    scope_outlet_query,
+    scope_payment_query,
+)
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 templates = Jinja2Templates(directory="app/templates")
@@ -28,9 +36,7 @@ async def payment_list(
     method: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(Payment)
-    if current_user.role == UserRole.field_rep:
-        query = query.filter(Payment.user_id == current_user.id)
+    query = scope_payment_query(db.query(Payment), current_user, db)
     if q:
         query = query.filter(Payment.payment_ref.ilike(f"%{q}%"))
     if status and status in [s.value for s in PaymentStatus]:
@@ -54,14 +60,15 @@ async def payment_new(
     db: Session = Depends(get_db),
     order_id: Optional[str] = Query(default=None),
 ):
-    outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
-    selected_order = db.query(Order).filter(Order.id == int(order_id)).first() if order_id else None
+    outlets = scope_outlet_query(
+        db.query(Outlet).filter(Outlet.status == OutletStatus.active), current_user, db
+    ).order_by(Outlet.name).all()
+    selected_order = require_order_access(db, current_user, int(order_id)) if order_id else None
     
-    # Fetch unpaid/partially-paid ZAP invoices
+    # Fetch unpaid/partially-paid native orders.
     unpaid_orders = (
-        db.query(Order)
+        scope_order_query(db.query(Order), current_user, db)
         .filter(
-            Order.flow_type == FlowType.zap_invoice,
             Order.status != OrderStatus.cancelled,
             Order.payment_settlement.in_([PaymentSettlementStatus.unpaid, PaymentSettlementStatus.partial])
         )
@@ -95,14 +102,22 @@ async def payment_create(
     denom_10: int = Form(default=0),
 ):
     try:
+        require_outlet_access(db, current_user, int(outlet_id), active_only=True)
+    except (HTTPException, ValueError):
+        set_flash_error(request, "Outlet not found.")
+        return RedirectResponse("/payments/new", status_code=302)
+    try:
         amt = float(amount)
         pay_method = PaymentMethod(method)
     except ValueError:
-        outlets = db.query(Outlet).filter(Outlet.status == OutletStatus.active).order_by(Outlet.name).all()
+        outlets = scope_outlet_query(
+            db.query(Outlet).filter(Outlet.status == OutletStatus.active),
+            current_user,
+            db,
+        ).order_by(Outlet.name).all()
         unpaid_orders = (
-            db.query(Order)
+            scope_order_query(db.query(Order), current_user, db)
             .filter(
-                Order.flow_type == FlowType.zap_invoice,
                 Order.status != OrderStatus.cancelled,
                 Order.payment_settlement.in_([PaymentSettlementStatus.unpaid, PaymentSettlementStatus.partial])
             )
@@ -117,13 +132,18 @@ async def payment_create(
         })
 
     target_order_id = int(order_id) if (order_id and order_id.strip() != "") else None
+    if target_order_id:
+        try:
+            require_order_access(db, current_user, target_order_id)
+        except HTTPException:
+            set_flash_error(request, "Order not found.")
+            return RedirectResponse("/payments/new", status_code=302)
     if not target_order_id:
-        # Find oldest unpaid or partial ZAP invoice for this outlet to auto-link
+        # Find the oldest unpaid or partial order for this outlet to auto-link.
         oldest_unpaid = (
             db.query(Order)
             .filter(
                 Order.outlet_id == int(outlet_id),
-                Order.flow_type == FlowType.zap_invoice,
                 Order.status != OrderStatus.cancelled,
                 Order.payment_settlement.in_([PaymentSettlementStatus.unpaid, PaymentSettlementStatus.partial])
             )
@@ -175,28 +195,29 @@ async def payment_verify(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Payment).filter(Payment.id == payment_id).first()
-    if item and item.status == PaymentStatus.collected:
-        item.status = PaymentStatus.verified
-        db.commit()
+    item = require_payment_access(db, current_user, payment_id)
+    if item.status != PaymentStatus.collected:
+        raise HTTPException(status_code=409, detail="Payment is not awaiting verification.")
+    item.status = PaymentStatus.verified
+    db.commit()
         
-        # Recalculate linked order
-        if item.order_id:
-            order = item.order
-            total_paid = sum(
-                float(pay.amount)
-                for pay in order.payments
-                if pay.status in (PaymentStatus.collected, PaymentStatus.verified)
-            )
-            if total_paid <= 0:
-                order.payment_settlement = PaymentSettlementStatus.unpaid
-            elif total_paid >= float(order.total_amount):
-                order.payment_settlement = PaymentSettlementStatus.paid
-            else:
-                order.payment_settlement = PaymentSettlementStatus.partial
-            db.commit()
+    # Recalculate linked order
+    if item.order_id:
+        order = item.order
+        total_paid = sum(
+            float(pay.amount)
+            for pay in order.payments
+            if pay.status in (PaymentStatus.collected, PaymentStatus.verified)
+        )
+        if total_paid <= 0:
+            order.payment_settlement = PaymentSettlementStatus.unpaid
+        elif total_paid >= float(order.total_amount):
+            order.payment_settlement = PaymentSettlementStatus.paid
+        else:
+            order.payment_settlement = PaymentSettlementStatus.partial
+        db.commit()
 
-        set_flash_success(request, f"Payment {item.payment_ref} verified.")
+    set_flash_success(request, f"Payment {item.payment_ref} verified.")
     return RedirectResponse("/payments", status_code=302)
 
 
@@ -206,26 +227,27 @@ async def payment_reject(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Payment).filter(Payment.id == payment_id).first()
-    if item and item.status in (PaymentStatus.collected, PaymentStatus.pending):
-        item.status = PaymentStatus.rejected
-        db.commit()
+    item = require_payment_access(db, current_user, payment_id)
+    if item.status not in (PaymentStatus.collected, PaymentStatus.pending):
+        raise HTTPException(status_code=409, detail="Payment is not awaiting review.")
+    item.status = PaymentStatus.rejected
+    db.commit()
         
-        # Recalculate linked order
-        if item.order_id:
-            order = item.order
-            total_paid = sum(
-                float(pay.amount)
-                for pay in order.payments
-                if pay.status in (PaymentStatus.collected, PaymentStatus.verified)
-            )
-            if total_paid <= 0:
-                order.payment_settlement = PaymentSettlementStatus.unpaid
-            elif total_paid >= float(order.total_amount):
-                order.payment_settlement = PaymentSettlementStatus.paid
-            else:
-                order.payment_settlement = PaymentSettlementStatus.partial
-            db.commit()
+    # Recalculate linked order
+    if item.order_id:
+        order = item.order
+        total_paid = sum(
+            float(pay.amount)
+            for pay in order.payments
+            if pay.status in (PaymentStatus.collected, PaymentStatus.verified)
+        )
+        if total_paid <= 0:
+            order.payment_settlement = PaymentSettlementStatus.unpaid
+        elif total_paid >= float(order.total_amount):
+            order.payment_settlement = PaymentSettlementStatus.paid
+        else:
+            order.payment_settlement = PaymentSettlementStatus.partial
+        db.commit()
 
-        set_flash_error(request, f"Payment {item.payment_ref} rejected.")
+    set_flash_error(request, f"Payment {item.payment_ref} rejected.")
     return RedirectResponse("/payments", status_code=302)

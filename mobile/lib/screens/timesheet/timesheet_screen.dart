@@ -4,7 +4,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/attendance_provider.dart';
 import '../../utils/date_formatter.dart';
 
-final myTimesheetsProvider = FutureProvider.autoDispose<List<dynamic>>((ref) async {
+final myTimesheetsProvider =
+    FutureProvider.autoDispose<List<dynamic>>((ref) async {
   final client = ref.watch(apiClientProvider);
   final res = await client.dio.get('/timesheets/my-timesheets');
   return res.data['items'] as List;
@@ -22,7 +23,6 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
   Widget build(BuildContext context) {
     final attendanceAsync = ref.watch(attendanceProvider);
     final timesheetsAsync = ref.watch(myTimesheetsProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
@@ -34,7 +34,7 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               ref.read(attendanceProvider.notifier).refresh();
-              ref.refresh(myTimesheetsProvider);
+              ref.invalidate(myTimesheetsProvider);
             },
           ),
         ],
@@ -64,7 +64,10 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: const Color(0xFF27272A)),
                         boxShadow: const [
-                          BoxShadow(color: Color(0x1F000000), blurRadius: 16, offset: Offset(0, 6)),
+                          BoxShadow(
+                              color: Color(0x1F000000),
+                              blurRadius: 16,
+                              offset: Offset(0, 6)),
                         ],
                       ),
                       child: Column(
@@ -83,14 +86,20 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: isCheckedIn ? const Color(0xFF15803D) : const Color(0xFF27272A),
+                                  color: isCheckedIn
+                                      ? const Color(0xFF15803D)
+                                      : const Color(0xFF27272A),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
                                   isCheckedIn ? 'ACTIVE SHIFT' : 'INACTIVE',
-                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ],
@@ -100,12 +109,16 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                             isCheckedIn && att.checkinTime != null
                                 ? 'Shift Checked In at ${DateFormatter.formatTime(att.checkinTime!)}'
                                 : 'No active timesheet shift today',
-                            style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             'Customer Outlet Visits Logged: ${att.visitCount}',
-                            style: const TextStyle(color: Color(0xFFA1A1AA), fontSize: 13),
+                            style: const TextStyle(
+                                color: Color(0xFFA1A1AA), fontSize: 13),
                           ),
                         ],
                       ),
@@ -118,7 +131,10 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
 
                 const Text(
                   'Synced Timesheets & Work Logs',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF09090B)),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF09090B)),
                 ),
                 const SizedBox(height: 12),
 
@@ -136,7 +152,8 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                           child: Text(
                             'No timesheets logged yet. Begin a workday shift on Home to log your first timesheet.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Color(0xFF71717A), fontSize: 13),
+                            style: TextStyle(
+                                color: Color(0xFF71717A), fontSize: 13),
                           ),
                         ),
                       );
@@ -150,13 +167,18 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                       itemBuilder: (ctx, i) {
                         final ts = items[i];
                         final checkinStr = ts['checkin_time'] != null
-                            ? DateFormatter.formatTime(DateTime.parse(ts['checkin_time']))
+                            ? DateFormatter.formatTime(
+                                DateTime.parse(ts['checkin_time']))
                             : 'N/A';
                         final checkoutStr = ts['checkout_time'] != null
-                            ? DateFormatter.formatTime(DateTime.parse(ts['checkout_time']))
+                            ? DateFormatter.formatTime(
+                                DateTime.parse(ts['checkout_time']))
                             : 'In Progress';
-                        final workDateStr = DateFormatter.formatDate(DateTime.parse(ts['work_date']));
-                        final approval = (ts['approval_status'] ?? 'pending').toString().toUpperCase();
+                        final workDateStr = DateFormatter.formatDate(
+                            DateTime.parse(ts['work_date']));
+                        final approval = (ts['approval_status'] ?? 'pending')
+                            .toString()
+                            .toUpperCase();
 
                         return Container(
                           padding: const EdgeInsets.all(16),
@@ -165,26 +187,39 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: const Color(0xFFE4E4E7)),
                             boxShadow: const [
-                              BoxShadow(color: Color(0x04000000), blurRadius: 6, offset: Offset(0, 2)),
+                              BoxShadow(
+                                  color: Color(0x04000000),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2)),
                             ],
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(workDateStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF09090B))),
+                                  Text(workDateStr,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: Color(0xFF09090B))),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: approval == 'APPROVED' ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                                      color: approval == 'APPROVED'
+                                          ? const Color(0xFFDCFCE7)
+                                          : const Color(0xFFFEF3C7),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
                                       approval,
                                       style: TextStyle(
-                                        color: approval == 'APPROVED' ? const Color(0xFF15803D) : const Color(0xFFD97706),
+                                        color: approval == 'APPROVED'
+                                            ? const Color(0xFF15803D)
+                                            : const Color(0xFFD97706),
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -194,18 +229,35 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                               ),
                               const SizedBox(height: 10),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Check-in: $checkinStr', style: const TextStyle(color: Color(0xFF71717A), fontSize: 12)),
-                                  Text('Check-out: $checkoutStr', style: const TextStyle(color: Color(0xFF71717A), fontSize: 12)),
+                                  Text('Check-in: $checkinStr',
+                                      style: const TextStyle(
+                                          color: Color(0xFF71717A),
+                                          fontSize: 12)),
+                                  Text('Check-out: $checkoutStr',
+                                      style: const TextStyle(
+                                          color: Color(0xFF71717A),
+                                          fontSize: 12)),
                                 ],
                               ),
                               const SizedBox(height: 6),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Hours Worked: ${ts['hours_worked']} hrs', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF09090B))),
-                                  Text('Outlet Visits: ${ts['visit_count']}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF09090B))),
+                                  Text(
+                                      'Hours Worked: ${ts['hours_worked']} hrs',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                          color: Color(0xFF09090B))),
+                                  Text('Outlet Visits: ${ts['visit_count']}',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                          color: Color(0xFF09090B))),
                                 ],
                               ),
                             ],
@@ -214,11 +266,16 @@ class _TimesheetScreenState extends ConsumerState<TimesheetScreen> {
                       },
                     );
                   },
-                  loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF09090B))),
+                  loading: () => const Center(
+                      child:
+                          CircularProgressIndicator(color: Color(0xFF09090B))),
                   error: (e, __) => Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                    child: Text('Error loading timesheets: $e', style: const TextStyle(color: Colors.red)),
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16)),
+                    child: Text('Error loading timesheets: $e',
+                        style: const TextStyle(color: Colors.red)),
                   ),
                 ),
               ],

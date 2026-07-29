@@ -30,6 +30,8 @@ class Leave(Base):
     leave_type = Column(Enum(LeaveType), nullable=False, default=LeaveType.casual)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
+    duration = Column(String(20), nullable=False, default="full")
+    half_day_session = Column(String(20), nullable=True)
     reason = Column(Text, nullable=True)
     status = Column(Enum(LeaveStatus), nullable=False, default=LeaveStatus.pending)
     approved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

@@ -1,0 +1,66 @@
+groups:
+  - name: safar-sfa-release
+    rules:
+      - alert: SafarHighErrorRate
+        expr: |
+          sum(rate(safar_http_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(safar_http_requests_total[5m])), 0.001)
+          > 0.01
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Safar SFA HTTP 5xx rate exceeds 1%
+
+      - alert: SafarHighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(safar_http_request_duration_seconds_bucket[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Safar SFA p95 latency exceeds one second
+
+      - alert: SafarNoTraffic
+        expr: sum(rate(safar_http_requests_total[10m])) == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Safar SFA is receiving no HTTP traffic
+
+      - alert: SafarReadinessFailed
+        expr: probe_success{job="safar-readiness"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Safar SFA readiness probe is failing
+
+      - alert: SafarSchedulerMissing
+        expr: safar_scheduler_owner == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Safar SFA has no active scheduler owner
+
+      - alert: SafarDatabasePoolSaturation
+        expr: safar_db_pool_checked_out / clamp_min(safar_db_pool_capacity, 1) > 0.8
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Safar SFA database pool utilization exceeds 80%
+
+      - alert: SafarProcessMemoryHigh
+        expr: process_resident_memory_bytes > 805306368
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Safar SFA process memory exceeds 768 MiB

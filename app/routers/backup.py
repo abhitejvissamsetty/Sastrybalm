@@ -15,6 +15,14 @@ router = APIRouter(prefix="/settings/backup", tags=["backup"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+def _backup_path(filename: str) -> str | None:
+    if os.path.basename(filename) != filename:
+        return None
+    if not filename.startswith("safar_sfa_backup_") or not filename.endswith(".sql.enc"):
+        return None
+    return os.path.join(BACKUP_DIR, filename)
+
+
 @router.get("", response_class=HTMLResponse)
 async def backup_dashboard(
     request: Request,
@@ -104,15 +112,14 @@ async def backup_download(
     filename: str,
     current_user: User = Depends(require_web_roles(UserRole.admin)),
 ):
-    filepath = os.path.join(BACKUP_DIR, filename)
-    if not os.path.exists(filepath) or not (filename.endswith(".sql") or filename.endswith(".zip")):
+    filepath = _backup_path(filename)
+    if not filepath or not os.path.exists(filepath):
         return RedirectResponse("/settings/backup", status_code=302)
     
-    media_type = "application/sql" if filename.endswith(".sql") else "application/zip"
     return FileResponse(
         path=filepath,
         filename=filename,
-        media_type=media_type
+        media_type="application/octet-stream",
     )
 
 
@@ -122,8 +129,8 @@ async def backup_delete(
     request: Request,
     current_user: User = Depends(require_web_roles(UserRole.admin)),
 ):
-    filepath = os.path.join(BACKUP_DIR, filename)
-    if os.path.exists(filepath) and (filename.endswith(".sql") or filename.endswith(".zip")):
+    filepath = _backup_path(filename)
+    if filepath and os.path.exists(filepath):
         os.remove(filepath)
         set_flash_success(request, f"Backup '{filename}' deleted.")
     else:
@@ -160,4 +167,3 @@ async def backup_parquet_rolling(
     except Exception as e:
         set_flash_error(request, f"Parquet rolling backup failed: {str(e)}")
     return RedirectResponse("/settings/backup", status_code=302)
-

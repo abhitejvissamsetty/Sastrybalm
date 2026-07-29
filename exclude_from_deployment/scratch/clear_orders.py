@@ -7,8 +7,8 @@ load_dotenv()
 conn = pymysql.connect(
     host=os.getenv("DB_HOST", "localhost"),
     port=int(os.getenv("DB_PORT", 8889)),
-    user=os.getenv("DB_USER", "root"),
-    password=os.getenv("DB_PASSWORD", "root"),
+    user=os.environ["DB_USER"],
+    password=os.environ["DB_PASSWORD"],
     database=os.getenv("DB_NAME", "safar_db")
 )
 

@@ -119,6 +119,8 @@
       </form>
     </div>
   </div>
+  {% from "shared/pagination.html" import render %}
+  {{ render(pagination, "/settings/sales-channels?x=1") }}
 
 </div>
 {% endblock %}

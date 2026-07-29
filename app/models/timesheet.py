@@ -49,10 +49,15 @@ class Timesheet(Base):
     is_archived = Column(Boolean, default=False, nullable=False, index=True)
     archived_at = Column(DateTime, nullable=True)
 
+    version = Column(Integer, default=1, nullable=False)
+    submitted_at = Column(DateTime, nullable=True)
+
     user = relationship("User", foreign_keys=[user_id], back_populates="timesheets")
     approved_by = relationship("User", foreign_keys=[approved_by_id])
     attendance = relationship("Attendance", foreign_keys=[attendance_id])
     visits = relationship("VisitRecord", back_populates="timesheet")
+    line_items = relationship("TimesheetLineItem", back_populates="timesheet", cascade="all, delete-orphan")
+    comments = relationship("TimesheetComment", back_populates="timesheet", cascade="all, delete-orphan", order_by="TimesheetComment.created_at.asc()")
 
     @property
     def hours_worked(self) -> float | None:
@@ -71,6 +76,43 @@ class Timesheet(Base):
             TimesheetApproval.approved: "bg-emerald-900/50 text-emerald-300",
             TimesheetApproval.rejected: "bg-red-900/50 text-red-300",
         }.get(self.approval_status, "bg-slate-700 text-slate-300")
+
+
+class TimesheetLineItem(Base):
+    __tablename__ = "timesheet_line_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timesheet_id = Column(Integer, ForeignKey("timesheets.id", ondelete="CASCADE"), nullable=False, index=True)
+    category = Column(String(100), nullable=False)  # Retailing Work, Joint Working, Office Work, Distributor Meetings, Public Campaigning
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    is_automated = Column(Boolean, default=False, nullable=False)
+    visit_record_id = Column(Integer, ForeignKey("visit_records.id", ondelete="SET NULL"), nullable=True)
+    notes = Column(Text, nullable=True)
+    image_url = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    timesheet = relationship("Timesheet", back_populates="line_items")
+    visit_record = relationship("VisitRecord", foreign_keys=[visit_record_id])
+
+    @property
+    def duration_minutes(self) -> float:
+        if self.start_time and self.end_time:
+            return round((self.end_time - self.start_time).total_seconds() / 60, 1)
+        return 0.0
+
+
+class TimesheetComment(Base):
+    __tablename__ = "timesheet_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timesheet_id = Column(Integer, ForeignKey("timesheets.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    comment = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    timesheet = relationship("Timesheet", back_populates="comments")
+    user = relationship("User", foreign_keys=[user_id])
 
 
 class VisitRecord(Base):
@@ -95,6 +137,8 @@ class VisitRecord(Base):
     joint_with_name = Column(String(255), nullable=True)
     joint_with_role = Column(String(100), nullable=True)
     joint_notes = Column(Text, nullable=True)
+    no_order_reason = Column(Text, nullable=True)
+    image_url = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     joint_with_user = relationship("User", foreign_keys=[joint_with_user_id])

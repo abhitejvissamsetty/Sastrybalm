@@ -22,10 +22,22 @@
         <p class="text-indigo-100 text-sm font-medium opacity-90">Safar SFA Platform</p>
       </div>
     </div>
-    <div class="text-right hidden sm:block">
-      <div class="glass px-6 py-4 rounded-2xl border border-white/10 backdrop-blur-xl">
-        <p class="text-indigo-100 text-[10px] font-bold uppercase tracking-widest opacity-60">Real-time Clock</p>
-        <p class="text-white text-xl font-bold mt-1 font-mono tracking-tight" id="live-clock"></p>
+    
+    <div class="flex items-center gap-4 flex-wrap">
+      <!-- Start Retailing Button -->
+      <button type="button" onclick="openStartRetailingDrawer()" 
+              class="h-12 px-6 rounded-2xl bg-white text-indigo-900 font-extrabold text-sm shadow-xl hover:bg-indigo-50 transition-all flex items-center gap-2.5 transform hover:scale-105 active:scale-95 cursor-pointer">
+        <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36rem" />
+        </svg>
+        <span>Start Retailing</span>
+      </button>
+
+      <div class="text-right hidden sm:block">
+        <div class="glass px-6 py-4 rounded-2xl border border-white/10 backdrop-blur-xl">
+          <p class="text-indigo-100 text-[10px] font-bold uppercase tracking-widest opacity-60">Real-time Clock</p>
+          <p class="text-white text-xl font-bold mt-1 font-mono tracking-tight" id="live-clock"></p>
+        </div>
       </div>
     </div>
   </div>
@@ -325,6 +337,51 @@
 
   </div>
 </div>
+
+<!-- Bottom-Sliding App Drawer for Active Beats -->
+<div id="beats-app-drawer-backdrop" onclick="closeStartRetailingDrawer()" 
+     class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md transition-opacity duration-300">
+</div>
+
+<div id="beats-app-drawer" 
+     class="fixed bottom-0 left-0 right-0 z-50 max-w-2xl mx-auto bg-slate-900 border-t border-white/10 rounded-t-3xl shadow-2xl transition-transform duration-300 transform translate-y-full flex flex-col max-h-[85vh] overflow-hidden">
+  
+  <!-- Swipe handle / Header -->
+  <div id="drawer-drag-handle" class="pt-3 pb-2 px-4 cursor-grab active:cursor-grabbing flex flex-col items-center border-b border-white/5 bg-slate-900/90 backdrop-blur-md">
+    <div class="w-12 h-1.5 rounded-full bg-slate-700 hover:bg-slate-600 transition-colors"></div>
+    <div class="w-full flex items-center justify-between mt-3">
+      <div>
+        <h3 class="text-base font-bold text-white tracking-tight flex items-center gap-2">
+          Select Active Beat
+          <span id="drawer-beat-count" class="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-semibold border border-indigo-500/30">0 Available</span>
+        </h3>
+        <p class="text-xs text-slate-400">Mapped via your L1 Position scope</p>
+      </div>
+      <button type="button" onclick="closeStartRetailingDrawer()" class="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition-colors">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Search Input in App Drawer Header -->
+    <div class="w-full mt-3 mb-1 relative">
+      <input type="text" id="drawer-search-input" onkeyup="filterDrawerBeats()" 
+             placeholder="Search beats by name, code, or user..." 
+             class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all">
+      <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+      </svg>
+    </div>
+  </div>
+
+  <!-- Drawer Body List -->
+  <div id="drawer-beats-list" class="p-4 flex-1 overflow-y-auto space-y-2.5">
+    <div class="p-8 text-center text-slate-500 text-sm">
+      Loading available beats...
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -343,5 +400,124 @@
   }
   updateClock();
   setInterval(updateClock, 1000);
+
+  let cachedBeatsData = [];
+
+  async function openStartRetailingDrawer() {
+    const backdrop = document.getElementById('beats-app-drawer-backdrop');
+    const drawer = document.getElementById('beats-app-drawer');
+    const listEl = document.getElementById('drawer-beats-list');
+    const searchInput = document.getElementById('drawer-search-input');
+
+    backdrop.classList.remove('hidden');
+    setTimeout(() => {
+      drawer.classList.remove('translate-y-full');
+    }, 10);
+
+    if (searchInput) searchInput.value = '';
+
+    try {
+      cachedBeatsData = [];
+      let page = 1;
+      let total = 0;
+      do {
+        const res = await fetch(`/api/retailing/beats?page=${page}&per_page=100`);
+        if (!res.ok) throw new Error('Failed to fetch beats');
+        const data = await res.json();
+        cachedBeatsData.push(...(data.beats || []));
+        total = data.total || cachedBeatsData.length;
+        page += 1;
+      } while (cachedBeatsData.length < total);
+      renderDrawerBeats(cachedBeatsData);
+    } catch (err) {
+      listEl.innerHTML = `<div class="p-6 text-center text-red-400 text-sm">Error loading active beats. Please try again.</div>`;
+    }
+  }
+
+  function closeStartRetailingDrawer() {
+    const backdrop = document.getElementById('beats-app-drawer-backdrop');
+    const drawer = document.getElementById('beats-app-drawer');
+    drawer.classList.add('translate-y-full');
+    setTimeout(() => {
+      backdrop.classList.add('hidden');
+    }, 300);
+  }
+
+  function renderDrawerBeats(beats) {
+    const listEl = document.getElementById('drawer-beats-list');
+    const countEl = document.getElementById('drawer-beat-count');
+
+    if (countEl) countEl.textContent = `${beats.length} Available`;
+
+    if (!beats || beats.length === 0) {
+      listEl.innerHTML = `
+        <div class="p-8 text-center glass rounded-2xl border border-white/5 space-y-2">
+          <p class="text-sm font-semibold text-slate-300">No Active Beats Found</p>
+          <p class="text-xs text-slate-500">No active beats are mapped to your position or search criteria.</p>
+        </div>
+      `;
+      return;
+    }
+
+    listEl.innerHTML = beats.map(b => `
+      <a href="/retailing/beat/${b.id}" 
+         class="block w-full p-4 rounded-2xl bg-slate-800/80 hover:bg-indigo-900/30 border border-white/10 hover:border-indigo-500/40 transition-all group shadow-lg">
+        <div class="flex items-center justify-between">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-bold border border-indigo-500/30">
+                ${b.code}
+              </span>
+              <span class="px-2 py-0.5 rounded bg-slate-900 text-slate-400 text-[10px] font-medium border border-white/5">
+                ${b.beat_type} • ${b.outlet_count} Outlets
+              </span>
+            </div>
+            <h4 class="text-base font-bold text-white group-hover:text-indigo-300 transition-colors truncate">
+              ${b.name}
+            </h4>
+            <p class="text-xs text-slate-400 mt-1 flex items-center gap-1.5 truncate">
+              <svg class="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+              <span class="truncate">${b.l1_display}</span>
+            </p>
+          </div>
+          <div class="ml-3 p-2 rounded-xl bg-slate-900 text-slate-400 group-hover:text-indigo-400 group-hover:bg-indigo-600/20 transition-all flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </div>
+        </div>
+      </a>
+    `).join('');
+  }
+
+  function filterDrawerBeats() {
+    const q = document.getElementById('drawer-search-input').value.toLowerCase().trim();
+    if (!q) {
+      renderDrawerBeats(cachedBeatsData);
+      return;
+    }
+    const filtered = cachedBeatsData.filter(b => 
+      b.name.toLowerCase().includes(q) || 
+      b.code.toLowerCase().includes(q) || 
+      b.l1_display.toLowerCase().includes(q)
+    );
+    renderDrawerBeats(filtered);
+  }
+
+  // Swipe-down gesture to dismiss drawer
+  let touchStartY = 0;
+  const drawerEl = document.getElementById('beats-app-drawer');
+  drawerEl?.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  drawerEl?.addEventListener('touchmove', (e) => {
+    const currentY = e.touches[0].clientY;
+    if (currentY - touchStartY > 60) {
+      closeStartRetailingDrawer();
+    }
+  }, { passive: true });
 </script>
 {% endblock %}

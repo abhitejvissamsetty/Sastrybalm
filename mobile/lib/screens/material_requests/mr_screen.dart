@@ -1,83 +1,88 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/beat_provider.dart';
+import '../../services/image_picker_service.dart';
 import '../../services/operations_service.dart';
 
-final mrServiceProvider = Provider((ref) {
-  final client = ref.watch(apiClientProvider);
-  return MaterialRequestService(client);
-});
+final mrServiceProvider =
+    Provider((ref) => MaterialRequestService(ref.watch(apiClientProvider)));
 
 class MrScreen extends ConsumerStatefulWidget {
-  const MrScreen({super.key});
-
+  final int outletId;
+  const MrScreen({super.key, required this.outletId});
   @override
   ConsumerState<MrScreen> createState() => _MrScreenState();
 }
 
 class _MrScreenState extends ConsumerState<MrScreen> {
-  final _descCtrl = TextEditingController();
-  final _categoryCtrl = TextEditingController();
-  final _dimsCtrl = TextEditingController();
-  final _notesCtrl = TextEditingController();
-  final _specsCtrl = TextEditingController();
-  bool _submitting = false;
+  final _description = TextEditingController();
+  final _dimensions = List.generate(4, (_) => TextEditingController());
+  final _picker = ImagePickerService();
+  Map<String, dynamic>? _context;
+  int? _productId;
+  final List<XFile?> _images = [null, null, null];
+  bool _loading = true, _submitting = false;
 
-  Future<void> _submitRequest() async {
-    final desc = _descCtrl.text.trim();
-    if (desc.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a description for the material request')),
-      );
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      _context = await ref.read(mrServiceProvider).getContext(widget.outletId);
+    } catch (e) {
+      if (mounted) _message('Unable to load request form: $e');
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _message(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  double? _number(int index) => double.tryParse(_dimensions[index].text.trim());
+
+  Future<void> _pick(int index) async {
+    final image = await _picker.showImageSourceDialog(context);
+    if (image != null && mounted) setState(() => _images[index] = image);
+  }
+
+  Future<void> _submit() async {
+    if (_productId == null ||
+        _description.text.trim().length < 5 ||
+        _images.any((e) => e == null)) {
+      _message(
+          'Select one product, enter a clear description, and attach all three images.');
       return;
     }
-
-    final outlet = ref.read(selectedOutletProvider);
-    if (outlet == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an outlet from the beat plan first')),
-      );
+    if (_dimensions
+        .any((c) => c.text.isNotEmpty && (double.tryParse(c.text) ?? 0) <= 0)) {
+      _message('Dimensions must be positive numbers.');
       return;
     }
-
     setState(() => _submitting = true);
     try {
-      final service = ref.read(mrServiceProvider);
-      final response = await service.submitRequest(
-        outletId: outlet.id,
-        description: desc,
-        category: _categoryCtrl.text.trim().isNotEmpty ? _categoryCtrl.text.trim() : null,
-        approxDimensions: _dimsCtrl.text.trim().isNotEmpty ? _dimsCtrl.text.trim() : null,
-        clientNotes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
-        materialSpecifications: _specsCtrl.text.trim().isNotEmpty ? _specsCtrl.text.trim() : null,
-      );
-
+      final result = await ref.read(mrServiceProvider).submitRequest(
+            outletId: widget.outletId,
+            productId: _productId!,
+            description: _description.text.trim(),
+            length: _number(0),
+            width: _number(1),
+            height: _number(2),
+            depth: _number(3),
+            presentOutletImagePath: _images[0]!.path,
+            installationPlaceImagePath: _images[1]!.path,
+            customerApprovalLetterImagePath: _images[2]!.path,
+          );
       if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Request Submitted'),
-            content: Text(
-              'Procurement Material Request submitted to CMMS.\n\nMR Code: ${response['mr_number'] ?? '#${response['id']}'}\nStatus: ${response['status'] ?? 'submitted'}',
-            ),
-            actions: [
-              TextButton(
-                child: const Text('OK'),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  context.pop();
-                },
-              ),
-            ],
-          ),
-        );
+        _message('Material Request ${result['mr_number']} submitted.');
+        context.pop();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit material request: $e'), backgroundColor: Colors.red.shade700),
-      );
+      if (mounted) _message('Submission failed: $e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -85,96 +90,110 @@ class _MrScreenState extends ConsumerState<MrScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final outlet = ref.watch(selectedOutletProvider);
-    final theme = Theme.of(context);
-
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final outlet = _context?['outlet'] as Map<String, dynamic>?;
+    final products = (_context?['products'] as List?) ?? [];
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Procurement Material Request'),
+      appBar: AppBar(title: const Text('New Material Request')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Card(
+              child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(outlet?['name'] ?? 'Outlet',
+                            style: Theme.of(context).textTheme.titleMedium),
+                        Text(outlet?['address'] ?? 'Address unavailable'),
+                        Text(outlet?['contact'] ?? 'Contact unavailable'),
+                        Text(
+                            'Location: ${outlet?['gps_lat'] ?? '—'}, ${outlet?['gps_lng'] ?? '—'}'),
+                      ]))),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<int>(
+            initialValue: _productId,
+            decoration:
+                const InputDecoration(labelText: 'Procurement Product *'),
+            items: products
+                .map<DropdownMenuItem<int>>((p) => DropdownMenuItem(
+                      value: p['id'] as int,
+                      child: Text('${p['name']} (${p['sku'] ?? 'No SKU'})'),
+                    ))
+                .toList(),
+            onChanged: (v) => setState(() => _productId = v),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+              controller: _description,
+              maxLines: 4,
+              maxLength: 2000,
+              decoration:
+                  const InputDecoration(labelText: 'Request Description *')),
+          const SizedBox(height: 8),
+          const Text('Dimensions (optional)'),
+          Row(
+              children: List.generate(
+                  4,
+                  (i) => Expanded(
+                          child: Padding(
+                        padding: EdgeInsets.only(right: i == 3 ? 0 : 8),
+                        child: TextField(
+                            controller: _dimensions[i],
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            decoration: InputDecoration(
+                                labelText: [
+                              'Length',
+                              'Width',
+                              'Height',
+                              'Depth'
+                            ][i])),
+                      )))),
+          const SizedBox(height: 16),
+          ...List.generate(
+              3,
+              (i) => _ImageField(
+                    label: [
+                      'Present Outlet Image *',
+                      'Installation Place Image *',
+                      'Customer Approval Letter Image *'
+                    ][i],
+                    image: _images[i],
+                    onTap: () => _pick(i),
+                  )),
+          const SizedBox(height: 12),
+          ElevatedButton(
+              onPressed: _submitting ? null : _submit,
+              child: Text(
+                  _submitting ? 'Submitting…' : 'Submit Material Request')),
+        ]),
       ),
-      body: _submitting
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (outlet != null) ...[
-                      Card(
-                        elevation: 2,
-                        shadowColor: theme.colorScheme.shadow.withOpacity(0.04),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Requesting For Outlet', style: theme.textTheme.bodyMedium),
-                              const SizedBox(height: 6),
-                              Text(
-                                outlet.name,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(outlet.code, style: theme.textTheme.bodyMedium),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    TextField(
-                      controller: _categoryCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Category / Material Type',
-                        hintText: 'e.g. OUTDOOR_GLOW_SIGNBOARD',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _dimsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Approximate Dimensions',
-                        hintText: 'e.g. 10ft (W) x 4ft (H)',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _specsCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Material Specifications',
-                        hintText: 'e.g. Acrylic LED backlit with MS frame',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _notesCtrl,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Client Notes & Installation Site Info',
-                        hintText: 'e.g. Needs wall mounting near storefront entrance',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _descCtrl,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Description / Remarks',
-                        hintText: 'e.g. Storefront branding request for premium GT outlet.',
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _submitRequest,
-                      child: const Text('Submit Material Request'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
     );
   }
+}
+
+class _ImageField extends StatelessWidget {
+  final String label;
+  final XFile? image;
+  final VoidCallback onTap;
+  const _ImageField(
+      {required this.label, required this.image, required this.onTap});
+  @override
+  Widget build(BuildContext context) => Card(
+          child: ListTile(
+        leading: image == null
+            ? const Icon(Icons.add_a_photo_outlined)
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.file(File(image!.path),
+                    width: 54, height: 54, fit: BoxFit.cover)),
+        title: Text(label),
+        subtitle: Text(image == null ? 'Camera or gallery' : 'Tap to replace'),
+        onTap: onTap,
+      ));
 }

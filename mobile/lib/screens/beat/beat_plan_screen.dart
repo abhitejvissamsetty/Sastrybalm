@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' hide Haversine;
 import '../../providers/beat_provider.dart';
 import '../../providers/attendance_provider.dart';
 import '../../utils/haversine.dart';
@@ -17,9 +20,11 @@ class BeatPlanScreen extends ConsumerStatefulWidget {
 
 class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
   Position? _currentPosition;
+  int _viewMode = 0; // 0: List View, 1: Map View
   bool _showSearch = false;
   final _searchCtrl = TextEditingController();
   String _outletQuery = '';
+  Outlet? _selectedMapOutlet;
 
   @override
   void initState() {
@@ -44,7 +49,39 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
     } catch (_) {}
   }
 
-  void _showAddOptions(BuildContext context, List<Beat> beats, int? currentBeatId) {
+  void _showToast(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message,
+            style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Colors.white)),
+        backgroundColor: const Color(0xFF09090B),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  Future<void> _openGoogleMaps(double lat, double lng, String title) async {
+    final url =
+        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        _showToast('Opening Google Maps location...');
+      }
+    } catch (_) {
+      _showToast('Redirecting to Google Maps ($lat, $lng)');
+    }
+  }
+
+  void _showAddOptions(
+      BuildContext context, List<Beat> beats, int? currentBeatId) {
     context.push('/outlet/new');
   }
 
@@ -75,22 +112,38 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
         ),
         title: beatsAsync.maybeWhen(
           data: (beats) {
-            final currentBeat = beats.firstWhere((b) => b.id == beatId, orElse: () => beats.isNotEmpty ? beats.first : Beat(id: 0, name: 'Beat Route', code: '', beatType: 'GT', outlets: []));
+            final currentBeat = beats.firstWhere((b) => b.id == beatId,
+                orElse: () => beats.isNotEmpty
+                    ? beats.first
+                    : Beat(
+                        id: 0,
+                        name: 'Beat Route',
+                        code: '',
+                        beatType: 'GT',
+                        outlets: []));
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   currentBeat.name,
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF09090B)),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: Color(0xFF09090B)),
                 ),
                 Text(
-                  currentBeat.code.isNotEmpty ? 'Code: ${currentBeat.code}' : 'Beat Outlets Route',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF71717A)),
+                  currentBeat.code.isNotEmpty
+                      ? 'Code: ${currentBeat.code}'
+                      : 'Beat Outlets Route',
+                  style:
+                      const TextStyle(fontSize: 11, color: Color(0xFF71717A)),
                 ),
               ],
             );
           },
-          orElse: () => const Text('Beat Outlets Route', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF09090B))),
+          orElse: () => const Text('Beat Outlets Route',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: Color(0xFF09090B))),
         ),
         actions: [
           IconButton(
@@ -115,11 +168,13 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.warning_amber_rounded, size: 64, color: theme.colorScheme.error),
+                    Icon(Icons.warning_amber_rounded,
+                        size: 64, color: theme.colorScheme.error),
                     const SizedBox(height: 16),
                     Text(
                       'Workday Not Active',
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -147,18 +202,22 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Inline Search Input Bar (when toggled via FAB)
-                  if (_showSearch)
+                  // Inline Search Input (when toggled in List View)
+                  if (_showSearch && _viewMode == 0)
                     Container(
                       color: Colors.white,
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                       child: TextField(
                         controller: _searchCtrl,
-                        onChanged: (val) => setState(() => _outletQuery = val.trim().toLowerCase()),
+                        onChanged: (val) => setState(
+                            () => _outletQuery = val.trim().toLowerCase()),
                         decoration: InputDecoration(
-                          hintText: 'Search outlets by name, code, phone, or owner...',
-                          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFA1A1AA)),
-                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF71717A)),
+                          hintText:
+                              'Search outlets by name, code, phone, or owner...',
+                          hintStyle: const TextStyle(
+                              fontSize: 13, color: Color(0xFFA1A1AA)),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: Color(0xFF71717A)),
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.clear_rounded, size: 18),
                             onPressed: () {
@@ -171,7 +230,8 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                           ),
                           filled: true,
                           fillColor: const Color(0xFFF4F4F5),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 10),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
@@ -180,23 +240,35 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                       ),
                     ),
 
-                  // Beat Outlets Content
+                  // Content Body: List View (0) vs OpenStreetMap Map View (1)
                   Expanded(
                     child: beatPlanAsync.when(
                       data: (plan) {
-                        final Beat? beat = plan['beat'];
                         final List<Outlet> allOutlets = plan['outlets'] ?? [];
                         final outlets = allOutlets.where((o) {
                           if (_outletQuery.isEmpty) return true;
-                          final nameMatch = o.name.toLowerCase().contains(_outletQuery);
-                          final codeMatch = o.code.toLowerCase().contains(_outletQuery);
-                          final mobileMatch = (o.mobile ?? '').contains(_outletQuery);
-                          final ownerMatch = (o.ownerName ?? '').toLowerCase().contains(_outletQuery);
-                          return nameMatch || codeMatch || mobileMatch || ownerMatch;
+                          final nameMatch =
+                              o.name.toLowerCase().contains(_outletQuery);
+                          final codeMatch =
+                              o.code.toLowerCase().contains(_outletQuery);
+                          final mobileMatch =
+                              (o.mobile ?? '').contains(_outletQuery);
+                          final ownerMatch = (o.ownerName ?? '')
+                              .toLowerCase()
+                              .contains(_outletQuery);
+                          return nameMatch ||
+                              codeMatch ||
+                              mobileMatch ||
+                              ownerMatch;
                         }).toList();
 
                         if (beatId == null) {
-                          return const Center(child: Text('Please select an active beat.'));
+                          return const Center(
+                              child: Text('Please select an active beat.'));
+                        }
+
+                        if (_viewMode == 1) {
+                          return _buildMapView(outlets);
                         }
 
                         return RefreshIndicator(
@@ -208,21 +280,37 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                           },
                           child: outlets.isEmpty
                               ? ListView(
-                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
                                   children: [
-                                    SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                                    SizedBox(
+                                        height:
+                                            MediaQuery.of(context).size.height *
+                                                0.25),
                                     Center(
                                       child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
-                                          const Icon(Icons.storefront_rounded, size: 48, color: Color(0xFFA1A1AA)),
+                                          const Icon(Icons.storefront_rounded,
+                                              size: 48,
+                                              color: Color(0xFFA1A1AA)),
                                           const SizedBox(height: 12),
                                           Text(
-                                            _outletQuery.isNotEmpty ? 'No outlets match "$_outletQuery"' : 'No active outlets in this beat',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF09090B)),
+                                            _outletQuery.isNotEmpty
+                                                ? 'No outlets match "$_outletQuery"'
+                                                : 'No active outlets in this beat',
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 15,
+                                                color: Color(0xFF09090B)),
                                           ),
                                           const SizedBox(height: 4),
-                                          const Text('Use the + New Outlet button to add customer outlets.', style: TextStyle(fontSize: 12, color: Color(0xFF71717A))),
+                                          const Text(
+                                              'Use the + New Outlet button to add customer outlets.',
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Color(0xFF71717A))),
                                         ],
                                       ),
                                     ),
@@ -231,11 +319,13 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                               : ListView.separated(
                                   padding: const EdgeInsets.all(16),
                                   itemCount: outlets.length,
-                                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 12),
                                   itemBuilder: (ctx, index) {
                                     final outlet = outlets[index];
                                     double? dist;
-                                    if (_currentPosition != null && outlet.hasGps) {
+                                    if (_currentPosition != null &&
+                                        outlet.hasGps) {
                                       dist = Haversine.distance(
                                         _currentPosition!.latitude,
                                         _currentPosition!.longitude,
@@ -249,15 +339,21 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                                       borderRadius: BorderRadius.circular(16),
                                       child: InkWell(
                                         onTap: () {
-                                          ref.read(selectedOutletProvider.notifier).state = outlet;
+                                          ref
+                                              .read(selectedOutletProvider
+                                                  .notifier)
+                                              .state = outlet;
                                           context.push('/outlet/${outlet.id}');
                                         },
                                         borderRadius: BorderRadius.circular(16),
                                         child: Container(
                                           padding: const EdgeInsets.all(16),
                                           decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(16),
-                                            border: Border.all(color: const Color(0xFFE4E4E7), width: 1),
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                            border: Border.all(
+                                                color: const Color(0xFFE4E4E7),
+                                                width: 1),
                                             boxShadow: const [
                                               BoxShadow(
                                                 color: Color(0x04000000),
@@ -267,34 +363,51 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                                             ],
                                           ),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
                                                 children: [
                                                   Expanded(
                                                     child: Text(
                                                       outlet.name,
                                                       style: const TextStyle(
-                                                        color: Color(0xFF09090B),
-                                                        fontWeight: FontWeight.w800,
+                                                        color:
+                                                            Color(0xFF09090B),
+                                                        fontWeight:
+                                                            FontWeight.w800,
                                                         fontSize: 15,
                                                         letterSpacing: -0.3,
                                                       ),
                                                     ),
                                                   ),
                                                   Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 3),
                                                     decoration: BoxDecoration(
-                                                      color: const Color(0xFFF4F4F5),
-                                                      borderRadius: BorderRadius.circular(6),
-                                                      border: Border.all(color: const Color(0xFFE4E4E7)),
+                                                      color: const Color(
+                                                          0xFFF4F4F5),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              6),
+                                                      border: Border.all(
+                                                          color: const Color(
+                                                              0xFFE4E4E7)),
                                                     ),
                                                     child: Text(
-                                                      outlet.code.isNotEmpty ? outlet.code : 'OUT-${outlet.id}',
+                                                      outlet.code.isNotEmpty
+                                                          ? outlet.code
+                                                          : 'OUT-${outlet.id}',
                                                       style: const TextStyle(
-                                                        color: Color(0xFF3F3F46),
-                                                        fontWeight: FontWeight.w700,
+                                                        color:
+                                                            Color(0xFF3F3F46),
+                                                        fontWeight:
+                                                            FontWeight.w700,
                                                         fontSize: 11,
                                                       ),
                                                     ),
@@ -302,81 +415,154 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                                                 ],
                                               ),
                                               const SizedBox(height: 8),
-                                              // Phone Number & Owner Details
                                               Row(
                                                 children: [
-                                                  const Icon(Icons.phone_rounded, size: 14, color: Color(0xFF2563EB)),
+                                                  const Icon(
+                                                      Icons.phone_rounded,
+                                                      size: 14,
+                                                      color: Color(0xFF2563EB)),
                                                   const SizedBox(width: 6),
                                                   Text(
-                                                    outlet.mobile != null && outlet.mobile!.isNotEmpty ? outlet.mobile! : 'No Phone Number',
+                                                    outlet.mobile != null &&
+                                                            outlet.mobile!
+                                                                .isNotEmpty
+                                                        ? outlet.mobile!
+                                                        : 'No Phone Number',
                                                     style: TextStyle(
                                                       fontSize: 13,
-                                                      fontWeight: FontWeight.w700,
-                                                      color: outlet.mobile != null && outlet.mobile!.isNotEmpty ? const Color(0xFF2563EB) : const Color(0xFFA1A1AA),
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      color: outlet.mobile !=
+                                                                  null &&
+                                                              outlet.mobile!
+                                                                  .isNotEmpty
+                                                          ? const Color(
+                                                              0xFF2563EB)
+                                                          : const Color(
+                                                              0xFFA1A1AA),
                                                     ),
                                                   ),
-                                                  if (outlet.ownerName != null && outlet.ownerName!.isNotEmpty) ...[
-                                                    const Text(' • ', style: TextStyle(color: Color(0xFFA1A1AA))),
+                                                  if (outlet.ownerName !=
+                                                          null &&
+                                                      outlet.ownerName!
+                                                          .isNotEmpty) ...[
+                                                    const Text(' • ',
+                                                        style: TextStyle(
+                                                            color: Color(
+                                                                0xFFA1A1AA))),
                                                     Expanded(
                                                       child: Text(
                                                         'Owner: ${outlet.ownerName}',
-                                                        style: const TextStyle(fontSize: 12, color: Color(0xFF71717A), fontWeight: FontWeight.w500),
+                                                        style: const TextStyle(
+                                                            fontSize: 12,
+                                                            color: Color(
+                                                                0xFF71717A),
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w500),
                                                         maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
                                                       ),
                                                     ),
                                                   ],
                                                 ],
                                               ),
-                                              if (outlet.address != null && outlet.address!.isNotEmpty) ...[
+                                              if (outlet.address != null &&
+                                                  outlet
+                                                      .address!.isNotEmpty) ...[
                                                 const SizedBox(height: 6),
                                                 Text(
                                                   outlet.address!,
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(fontSize: 12, color: Color(0xFF71717A)),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: Color(0xFF71717A)),
                                                 ),
                                               ],
                                               const SizedBox(height: 12),
                                               Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
                                                 children: [
                                                   Row(
                                                     children: [
                                                       Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                        decoration: BoxDecoration(
-                                                          color: const Color(0xFFF4F4F5),
-                                                          borderRadius: BorderRadius.circular(6),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 3),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: const Color(
+                                                              0xFFF4F4F5),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(6),
                                                         ),
                                                         child: Text(
                                                           outlet.channelLabel,
-                                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF52525B)),
+                                                          style: const TextStyle(
+                                                              fontSize: 10,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              color: Color(
+                                                                  0xFF52525B)),
                                                         ),
                                                       ),
                                                       if (dist != null) ...[
-                                                        const SizedBox(width: 8),
+                                                        const SizedBox(
+                                                            width: 8),
                                                         Row(
                                                           children: [
-                                                            const Icon(Icons.location_on_rounded, color: Color(0xFF2563EB), size: 14),
-                                                            const SizedBox(width: 3),
+                                                            const Icon(
+                                                                Icons
+                                                                    .location_on_rounded,
+                                                                color: Color(
+                                                                    0xFF2563EB),
+                                                                size: 14),
+                                                            const SizedBox(
+                                                                width: 3),
                                                             Text(
-                                                              dist < 1000 ? '${dist.toStringAsFixed(0)} m' : '${(dist / 1000).toStringAsFixed(1)} km',
-                                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                                                              dist < 1000
+                                                                  ? '${dist.toStringAsFixed(0)} m'
+                                                                  : '${(dist / 1000).toStringAsFixed(1)} km',
+                                                              style: const TextStyle(
+                                                                  fontSize: 11,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: Color(
+                                                                      0xFF2563EB)),
                                                             ),
                                                           ],
                                                         ),
                                                       ],
                                                     ],
                                                   ),
-                                                  Row(
-                                                    children: const [
+                                                  const Row(
+                                                    children: [
                                                       Text(
                                                         'Visit Outlet',
-                                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF09090B)),
+                                                        style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                            color: Color(
+                                                                0xFF09090B)),
                                                       ),
                                                       SizedBox(width: 4),
-                                                      Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFF09090B)),
+                                                      Icon(
+                                                          Icons
+                                                              .arrow_forward_ios_rounded,
+                                                          size: 12,
+                                                          color: Color(
+                                                              0xFF09090B)),
                                                     ],
                                                   ),
                                                 ],
@@ -390,21 +576,57 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                                 ),
                         );
                       },
-                      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF09090B))),
-                      error: (e, __) => Center(child: Text('Error loading beat plan: $e')),
+                      loading: () => const Center(
+                          child: CircularProgressIndicator(
+                              color: Color(0xFF09090B))),
+                      error: (e, __) =>
+                          Center(child: Text('Error loading beat plan: $e')),
                     ),
                   ),
                 ],
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF09090B))),
+            loading: () => const Center(
+                child: CircularProgressIndicator(color: Color(0xFF09090B))),
             error: (e, __) => Center(child: Text('Error loading beats: $e')),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF09090B))),
+        loading: () => const Center(
+            child: CircularProgressIndicator(color: Color(0xFF09090B))),
         error: (e, __) => Center(child: Text('Error: $e')),
       ),
-      floatingActionButton: beatId != null
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE4E4E7), width: 1)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _viewMode,
+          onTap: (index) => setState(() => _viewMode = index),
+          backgroundColor: Colors.white,
+          selectedItemColor: const Color(0xFF09090B),
+          unselectedItemColor: const Color(0xFFA1A1AA),
+          selectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+          elevation: 0,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.view_list_rounded),
+              activeIcon:
+                  Icon(Icons.view_list_rounded, color: Color(0xFF09090B)),
+              label: 'List View',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.map_rounded),
+              activeIcon: Icon(Icons.map_rounded, color: Color(0xFF09090B)),
+              label: 'Map View',
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: (beatId != null && _viewMode == 0)
           ? beatsAsync.maybeWhen(
               data: (beats) => Row(
                 mainAxisSize: MainAxisSize.min,
@@ -423,7 +645,9 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                       });
                     },
                     tooltip: 'Search Outlets',
-                    child: Icon(_showSearch ? Icons.search_off_rounded : Icons.search_rounded),
+                    child: Icon(_showSearch
+                        ? Icons.search_off_rounded
+                        : Icons.search_rounded),
                   ),
                   const SizedBox(width: 10),
                   FloatingActionButton.extended(
@@ -432,13 +656,298 @@ class _BeatPlanScreenState extends ConsumerState<BeatPlanScreen> {
                     foregroundColor: Colors.white,
                     onPressed: () => _showAddOptions(context, beats, beatId),
                     icon: const Icon(Icons.add_location_alt_rounded, size: 18),
-                    label: const Text('New Outlet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    label: const Text('New Outlet',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
                 ],
               ),
               orElse: () => null,
             )
           : null,
+    );
+  }
+
+  Widget _buildMapView(List<Outlet> outlets) {
+    if (outlets.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Text(
+            'No outlet map locations available for this beat.',
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Color(0xFF71717A)),
+          ),
+        ),
+      );
+    }
+
+    final selected = _selectedMapOutlet ?? outlets.first;
+
+    // Calculate mean center LatLng
+    double sumLat = 0.0;
+    double sumLng = 0.0;
+    for (int i = 0; i < outlets.length; i++) {
+      final o = outlets[i];
+      sumLat += o.gpsLat ?? (12.9654 + (i * 0.01));
+      sumLng += o.gpsLng ?? (80.2483 + (i * 0.01));
+    }
+    final centerLat = sumLat / outlets.length;
+    final centerLng = sumLng / outlets.length;
+
+    final markers = outlets.asMap().entries.map((entry) {
+      final idx = entry.key;
+      final outlet = entry.value;
+      final isSelected = selected.id == outlet.id;
+
+      final double lat = outlet.gpsLat ?? (12.9654 + (idx * 0.01));
+      final double lng = outlet.gpsLng ?? (80.2483 + (idx * 0.01));
+
+      return Marker(
+        point: LatLng(lat, lng),
+        width: 130,
+        height: 70,
+        child: GestureDetector(
+          onTap: () {
+            setState(() => _selectedMapOutlet = outlet);
+            _openGoogleMaps(lat, lng, outlet.name);
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFFEA580C)
+                      : const Color(0xFF09090B),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: isSelected
+                          ? Colors.deepOrangeAccent.withValues(alpha: 0.4)
+                          : Colors.black26,
+                      blurRadius: isSelected ? 10 : 5,
+                      spreadRadius: isSelected ? 3 : 1,
+                    )
+                  ],
+                  border: Border.all(
+                    color: Colors.white,
+                    width: 2.5,
+                  ),
+                ),
+                child: Icon(
+                  Icons.location_on_rounded,
+                  size: isSelected ? 22 : 16,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 2)
+                  ],
+                ),
+                child: Text(
+                  outlet.name,
+                  style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF09090B)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }).toList();
+
+    return SizedBox.expand(
+      child: Column(
+        children: [
+          // OpenStreetMap Tile Canvas Container
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.all(16),
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+              ),
+              child: Stack(
+                children: [
+                  FlutterMap(
+                    options: MapOptions(
+                      initialCenter: LatLng(centerLat, centerLng),
+                      initialZoom: 12.0,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.safar.sfamobile',
+                      ),
+                      MarkerLayer(markers: markers),
+                    ],
+                  ),
+                  Positioned(
+                    top: 14,
+                    left: 14,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4)
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.map_rounded,
+                              size: 16, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'OpenStreetMap • ${outlets.length} Outlets',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: Color(0xFF09090B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Bottom Outlet Details Callout Panel
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE4E4E7)),
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 8)
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        selected.name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: Color(0xFF09090B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF4F4F5),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        selected.code.isNotEmpty
+                            ? selected.code
+                            : 'OUT-${selected.id}',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF52525B)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  selected.address != null && selected.address!.isNotEmpty
+                      ? selected.address!
+                      : 'No address recorded',
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF71717A)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF2563EB),
+                          side: const BorderSide(color: Color(0xFF2563EB)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        icon: const Icon(Icons.near_me_rounded, size: 16),
+                        label: const Text('Google Maps',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: () {
+                          final double lat = selected.gpsLat ?? 12.9654;
+                          final double lng = selected.gpsLng ?? 80.2483;
+                          _openGoogleMaps(lat, lng, selected.name);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF09090B),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                        label: const Text('Visit Outlet',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: () {
+                          ref.read(selectedOutletProvider.notifier).state =
+                              selected;
+                          context.push('/outlet/${selected.id}');
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -15,7 +15,8 @@ class VisitScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.storefront_rounded, size: 64, color: theme.colorScheme.primary),
+              Icon(Icons.storefront_rounded,
+                  size: 64, color: theme.colorScheme.primary),
               const SizedBox(height: 16),
               Text(
                 'Manage Visits',

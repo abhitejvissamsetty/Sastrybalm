@@ -1,250 +1,238 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/auth_provider.dart';
+import '../../services/image_picker_service.dart';
+import 'vendor_admin_screen.dart';
+import 'procurement_map.dart';
 
 class VendorTechScreen extends ConsumerStatefulWidget {
   const VendorTechScreen({super.key});
-
   @override
   ConsumerState<VendorTechScreen> createState() => _VendorTechScreenState();
 }
 
 class _VendorTechScreenState extends ConsumerState<VendorTechScreen> {
-  int _selectedTab = 0;
-  bool _loading = false;
-  List<dynamic> _materialRequests = [];
-  List<dynamic> _items = [];
-
+  int _tab = 0;
+  bool _loading = true;
+  bool _mapView = false;
+  List<dynamic> _mrs = [], _items = [], _assets = [], _maintenance = [];
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    _load();
   }
 
-  Future<void> _fetchData() async {
+  Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final client = ref.read(apiClientProvider);
-      final mrRes = await client.dio.get('/material-requests');
-      final itemsRes = await client.dio.get('/procurement/items');
+      final s = ref.read(procurementServiceProvider);
+      final values = await Future.wait(
+          [s.materialRequests(), s.items(), s.assets(), s.maintenanceLogs()]);
       if (mounted) {
         setState(() {
-          _materialRequests = mrRes.data['items'] as List;
-          _items = itemsRes.data['items'] as List;
-          _loading = false;
+          _mrs = values[0];
+          _items = values[1];
+          _assets = values[2];
+          _maintenance = values[3];
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) _message('Unable to load technician assignments: $e');
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _message(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  Future<List<String>?> _twoImages() async {
+    final picker = ImagePickerService();
+    final paths = <String>[];
+    for (var i = 0; i < 2; i++) {
+      final image = await picker.showImageSourceDialog(context);
+      if (image == null) return null;
+      paths.add(image.path);
+    }
+    final service = ref.read(procurementServiceProvider);
+    return Future.wait(paths.map(service.uploadImage));
+  }
+
+  Future<String?> _text(String title, String label) {
+    final c = TextEditingController();
+    return showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+              title: Text(title),
+              content: TextField(
+                  controller: c,
+                  maxLines: 3,
+                  decoration: InputDecoration(labelText: label)),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel')),
+                ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, c.text.trim()),
+                    child: const Text('Continue'))
+              ],
+            ));
+  }
+
+  Future<void> _recce(Map<String, dynamic> mr) async {
+    final description =
+        await _text('Submit Recce', 'Description and location constraints');
+    if (description == null || description.isEmpty) return;
+    final images = await _twoImages();
+    if (images == null) return;
+    try {
+      await ref.read(procurementServiceProvider).submitRecce(mr['id'], {
+        'description': description,
+        'location_notes': description,
+        'dimensions': mr['approx_dimensions'],
+        'image_urls': images,
+      });
+      _message('Recce submitted for L3/L4 approval.');
+      await _load();
+    } catch (e) {
+      _message('Recce submission failed: $e');
     }
   }
 
-  Future<void> _submitRecce(Map<String, dynamic> mr) async {
-    final dimsCtrl = TextEditingController(text: mr['approx_dimensions'] ?? '10ft x 4ft');
-    final specsCtrl = TextEditingController(text: mr['material_specifications'] ?? 'Standard Specs');
-    final notesCtrl = TextEditingController();
-    final photoCtrl = TextEditingController(text: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158');
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Submit On-Site Recce Information'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: dimsCtrl, decoration: const InputDecoration(labelText: 'Measured Dimensions')),
-              const SizedBox(height: 10),
-              TextField(controller: specsCtrl, decoration: const InputDecoration(labelText: 'Material Specifications')),
-              const SizedBox(height: 10),
-              TextField(controller: photoCtrl, decoration: const InputDecoration(labelText: 'Site Recce Photo URL')),
-              const SizedBox(height: 10),
-              TextField(controller: notesCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Site Notes & Constraints')),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(child: const Text('Cancel'), onPressed: () => Navigator.pop(ctx, false)),
-          ElevatedButton(child: const Text('Submit Recce'), onPressed: () => Navigator.pop(ctx, true)),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        final client = ref.read(apiClientProvider);
-        await client.dio.post('/procurement/material-requests/${mr['id']}/recce', data: {
-          'dimensions': dimsCtrl.text.trim(),
-          'material_specifications': specsCtrl.text.trim(),
-          'client_notes': notesCtrl.text.trim(),
-          'photo_url': photoCtrl.text.trim(),
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Recce Information submitted!')));
-          _fetchData();
-        }
-      } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
+  Future<void> _deploy(Map<String, dynamic> item) async {
+    final description = await _text(
+        'Deploy Item ${item['batch_number']}', 'Installation description');
+    if (description == null || description.isEmpty) return;
+    if (!mounted) return;
+    final image = await ImagePickerService().showImageSourceDialog(context);
+    if (image == null) return;
+    try {
+      final url =
+          await ref.read(procurementServiceProvider).uploadImage(image.path);
+      await ref
+          .read(procurementServiceProvider)
+          .deployItem(item['id'], description, url);
+      _message('Item installed and Asset created.');
+      await _load();
+    } catch (e) {
+      _message('Installation failed: $e');
     }
   }
 
-  Future<void> _createAssetFromItem(Map<String, dynamic> item) async {
-    final photoCtrl = TextEditingController(text: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158');
-    final notesCtrl = TextEditingController(text: 'Asset installed successfully at outlet.');
+  Future<void> _createMaintenance(Map<String, dynamic> asset) async {
+    final issue = await _text('Create Maintenance Log', 'Issue description');
+    if (issue == null || issue.isEmpty) return;
+    if (!mounted) return;
+    final image = await ImagePickerService().showImageSourceDialog(context);
+    if (!mounted) return;
+    final urls = image == null
+        ? <String>[]
+        : [await ref.read(procurementServiceProvider).uploadImage(image.path)];
+    try {
+      await ref
+          .read(procurementServiceProvider)
+          .createMaintenance(asset['id'], issue, urls);
+      await _load();
+    } catch (e) {
+      _message('Maintenance creation failed: $e');
+    }
+  }
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Create Asset (Installation)'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Item Batch: ${item['batch_number']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            TextField(controller: photoCtrl, decoration: const InputDecoration(labelText: 'Installation Asset Photo URL')),
-            const SizedBox(height: 10),
-            TextField(controller: notesCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Installation Notes')),
-          ],
-        ),
-        actions: [
-          TextButton(child: const Text('Cancel'), onPressed: () => Navigator.pop(ctx, false)),
-          ElevatedButton(child: const Text('Create Asset'), onPressed: () => Navigator.pop(ctx, true)),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        final client = ref.read(apiClientProvider);
-        await client.dio.post('/procurement/items/${item['id']}/create-asset', data: {
-          'image_url': photoCtrl.text.trim(),
-          'notes': notesCtrl.text.trim(),
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Asset installed and created successfully!')));
-          _fetchData();
-        }
-      } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
+  Future<void> _progress(Map<String, dynamic> log) async {
+    final value =
+        await _text('Report Maintenance Progress', 'Percentage 0–100');
+    if (value == null || int.tryParse(value) == null) return;
+    if (!mounted) return;
+    try {
+      final image = await ImagePickerService().showImageSourceDialog(context);
+      if (!mounted) return;
+      final urls = image == null
+          ? <String>[]
+          : [
+              await ref.read(procurementServiceProvider).uploadImage(image.path)
+            ];
+      await ref.read(procurementServiceProvider).reportMaintenance(
+          log['id'], int.parse(value), 'Technician update',
+          imageUrls: urls);
+      await _load();
+    } catch (e) {
+      _message('Progress failed: $e');
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(title: const Text('Vendor Technician Portal'), elevation: 0),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                _buildTabPill(0, 'Recce Assignments'),
-                const SizedBox(width: 8),
-                _buildTabPill(1, 'Pending Asset Installations'),
-              ],
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Vendor Technician Portal'), actions: [
+          if (_tab == 0 || _tab == 1)
+            IconButton(
+              onPressed: () => setState(() => _mapView = !_mapView),
+              icon: Icon(_mapView ? Icons.view_list : Icons.map_outlined),
             ),
-          ),
+        ]),
+        body: Column(children: [
+          SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(8),
+              child: SegmentedButton<int>(segments: const [
+                ButtonSegment(value: 0, label: Text('Recce')),
+                ButtonSegment(value: 1, label: Text('Ready Items')),
+                ButtonSegment(value: 2, label: Text('Assets')),
+                ButtonSegment(value: 3, label: Text('Maintenance')),
+              ], selected: {
+                _tab
+              }, onSelectionChanged: (v) => setState(() => _tab = v.first))),
           Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF09090B)))
-                : Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: _selectedTab == 0 ? _buildRecceTab() : _buildItemsTab(),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabPill(int index, String label) {
-    final selected = _selectedTab == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTab = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF09090B) : const Color(0xFFF4F4F5),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF09090B),
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecceTab() {
-    if (_materialRequests.isEmpty) return const Center(child: Text('No assigned Recce tasks.'));
-    return ListView.separated(
-      itemCount: _materialRequests.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (ctx, i) {
-        final mr = _materialRequests[i];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE4E4E7)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(mr['mr_number'] ?? 'MR-${mr['id']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 4),
-              Text(mr['description'] ?? 'No description', style: const TextStyle(color: Color(0xFF71717A), fontSize: 12)),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () => _submitRecce(mr),
-                child: const Text('Submit On-Site Recce Info'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildItemsTab() {
-    if (_items.isEmpty) return const Center(child: Text('No pending Items for installation.'));
-    return ListView.separated(
-      itemCount: _items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (ctx, i) {
-        final item = _items[i];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE4E4E7)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(item['item_name'] ?? 'Item', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 4),
-              Text('Batch Code: ${item['batch_number']}', style: const TextStyle(color: Color(0xFF71717A), fontSize: 12)),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () => _createAssetFromItem(item),
-                child: const Text('Create Asset & Complete Installation'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _mapView && (_tab == 0 || _tab == 1)
+                      ? ProcurementMap(records: _tab == 0 ? _mrs : _items)
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          child: ListView(
+                              padding: const EdgeInsets.all(12),
+                              children: _cards()))),
+        ]),
+      );
+  List<Widget> _cards() {
+    final records = [_mrs, _items, _assets, _maintenance][_tab];
+    if (records.isEmpty) {
+      return [
+        const SizedBox(
+            height: 300, child: Center(child: Text('No assigned records.')))
+      ];
+    }
+    return records.map((raw) {
+      final r = raw as Map<String, dynamic>;
+      String title, subtitle, label;
+      VoidCallback? action;
+      if (_tab == 0) {
+        title = r['mr_number'];
+        subtitle = '${r['status']} • ${r['product_name'] ?? ''}';
+        label = 'Submit Recce';
+        if (r['status'] == 'vendor_assigned' ||
+            r['status'] == 'recce_completed') {
+          action = () => _recce(r);
+        }
+      } else if (_tab == 1) {
+        title = r['batch_number'];
+        subtitle = '${r['item_name']} • ${r['status']}';
+        label = 'Deploy Item';
+        if (r['status'] == 'Ready') action = () => _deploy(r);
+      } else if (_tab == 2) {
+        title = r['ac_number'];
+        subtitle = '${r['asset_state']} • ${r['outlet_name'] ?? ''}';
+        label = 'Maintenance';
+        action = () => _createMaintenance(r);
+      } else {
+        title = 'Maintenance #${r['id']}';
+        subtitle = '${r['status']} • ${r['progress_percent']}%';
+        label = 'Report Progress';
+        if (r['status'] != 'Validated') action = () => _progress(r);
+      }
+      return Card(
+          child: ListTile(
+              title: Text(title),
+              subtitle: Text(subtitle),
+              trailing: action == null
+                  ? null
+                  : TextButton(onPressed: action, child: Text(label))));
+    }).toList();
   }
 }

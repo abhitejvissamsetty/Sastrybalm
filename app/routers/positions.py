@@ -11,12 +11,54 @@ from app.models.position import Position, PositionLevel
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
+from app.services.access_control import (
+    build_access_scope,
+    require_beat_access,
+    require_position_access,
+    require_user_access,
+    require_warehouse_access,
+    scope_beat_query,
+    scope_position_query,
+    scope_user_query,
+)
 
 router = APIRouter(prefix="/master-data/positions", tags=["positions"])
 templates = Jinja2Templates(directory="app/templates")
 
 
-def validate_position_hierarchy(db: Session, level_str: str, reporting_to_id: Optional[str], current_pos_id: Optional[int] = None) -> Optional[str]:
+def _position_form_options(db: Session, user: User, *, exclude_position_id=None):
+    manager_query = scope_position_query(
+        db.query(Position), user, db
+    ).filter(Position.is_active == True, Position.level != PositionLevel.L1)
+    if exclude_position_id:
+        manager_query = manager_query.filter(Position.id != exclude_position_id)
+    beats = scope_beat_query(db.query(Beat), user, db).filter(
+        Beat.is_active == True
+    ).order_by(Beat.name).all()
+    users = scope_user_query(db.query(User), user, db).filter(
+        User.is_active == True, User.role != UserRole.admin
+    ).order_by(User.full_name).all()
+    scope = build_access_scope(user, db)
+    warehouse_query = db.query(Warehouse).filter(Warehouse.is_active == True)
+    if not scope.unrestricted:
+        warehouse_query = warehouse_query.filter(
+            Warehouse.id.in_(scope.warehouse_ids or {-1})
+        )
+    return (
+        manager_query.order_by(Position.name).all(),
+        beats,
+        users,
+        warehouse_query.order_by(Warehouse.name).all(),
+    )
+
+
+def validate_position_hierarchy(
+    db: Session,
+    level_str: str,
+    reporting_to_id: Optional[str],
+    current_pos_id: Optional[int] = None,
+    current_user: Optional[User] = None,
+) -> Optional[str]:
     try:
         level = PositionLevel(level_str)
     except ValueError:
@@ -37,7 +79,11 @@ def validate_position_hierarchy(db: Session, level_str: str, reporting_to_id: Op
         if current_pos_id and rid == current_pos_id:
             return "A position cannot report to itself."
             
-        parent = db.query(Position).filter(Position.id == rid).first()
+        parent = (
+            require_position_access(db, current_user, rid)
+            if current_user
+            else db.query(Position).filter(Position.id == rid).first()
+        )
         if not parent:
             return "Parent position not found."
         if not parent.is_active:
@@ -63,8 +109,12 @@ async def position_list(
     page: int = Query(default=1, ge=1),
     tab: str = Query(default="active"),
 ):
-    active_query = db.query(Position).filter(Position.is_active == True)
-    inactive_query = db.query(Position).filter(Position.is_active == False)
+    active_query = scope_position_query(
+        db.query(Position), current_user, db
+    ).filter(Position.is_active == True)
+    inactive_query = scope_position_query(
+        db.query(Position), current_user, db
+    ).filter(Position.is_active == False)
     
     if q:
         active_query = active_query.filter(Position.name.ilike(f"%{q}%") | Position.code.ilike(f"%{q}%"))
@@ -103,10 +153,9 @@ async def position_new(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1).order_by(Position.name).all()
-    beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-    users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
-    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
+    managers, beats, users, warehouses = _position_form_options(
+        db, current_user
+    )
     return templates.TemplateResponse("positions/form.html", {
         "request": request, "current_user": current_user,
         "item": None, "managers": managers, "beats": beats, "users": users, "warehouses": warehouses,
@@ -128,10 +177,9 @@ async def position_create(
     attached_user_id: Optional[str] = Form(default=None),
 ):
     def _form_context(err_msg: str):
-        managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1).order_by(Position.name).all()
-        beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-        users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
-        warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
+        managers, beats, users, warehouses = _position_form_options(
+            db, current_user
+        )
         return templates.TemplateResponse("positions/form.html", {
             "request": request, "current_user": current_user,
             "item": None, "managers": managers, "beats": beats, "users": users, "warehouses": warehouses,
@@ -144,12 +192,18 @@ async def position_create(
     if db.query(Position).filter(Position.code == code.upper()).first():
         return _form_context(f"Code '{code.upper()}' already exists.")
         
-    err = validate_position_hierarchy(db, level, reporting_to_id)
+    err = validate_position_hierarchy(
+        db, level, reporting_to_id, current_user=current_user
+    )
     if err:
         return _form_context(err)
 
     rid = int(reporting_to_id) if (reporting_to_id and reporting_to_id.strip() != "") else None
     wid = int(warehouse_id) if (warehouse_id and warehouse_id.strip() != "") else None
+    if rid:
+        require_position_access(db, current_user, rid, active_only=True)
+    if wid:
+        require_warehouse_access(db, current_user, wid)
 
     # L1 Position Warehouse Validation
     if level == PositionLevel.L1.value:
@@ -163,9 +217,8 @@ async def position_create(
 
     pos = Position(name=name, code=code.upper(), level=PositionLevel(level), reporting_to_id=rid, warehouse_id=wid)
     if attached_user_id and attached_user_id.strip() != "":
-        user_obj = db.query(User).filter(User.id == int(attached_user_id)).first()
-        if user_obj:
-            pos.users.append(user_obj)
+        user_obj = require_user_access(db, current_user, int(attached_user_id))
+        pos.users.append(user_obj)
     db.add(pos)
     db.commit()
     set_flash_success(request, f"Position '{name}' created.")
@@ -178,17 +231,13 @@ async def position_edit(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Position).filter(Position.id == pos_id).first()
-    if not item:
-        set_flash_error(request, "Position not found.")
-        return RedirectResponse("/master-data/positions", status_code=302)
+    item = require_position_access(db, current_user, pos_id)
     if current_user.role == UserRole.territory_manager and item.level != PositionLevel.L1:
         set_flash_error(request, "Territory Managers are authorized to edit L1 Positions only.")
         return RedirectResponse("/master-data/positions", status_code=302)
-    managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1, Position.id != pos_id).order_by(Position.name).all()
-    beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-    users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
-    warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
+    managers, beats, users, warehouses = _position_form_options(
+        db, current_user, exclude_position_id=pos_id
+    )
     return templates.TemplateResponse("positions/form.html", {
         "request": request, "current_user": current_user,
         "item": item, "managers": managers, "beats": beats, "users": users, "warehouses": warehouses,
@@ -210,16 +259,12 @@ async def position_update(
     beat_ids: list[str] = Form(default=[]),
     attached_user_id: Optional[str] = Form(default=None),
 ):
-    item = db.query(Position).filter(Position.id == pos_id).first()
-    if not item:
-        set_flash_error(request, "Position not found.")
-        return RedirectResponse("/master-data/positions", status_code=302)
+    item = require_position_access(db, current_user, pos_id)
 
     def _form_context(err_msg: str):
-        managers = db.query(Position).filter(Position.is_active == True, Position.level != PositionLevel.L1, Position.id != pos_id).order_by(Position.name).all()
-        beats = db.query(Beat).filter(Beat.is_active == True).order_by(Beat.name).all()
-        users = db.query(User).filter(User.is_active == True, User.role != UserRole.admin).order_by(User.full_name).all()
-        warehouses = db.query(Warehouse).filter(Warehouse.is_active == True).order_by(Warehouse.name).all()
+        managers, beats, users, warehouses = _position_form_options(
+            db, current_user, exclude_position_id=pos_id
+        )
         return templates.TemplateResponse("positions/form.html", {
             "request": request, "current_user": current_user,
             "item": item, "managers": managers, "beats": beats, "users": users, "warehouses": warehouses,
@@ -232,12 +277,22 @@ async def position_update(
     if db.query(Position).filter(Position.code == code.upper(), Position.id != pos_id).first():
         return _form_context(f"Code '{code.upper()}' already in use.")
         
-    err = validate_position_hierarchy(db, level, reporting_to_id, current_pos_id=pos_id)
+    err = validate_position_hierarchy(
+        db,
+        level,
+        reporting_to_id,
+        current_pos_id=pos_id,
+        current_user=current_user,
+    )
     if err:
         return _form_context(err)
 
     rid = int(reporting_to_id) if (reporting_to_id and reporting_to_id.strip() != "") else None
     wid = int(warehouse_id) if (warehouse_id and warehouse_id.strip() != "") else None
+    if rid:
+        require_position_access(db, current_user, rid, active_only=True)
+    if wid:
+        require_warehouse_access(db, current_user, wid)
 
     # L1 Position Warehouse Validation
     if level == PositionLevel.L1.value:
@@ -257,9 +312,8 @@ async def position_update(
 
     item.users.clear()
     if attached_user_id and attached_user_id.strip() != "":
-        user_obj = db.query(User).filter(User.id == int(attached_user_id)).first()
-        if user_obj:
-            item.users.append(user_obj)
+        user_obj = require_user_access(db, current_user, int(attached_user_id))
+        item.users.append(user_obj)
         
     db.commit()
     set_flash_success(request, f"Position '{name}' updated.")
@@ -272,7 +326,7 @@ async def position_activate(
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Position).filter(Position.id == pos_id).first()
+    item = require_position_access(db, current_user, pos_id)
     if item:
         item.is_active = True
         db.commit()
@@ -296,7 +350,7 @@ async def position_delete(
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Position).filter(Position.id == pos_id).first()
+    item = require_position_access(db, current_user, pos_id)
     if item:
         if not item.is_vacant:
             set_flash_error(request, f"Cannot deactivate '{item.name}' because it has active assigned users.")
@@ -320,10 +374,7 @@ async def position_attach_beats_get(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Position).filter(Position.id == pos_id).first()
-    if not item or not item.is_active:
-        set_flash_error(request, "Active position not found.")
-        return RedirectResponse("/master-data/positions", status_code=302)
+    item = require_position_access(db, current_user, pos_id, active_only=True)
     if item.level != PositionLevel.L1:
         set_flash_error(request, "Beats can only be attached to L1 positions.")
         return RedirectResponse("/master-data/positions", status_code=302)
@@ -337,7 +388,9 @@ async def position_attach_beats_get(
     ).all()
 
     # Filter beats matching the Region resolved from Position's Territory
-    query = db.query(Beat).filter(Beat.is_active == True)
+    query = scope_beat_query(
+        db.query(Beat), current_user, db
+    ).filter(Beat.is_active == True)
     if other_mapped_beat_ids:
         query = query.filter(~Beat.id.in_(other_mapped_beat_ids))
 
@@ -354,7 +407,16 @@ async def position_attach_beats_get(
 
     all_beats = query.order_by(Beat.name).all()
     assigned_beat_ids = [b.id for b in item.beats]
-    territories = db.query(Geography).filter(Geography.level == GeoLevel.territory, Geography.is_active == True).order_by(Geography.name).all()
+    access_scope = build_access_scope(current_user, db)
+    territory_query = db.query(Geography).filter(
+        Geography.level == GeoLevel.territory,
+        Geography.is_active == True,
+    )
+    if not access_scope.unrestricted:
+        territory_query = territory_query.filter(
+            Geography.id.in_(access_scope.geography_ids or {-1})
+        )
+    territories = territory_query.order_by(Geography.name).all()
 
     return templates.TemplateResponse("positions/attach_beats.html", {
         "request": request,
@@ -374,10 +436,7 @@ async def position_attach_beats_post(
     db: Session = Depends(get_db),
     beat_ids: list[str] = Form(default=[]),
 ):
-    item = db.query(Position).filter(Position.id == pos_id).first()
-    if not item or not item.is_active:
-        set_flash_error(request, "Active position not found.")
-        return RedirectResponse("/master-data/positions", status_code=302)
+    item = require_position_access(db, current_user, pos_id, active_only=True)
     if item.level != PositionLevel.L1:
         set_flash_error(request, "Beats can only be attached to L1 positions.")
         return RedirectResponse("/master-data/positions", status_code=302)
@@ -386,7 +445,10 @@ async def position_attach_beats_post(
     if beat_ids:
         int_ids = [int(i) for i in beat_ids if i]
         if int_ids:
-            beat_objs = db.query(Beat).filter(Beat.id.in_(int_ids)).all()
+            beat_objs = [
+                require_beat_access(db, current_user, beat_id, active_only=True)
+                for beat_id in int_ids
+            ]
             item.beats.extend(beat_objs)
         
     db.commit()

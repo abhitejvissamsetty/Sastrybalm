@@ -14,7 +14,6 @@ from app.models.order import Order, OrderItem, OrderStatus
 from app.models.outlet import Outlet, OutletStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.product import Product
-from app.models.company import CompanyProfile
 from app.models.timesheet import Timesheet, VisitRecord
 from app.models.user import User, UserRole
 
@@ -145,12 +144,6 @@ async def dashboard(
         rec_q = rec_q.filter(Order.user_id.in_(rep_ids)) if rep_ids else rec_q.filter(False)
     recent_orders = rec_q.limit(6).all()
 
-    # ── Integration sync status ───────────────────────────────────────────────
-    profiles = db.query(CompanyProfile).filter(CompanyProfile.is_active == True).all()
-    zap_configured = any(p.zap_base_url and p.zap_api_key_encrypted for p in profiles)
-    cmms_configured = any(p.cmms_base_url and p.cmms_api_key_encrypted for p in profiles)
-    connect_configured = any(p.connect_base_url and p.connect_api_key_encrypted for p in profiles)
-
     return templates.TemplateResponse(
         "dashboard/index.html",
         {
@@ -170,9 +163,6 @@ async def dashboard(
             "open_work_orders": open_work_orders,
             "pending_quotations": pending_quotations,
             "recent_orders": recent_orders,
-            "zap_configured": zap_configured,
-            "cmms_configured": cmms_configured,
-            "connect_configured": connect_configured,
         },
     )
 

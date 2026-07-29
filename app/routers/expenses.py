@@ -1,9 +1,8 @@
 import os
-import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -14,6 +13,11 @@ from app.models.expense import Expense, ExpenseCategory, ExpenseStatus
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
+from app.services.access_control import (
+    require_expense_access,
+    scope_employee_record_query,
+)
+from app.utils.s3_service import upload_image_file
 
 ALLOWED_RECEIPT_EXTS = {".jpg", ".jpeg", ".png", ".pdf"}
 MAX_RECEIPT_SIZE = 5 * 1024 * 1024  # 5 MB
@@ -31,9 +35,7 @@ async def expense_list(
     category: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(Expense)
-    if current_user.role == UserRole.field_rep:
-        query = query.filter(Expense.user_id == current_user.id)
+    query = scope_employee_record_query(db.query(Expense), Expense, current_user, db)
     if status and status in [s.value for s in ExpenseStatus]:
         query = query.filter(Expense.status == status)
     if category and category in [c.value for c in ExpenseCategory]:
@@ -101,13 +103,14 @@ async def expense_create(
                 "error": "Receipt file too large. Maximum 5MB.",
             })
 
-        upload_dir = os.path.join("app", "static", "uploads", "receipts")
-        os.makedirs(upload_dir, exist_ok=True)
-        filename = f"{uuid.uuid4().hex}{ext}"
-        filepath = os.path.join(upload_dir, filename)
-        with open(filepath, "wb") as f:
-            f.write(contents)
-        receipt_url = f"/static/uploads/receipts/{filename}"
+        receipt_url = upload_image_file(
+            db,
+            contents,
+            receipt_file.filename,
+            folder_prefix="receipts",
+            content_type=receipt_file.content_type or "application/octet-stream",
+            bucket_type="files",
+        )
 
     e = Expense(
         user_id=current_user.id,
@@ -131,14 +134,10 @@ async def expense_upload_receipt(
     db: Session = Depends(get_db),
 ):
     """Upload or replace receipt for an existing expense."""
-    expense = db.query(Expense).filter(Expense.id == expense_id).first()
-    if not expense:
+    try:
+        expense = require_expense_access(db, current_user, expense_id)
+    except HTTPException:
         set_flash_error(request, "Expense not found.")
-        return RedirectResponse("/operations/expenses", status_code=302)
-
-    # Ownership check for field reps
-    if current_user.role == UserRole.field_rep and expense.user_id != current_user.id:
-        set_flash_error(request, "You can only upload receipts for your own expenses.")
         return RedirectResponse("/operations/expenses", status_code=302)
 
     form = await request.form()
@@ -158,14 +157,14 @@ async def expense_upload_receipt(
         set_flash_error(request, "File too large. Maximum 5MB.")
         return RedirectResponse("/operations/expenses", status_code=302)
 
-    upload_dir = os.path.join("app", "static", "uploads", "receipts")
-    os.makedirs(upload_dir, exist_ok=True)
-    filename = f"{uuid.uuid4().hex}{ext}"
-    filepath = os.path.join(upload_dir, filename)
-    with open(filepath, "wb") as f:
-        f.write(contents)
-
-    expense.receipt_url = f"/static/uploads/receipts/{filename}"
+    expense.receipt_url = upload_image_file(
+        db,
+        contents,
+        receipt_file.filename,
+        folder_prefix="receipts",
+        content_type=receipt_file.content_type or "application/octet-stream",
+        bucket_type="files",
+    )
     db.commit()
     set_flash_success(request, f"Receipt uploaded for expense #{expense_id}.")
     return RedirectResponse("/operations/expenses", status_code=302)
@@ -177,13 +176,14 @@ async def expense_approve(
     current_user: User = Depends(require_web_roles(UserRole.admin, UserRole.territory_manager)),
     db: Session = Depends(get_db),
 ):
-    item = db.query(Expense).filter(Expense.id == expense_id).first()
-    if item and item.status == ExpenseStatus.submitted:
-        item.status = ExpenseStatus.approved
-        item.approved_by_id = current_user.id
-        item.approved_at = datetime.now()
-        db.commit()
-        set_flash_success(request, f"Expense #{expense_id} approved.")
+    item = require_expense_access(db, current_user, expense_id)
+    if item.status != ExpenseStatus.submitted:
+        raise HTTPException(status_code=409, detail="Expense is not awaiting approval.")
+    item.status = ExpenseStatus.approved
+    item.approved_by_id = current_user.id
+    item.approved_at = datetime.now()
+    db.commit()
+    set_flash_success(request, f"Expense #{expense_id} approved.")
     return RedirectResponse("/operations/expenses", status_code=302)
 
 
@@ -194,10 +194,13 @@ async def expense_reject(
     db: Session = Depends(get_db),
     reason: Optional[str] = Form(default=None),
 ):
-    item = db.query(Expense).filter(Expense.id == expense_id).first()
-    if item and item.status == ExpenseStatus.submitted:
-        item.status = ExpenseStatus.rejected
-        item.rejection_reason = reason
-        db.commit()
-        set_flash_error(request, f"Expense #{expense_id} rejected.")
+    item = require_expense_access(db, current_user, expense_id)
+    if item.status != ExpenseStatus.submitted:
+        raise HTTPException(status_code=409, detail="Expense is not awaiting review.")
+    if not (reason or "").strip():
+        raise HTTPException(status_code=400, detail="Rejection reason is required.")
+    item.status = ExpenseStatus.rejected
+    item.rejection_reason = reason.strip()
+    db.commit()
+    set_flash_error(request, f"Expense #{expense_id} rejected.")
     return RedirectResponse("/expenses", status_code=302)

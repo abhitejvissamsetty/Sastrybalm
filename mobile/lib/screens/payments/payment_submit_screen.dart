@@ -10,7 +10,8 @@ class PaymentSubmitScreen extends ConsumerStatefulWidget {
   const PaymentSubmitScreen({super.key});
 
   @override
-  ConsumerState<PaymentSubmitScreen> createState() => _PaymentSubmitScreenState();
+  ConsumerState<PaymentSubmitScreen> createState() =>
+      _PaymentSubmitScreenState();
 }
 
 class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
@@ -29,7 +30,8 @@ class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
   Future<void> _loadUnsubmittedPayments() async {
     setState(() => _loading = true);
     final box = hiveCipher != null
-        ? await Hive.openBox('unsubmitted_payments', encryptionCipher: hiveCipher)
+        ? await Hive.openBox('unsubmitted_payments',
+            encryptionCipher: hiveCipher)
         : await Hive.openBox('unsubmitted_payments');
     final List<Map<String, dynamic>> list = [];
     for (final key in box.keys) {
@@ -56,7 +58,8 @@ class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
   Future<void> _submitPayments() async {
     if (_selectedIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one payment to submit')),
+        const SnackBar(
+            content: Text('Please select at least one payment to submit')),
       );
       return;
     }
@@ -70,24 +73,29 @@ class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
       final validIds = _selectedIds.where((id) => id >= 0).toList();
       if (validIds.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Offline collections must sync with the server before submission.')),
+          const SnackBar(
+              content: Text(
+                  'Offline collections must sync with the server before submission.')),
         );
         return;
       }
 
       final response = await service.submitPayments(
         paymentIds: validIds,
-        notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+        notes:
+            _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
       );
 
       final box = hiveCipher != null
-          ? await Hive.openBox('unsubmitted_payments', encryptionCipher: hiveCipher)
+          ? await Hive.openBox('unsubmitted_payments',
+              encryptionCipher: hiveCipher)
           : await Hive.openBox('unsubmitted_payments');
       for (final id in validIds) {
         await box.delete(id);
       }
 
       if (mounted) {
+        if (!mounted) return;
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -108,8 +116,11 @@ class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Submission failed: $e'), backgroundColor: Colors.red.shade700),
+        SnackBar(
+            content: Text('Submission failed: $e'),
+            backgroundColor: Colors.red.shade700),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -132,7 +143,8 @@ class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.check_circle_outline_rounded, size: 64, color: Colors.green),
+                        const Icon(Icons.check_circle_outline_rounded,
+                            size: 64, color: Colors.green),
                         const SizedBox(height: 16),
                         Text(
                           'All Cleared!',
@@ -159,7 +171,8 @@ class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
                   children: [
                     Expanded(
                       child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         itemCount: _payments.length,
                         itemBuilder: (ctx, idx) {
                           final payment = _payments[idx];
@@ -172,7 +185,8 @@ class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
 
                           return Card(
                             elevation: 2,
-                            shadowColor: theme.colorScheme.shadow.withOpacity(0.04),
+                            shadowColor: theme.colorScheme.shadow
+                                .withValues(alpha: 0.04),
                             child: CheckboxListTile(
                               value: isSelected,
                               onChanged: (val) {
@@ -186,17 +200,20 @@ class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
                               },
                               activeColor: theme.colorScheme.primary,
                               title: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     refNo,
-                                    style: theme.textTheme.titleMedium?.copyWith(
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                   Text(
                                     CurrencyFormatter.format(amount),
-                                    style: theme.textTheme.titleMedium?.copyWith(
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
                                       color: theme.colorScheme.primary,
                                     ),
@@ -220,10 +237,13 @@ class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: theme.cardTheme.color,
-                        border: Border(top: BorderSide(color: theme.dividerColor, width: 1.0)),
+                        border: Border(
+                            top: BorderSide(
+                                color: theme.dividerColor, width: 1.0)),
                         boxShadow: [
                           BoxShadow(
-                            color: theme.colorScheme.shadow.withOpacity(0.05),
+                            color: theme.colorScheme.shadow
+                                .withValues(alpha: 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, -4),
                           ),
@@ -245,7 +265,8 @@ class _PaymentSubmitScreenState extends ConsumerState<PaymentSubmitScreen> {
                             children: [
                               Text(
                                 'Selected (${_selectedIds.length})',
-                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                                style: theme.textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               Text(
                                 CurrencyFormatter.format(_selectedTotal),

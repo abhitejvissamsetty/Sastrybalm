@@ -6,10 +6,7 @@ from alembic import context
 from app.config import settings
 from app.models.base import Base
 # Import all models so Base.metadata has full table set for autogenerate
-from app.models import (  # noqa: registers all models with Base
-    geography, company, position, beat, outlet, product, user,
-    order, payment, expense, timesheet, material_request, alert,
-)
+import app.models  # noqa: F401  # registers every model with Base.metadata
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.db_url)
@@ -27,6 +24,10 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+        # MySQL reflects CURRENT_TIMESTAMP as text while SQLAlchemy models use
+        # func.now(); comparing those forms produces false-positive drift.
+        compare_server_default=False,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -39,7 +40,12 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=False,
+        )
         with context.begin_transaction():
             context.run_migrations()
 

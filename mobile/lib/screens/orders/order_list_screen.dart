@@ -29,11 +29,13 @@ class OrderListScreen extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.lock_outline_rounded, size: 64, color: Color(0xFF09090B)),
+                const Icon(Icons.lock_outline_rounded,
+                    size: 64, color: Color(0xFF09090B)),
                 const SizedBox(height: 16),
                 Text(
                   'Workday Not Active',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -85,7 +87,8 @@ class OrderListScreen extends ConsumerWidget {
                 final orderNo = order['order_number'] ?? '#${order['id']}';
                 final status = order['status'] ?? 'unknown';
                 final outlet = order['outlet_name'] ?? 'General Outlet';
-                final amount = (order['total_amount'] as num?)?.toDouble() ?? 0.0;
+                final amount =
+                    (order['total_amount'] as num?)?.toDouble() ?? 0.0;
                 final date = order['order_date'] ?? '';
 
                 Color statusColor;
@@ -101,15 +104,17 @@ class OrderListScreen extends ConsumerWidget {
                     statusColor = Colors.red.shade600;
                     break;
                   default:
-                    statusColor = theme.colorScheme.onSurface.withOpacity(0.6);
+                    statusColor =
+                        theme.colorScheme.onSurface.withValues(alpha: 0.6);
                 }
 
                 return Card(
                   elevation: 2,
-                  shadowColor: theme.colorScheme.shadow.withOpacity(0.04),
+                  shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.04),
                   child: ListTile(
                     onTap: () => context.push('/order/${order['id']}'),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     title: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -120,9 +125,10 @@ class OrderListScreen extends ConsumerWidget {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
+                            color: statusColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(

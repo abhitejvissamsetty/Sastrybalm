@@ -4,6 +4,7 @@ Started via FastAPI lifespan in main.py.
 Handles field tracking alerts, payment verification reminders, and order SLAs.
 """
 from datetime import date, datetime, timedelta
+from functools import partial
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -15,10 +16,15 @@ from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.timesheet import Timesheet
 from app.models.user import User, UserRole
+from app.models.scheduler_state import SchedulerJobRun
+from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
 
-scheduler = AsyncIOScheduler(timezone="Asia/Kolkata")
+scheduler = AsyncIOScheduler(
+    timezone="Asia/Kolkata",
+    job_defaults={"coalesce": True, "max_instances": 1},
+)
 
 
 def _get_db():
@@ -36,6 +42,51 @@ def _alert_exists(db, alert_type: AlertType, title: str, since: datetime) -> boo
         Alert.title == title,
         Alert.created_at >= since,
     ).first() is not None
+
+
+def run_guarded_job(
+    job_name: str,
+    bucket_seconds: int,
+    job,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Run a job once per deterministic UTC time bucket and persist outcome."""
+    current = now or datetime.utcnow()
+    epoch = int(current.timestamp())
+    bucket = datetime.utcfromtimestamp(epoch - (epoch % bucket_seconds))
+    db = SessionLocal()
+    run = SchedulerJobRun(
+        job_name=job_name,
+        scheduled_bucket=bucket,
+        status="running",
+        started_at=current,
+    )
+    db.add(run)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        db.close()
+        logger.info("Skipping duplicate scheduler run %s for %s", job_name, bucket)
+        return False
+
+    try:
+        job()
+    except Exception as exc:
+        run.status = "failed"
+        run.error = str(exc)[:4000]
+        run.finished_at = datetime.utcnow()
+        db.commit()
+        logger.exception("Scheduler job %s failed", job_name)
+        raise
+    else:
+        run.status = "succeeded"
+        run.finished_at = datetime.utcnow()
+        db.commit()
+        return True
+    finally:
+        db.close()
 
 
 def job_missing_checkins() -> None:
@@ -141,6 +192,7 @@ def job_daily_backup() -> None:
         logger.info("Automated daily backup created: %s", filepath)
     except Exception as e:
         logger.error("Automated daily backup failed: %s", e)
+        raise
 
 
 def job_daily_parquet_backup() -> None:
@@ -163,6 +215,7 @@ def job_daily_parquet_backup() -> None:
         logger.info(f"Automated daily Parquet rolling backup complete: {res.get('total_tables')} tables, {res.get('total_records')} records exported.")
     except Exception as e:
         logger.error(f"Automated daily Parquet rolling backup failed: {e}")
+        raise
     finally:
         db.close()
 
@@ -219,15 +272,44 @@ def job_auto_approve_orders() -> None:
 
     except Exception as exc:
         logger.error(f"Error in job_auto_approve_orders: {exc}")
+        raise
+    finally:
+        db.close()
+
+
+def job_auto_submit_old_timesheets() -> None:
+    """Automatically submits any open unsubmitted timesheets older than 7 days."""
+    db = SessionLocal()
+    try:
+        from app.utils.timezone import ist_today, ist_now
+        from app.models.timesheet import TimesheetStatus, TimesheetApproval
+        cutoff_date = ist_today() - timedelta(days=7)
+        old_unsubmitted = db.query(Timesheet).filter(
+            Timesheet.submitted_at.is_(None),
+            Timesheet.work_date <= cutoff_date
+        ).all()
+
+        for ts in old_unsubmitted:
+            ts.submitted_at = ist_now()
+            ts.status = TimesheetStatus.closed
+            ts.approval_status = TimesheetApproval.pending
+            ts.version += 1
+
+        if old_unsubmitted:
+            db.commit()
+            logger.info(f"Auto-submitted {len(old_unsubmitted)} timesheets older than 7 days.")
+    except Exception as exc:
+        logger.error(f"Error in job_auto_submit_old_timesheets: {exc}")
+        raise
     finally:
         db.close()
 
 
 def start_scheduler() -> None:
-    """Start background scheduler for missing check-in, SLA alerts, auto-approvals, and daily backups."""
+    """Start background scheduler for missing check-in, SLA alerts, auto-approvals, timesheets, and daily backups."""
     # Missing check-in alert at 10:30 AM IST on working days
     scheduler.add_job(
-        job_missing_checkins,
+        partial(run_guarded_job, "missing_checkins", 86400, job_missing_checkins),
         CronTrigger(hour=10, minute=30, day_of_week="mon-sat"),
         id="missing_checkins",
         replace_existing=True,
@@ -235,7 +317,7 @@ def start_scheduler() -> None:
     )
     # Stale payment alerts at 9 PM IST daily
     scheduler.add_job(
-        job_stale_payments,
+        partial(run_guarded_job, "stale_payments", 3600, job_stale_payments),
         CronTrigger(hour=21, minute=0),
         id="stale_payments",
         replace_existing=True,
@@ -243,7 +325,7 @@ def start_scheduler() -> None:
     )
     # Stale order SLA alerts at 9:05 PM IST daily
     scheduler.add_job(
-        job_stale_orders,
+        partial(run_guarded_job, "stale_orders", 3600, job_stale_orders),
         CronTrigger(hour=21, minute=5),
         id="stale_orders",
         replace_existing=True,
@@ -251,15 +333,23 @@ def start_scheduler() -> None:
     )
     # Auto-approve orders post cutoff time (runs every 15 minutes)
     scheduler.add_job(
-        job_auto_approve_orders,
+        partial(run_guarded_job, "auto_approve_orders", 900, job_auto_approve_orders),
         CronTrigger(minute="*/15"),
         id="auto_approve_orders",
         replace_existing=True,
         misfire_grace_time=600,
     )
+    # Auto-submit timesheets older than 7 days at 00:30 AM IST daily
+    scheduler.add_job(
+        partial(run_guarded_job, "auto_submit_old_timesheets", 86400, job_auto_submit_old_timesheets),
+        CronTrigger(hour=0, minute=30),
+        id="auto_submit_old_timesheets",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
     # Automated daily system backup at midnight (00:00 IST)
     scheduler.add_job(
-        job_daily_backup,
+        partial(run_guarded_job, "daily_backup", 86400, job_daily_backup),
         CronTrigger(hour=0, minute=0),
         id="daily_backup",
         replace_existing=True,
@@ -267,7 +357,7 @@ def start_scheduler() -> None:
     )
     # Automated daily rolling Parquet backup to Permanent Files Bucket at 01:00 AM IST
     scheduler.add_job(
-        job_daily_parquet_backup,
+        partial(run_guarded_job, "daily_parquet_backup", 86400, job_daily_parquet_backup),
         CronTrigger(hour=1, minute=0),
         id="daily_parquet_backup",
         replace_existing=True,

@@ -10,6 +10,7 @@ from app.models.geography import Geography, GeoLevel
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
 from app.utils.pagination import paginate
+from app.services.access_control import build_access_scope
 
 router = APIRouter(prefix="/master-data/geography", tags=["geography"])
 templates = Jinja2Templates(directory="app/templates")
@@ -34,9 +35,11 @@ async def geo_list(
     page: int = Query(default=1, ge=1),
 ):
     query = db.query(Geography)
-    if current_user.role == UserRole.territory_manager:
-        allowed_geo_ids = _get_tm_allowed_geo_ids(current_user, db)
-        query = query.filter(Geography.id.in_(allowed_geo_ids))
+    access_scope = build_access_scope(current_user, db)
+    if not access_scope.unrestricted:
+        query = query.filter(
+            Geography.id.in_(access_scope.geography_ids or {-1})
+        )
 
     if q:
         query = query.filter(

@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 
 from app.utils.geography_scope import get_user_allowed_warehouse_ids
+from app.services.access_control import require_warehouse_access, scope_warehouse_query
 from datetime import datetime
 
 
@@ -101,9 +102,9 @@ async def inventory_list(
         prod.scoped_warehouse_stocks = scoped_stocks
         prod.scoped_total_stock = sum(ws.stock_qty for ws in scoped_stocks)
 
-    wh_query = db.query(Warehouse).filter(Warehouse.is_active == True)
-    if allowed_wh_ids is not None:
-        wh_query = wh_query.filter(Warehouse.id.in_(allowed_wh_ids))
+    wh_query = scope_warehouse_query(
+        db.query(Warehouse), current_user, db
+    ).filter(Warehouse.is_active == True)
     warehouses = wh_query.order_by(Warehouse.name).all()
 
     return templates.TemplateResponse("inventory/list.html", {
@@ -200,8 +201,11 @@ async def inventory_assign_warehouse(
         set_flash_error(request, "Stockable product not found.")
         return RedirectResponse("/catalogue/inventory", status_code=302)
 
-    wh = db.query(Warehouse).filter(Warehouse.id == warehouse_id, Warehouse.is_active == True).first()
-    if not wh:
+    try:
+        wh = require_warehouse_access(
+            db, current_user, warehouse_id, active_only=True
+        )
+    except HTTPException:
         set_flash_error(request, "Selected warehouse not found or inactive.")
         return RedirectResponse("/catalogue/inventory", status_code=302)
 
@@ -244,10 +248,7 @@ async def inventory_remove_warehouse(
     warehouse_id: int = Form(...),
 ):
     """Remove warehouse assignment from product."""
-    allowed_wh_ids = get_user_allowed_warehouse_ids(current_user, db)
-    if allowed_wh_ids is not None and warehouse_id not in allowed_wh_ids:
-        set_flash_error(request, "Access denied.")
-        return RedirectResponse("/catalogue/inventory", status_code=302)
+    require_warehouse_access(db, current_user, warehouse_id)
 
     pws = db.query(ProductWarehouseStock).filter(
         ProductWarehouseStock.product_id == product_id,
@@ -299,10 +300,7 @@ async def inventory_stock_inward(
             set_flash_error(request, "Access denied. You can only inward stock for warehouses in your assigned geography.")
             return RedirectResponse("/catalogue/inventory", status_code=302)
 
-        wh = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
-        if not wh or not wh.is_active:
-            set_flash_error(request, "Selected warehouse is inactive or not found.")
-            return RedirectResponse("/catalogue/inventory", status_code=302)
+        wh = require_warehouse_access(db, current_user, wh_id, active_only=True)
 
         record_stock_movement(
             db=db,
@@ -343,10 +341,7 @@ async def inventory_stock_adjust(
             set_flash_error(request, "Access denied. You can only adjust stock for warehouses in your assigned geography.")
             return RedirectResponse("/catalogue/inventory", status_code=302)
 
-        wh = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
-        if not wh or not wh.is_active:
-            set_flash_error(request, "Selected warehouse is inactive or not found.")
-            return RedirectResponse("/catalogue/inventory", status_code=302)
+        wh = require_warehouse_access(db, current_user, wh_id, active_only=True)
 
         record_stock_movement(
             db=db,
@@ -390,6 +385,7 @@ async def inventory_movements(
         query = query.filter(StockMovement.warehouse_id.in_(allowed_wh_ids))
 
     if warehouse_id and warehouse_id.isdigit():
+        require_warehouse_access(db, current_user, int(warehouse_id))
         query = query.filter(StockMovement.warehouse_id == int(warehouse_id))
 
     if product_id and product_id.isdigit():
@@ -415,9 +411,9 @@ async def inventory_movements(
     query = query.order_by(StockMovement.created_at.desc())
     pagination = paginate(query, page)
 
-    wh_query = db.query(Warehouse).filter(Warehouse.is_active == True)
-    if allowed_wh_ids is not None:
-        wh_query = wh_query.filter(Warehouse.id.in_(allowed_wh_ids))
+    wh_query = scope_warehouse_query(
+        db.query(Warehouse), current_user, db
+    ).filter(Warehouse.is_active == True)
     warehouses = wh_query.order_by(Warehouse.name).all()
 
     products = db.query(Product).filter(Product.is_active == True, Product.is_stockable == True).order_by(Product.name).all()

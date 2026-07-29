@@ -1,132 +1,20 @@
 {% extends "base.html" %}
-
 {% block title %}Company Profiles{% endblock %}
-
 {% block content %}
 <div class="space-y-6">
-
   <div class="flex items-center justify-between">
-    <div>
-      <h1 class="text-2xl font-bold text-white">Company Profiles</h1>
-      <p class="mt-1 text-sm text-slate-400">ZAP, CMMS, and CONNECT integration credentials per company</p>
-    </div>
-    <a href="/company/profiles/new"
-       class="inline-flex items-center gap-x-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
-      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-      </svg>
-      New Profile
-    </a>
+    <div><h1 class="text-2xl font-bold text-white">Company Profiles</h1><p class="text-sm text-slate-400">Company identities for native workflows</p></div>
+    <a href="/company/profiles/new" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">New Profile</a>
   </div>
-
-  <div class="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
+  <div class="overflow-hidden rounded-xl border border-slate-700">
     <table class="min-w-full divide-y divide-slate-700">
-      <thead>
-        <tr class="bg-slate-800">
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Company</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Code</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">ZAP</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">CMMS</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">CONNECT</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-          <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-700/50">
-        {% for item in profiles %}
-        <tr class="hover:bg-slate-800/60 transition-colors">
-          <td class="px-4 py-3 text-sm">
-            <div class="font-medium text-white">{{ item.name }}</div>
-            <div class="flex flex-wrap gap-1 mt-1">
-              {% for tag in item.tag_badges() %}
-                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-semibold {{ tag.cls }}">{{ tag.name }}</span>
-              {% endfor %}
-            </div>
-          </td>
-          <td class="px-4 py-3 text-sm font-mono text-slate-300 hidden sm:table-cell">{{ item.code }}</td>
-          <td class="px-4 py-3 text-sm hidden md:table-cell">
-            {% if item.zap_base_url %}
-            <span class="inline-flex items-center gap-x-1 text-emerald-400">
-              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-              </svg>
-              Configured
-            </span>
-            {% else %}
-            <span class="text-slate-600 text-xs">Not set</span>
-            {% endif %}
-          </td>
-          <td class="px-4 py-3 text-sm hidden md:table-cell">
-            {% if item.cmms_base_url %}
-            <span class="inline-flex items-center gap-x-1 text-emerald-400">
-              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-              </svg>
-              Configured
-            </span>
-            {% else %}
-            <span class="text-slate-600 text-xs">Not set</span>
-            {% endif %}
-          </td>
-          <td class="px-4 py-3 text-sm hidden md:table-cell">
-            {% if item.connect_base_url %}
-            <span class="inline-flex items-center gap-x-1 text-emerald-400">
-              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-              </svg>
-              Configured
-            </span>
-            {% else %}
-            <span class="text-slate-600 text-xs">Not set</span>
-            {% endif %}
-          </td>
-          <td class="px-4 py-3 text-sm">
-            {% if item.is_active %}
-            <span class="inline-flex items-center rounded-full bg-emerald-900/50 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">Active</span>
-            {% else %}
-            <span class="inline-flex items-center rounded-full bg-slate-700 px-2.5 py-0.5 text-xs font-semibold text-slate-400">Inactive</span>
-            {% endif %}
-          </td>
-          <td class="px-4 py-3 text-right text-xs">
-            <div class="flex items-center justify-end gap-x-3">
-              {% if item.is_active %}
-                <a href="/company/profiles/{{ item.id }}/edit" class="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">Edit</a>
-                <a href="/company/profiles/{{ item.id }}/product-mappings" class="text-blue-400 hover:text-blue-300 font-semibold transition-colors">Products Map</a>
-                <a href="/company/profiles/{{ item.id }}/account-mappings" class="text-purple-400 hover:text-purple-300 font-semibold transition-colors">Accounts Map</a>
-                <form method="post" action="/company/profiles/{{ item.id }}/delete" class="inline" onsubmit="return confirmSubmit(event, 'Deactivate company profile {{ item.name }}?', 'Deactivate Profile', 'danger')">
-                  <button type="submit" class="text-red-400 hover:text-red-300 font-semibold transition-colors">Deactivate</button>
-                </form>
-              {% else %}
-                <form method="post" action="/company/profiles/{{ item.id }}/activate" class="inline">
-                  <button type="submit" class="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">Activate</button>
-                </form>
-              {% endif %}
-            </div>
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="7" class="px-4 py-12 text-center text-sm text-slate-500">
-            No company profiles yet.
-            <a href="/company/profiles/new" class="text-indigo-400 hover:underline ml-1">Add the first one.</a>
-          </td>
-        </tr>
-        {% endfor %}
+      <thead class="bg-slate-900/50"><tr><th class="px-4 py-3 text-left text-xs text-slate-400">Company</th><th class="px-4 py-3 text-left text-xs text-slate-400">Code</th><th class="px-4 py-3 text-right text-xs text-slate-400">Actions</th></tr></thead>
+      <tbody class="divide-y divide-slate-700 bg-slate-800/40">
+      {% for item in profiles %}
+        <tr><td class="px-4 py-3 text-white">{{ item.name }}</td><td class="px-4 py-3 font-mono text-slate-300">{{ item.code }}</td><td class="px-4 py-3 text-right"><a class="text-indigo-400" href="/company/profiles/{{ item.id }}/edit">Edit</a></td></tr>
+      {% else %}<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">No profiles.</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>
-
-  <!-- System Config link -->
-  <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-5 flex items-center justify-between">
-    <div>
-      <p class="text-sm font-semibold text-white">System Configuration</p>
-      <p class="text-xs text-slate-500 mt-0.5">Payment modes, GPS threshold, sync interval</p>
-    </div>
-    <a href="/company/config"
-       class="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors">
-      Configure
-    </a>
-  </div>
-
 </div>
 {% endblock %}

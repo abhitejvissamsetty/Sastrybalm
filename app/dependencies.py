@@ -25,10 +25,14 @@ def get_current_web_user(request: Request, db: Session = Depends(get_db)) -> Opt
     user_id = request.session.get("user_id")
     if not user_id:
         return None
-    return db.query(User).options(
+    user = db.query(User).options(
         joinedload(User.module_access),
         joinedload(User.geography),
     ).filter(User.id == user_id, User.is_active == True).first()
+    if user:
+        request.state.audit_user_id = user.id
+        request.state.audit_user_role = user.role.value
+    return user
 
 
 def require_web_auth(user: Optional[User] = Depends(get_current_web_user)) -> User:
@@ -48,6 +52,7 @@ def require_web_roles(*roles: UserRole):
 # ── Mobile API (JWT Bearer) ────────────────────────────────────────────────────
 
 def get_current_api_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> Optional[User]:
@@ -59,9 +64,14 @@ def get_current_api_user(
     user_id = payload.get("sub")
     if not user_id:
         return None
-    return db.query(User).options(
+    user = db.query(User).options(
         joinedload(User.geography),
     ).filter(User.id == int(user_id), User.is_active == True).first()
+    if not user or payload.get("ver") != user.token_version:
+        return None
+    request.state.audit_user_id = user.id
+    request.state.audit_user_role = user.role.value
+    return user
 
 
 def require_api_auth(user: Optional[User] = Depends(get_current_api_user)) -> User:

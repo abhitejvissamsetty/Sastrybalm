@@ -1,5 +1,5 @@
 """
-Vendor & Vendor Employee models for CMMS procurement workflow.
+Vendor and vendor-employee models for the native procurement workflow.
 Vendors are mobile-only with separate login. Admin can view procurement timeline.
 """
 import enum
@@ -35,7 +35,8 @@ class Vendor(Base):
     email = Column(String(255), unique=True, nullable=True)
     category = Column(String(100), nullable=True)
     status = Column(Enum(VendorStatus), nullable=False, default=VendorStatus.active)
-    cmms_supplier_ref = Column(String(100), nullable=True)
+    batch_prefix = Column(String(40), nullable=True)
+    next_batch_sequence = Column(Integer, nullable=False, default=1)
     # Scope Fields
     geography_id = Column(Integer, ForeignKey("geographies.id", ondelete="SET NULL"), nullable=True)
     # Auth for vendor mobile login
@@ -63,7 +64,6 @@ class VendorEmployee(Base):
     name = Column(String(255), nullable=False)
     mobile = Column(String(20), unique=True, nullable=True)
     email = Column(String(255), nullable=True)
-    cmms_ref = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     # Auth for technician mobile login
     hashed_password = Column(String(255), nullable=True)

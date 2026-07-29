@@ -9,7 +9,8 @@ final syncServiceProvider = Provider((ref) {
   return SyncService(client, cipher: hiveCipher);
 });
 
-final connectivityStreamProvider = StreamProvider<List<ConnectivityResult>>((ref) {
+final connectivityStreamProvider =
+    StreamProvider<List<ConnectivityResult>>((ref) {
   return Connectivity().onConnectivityChanged;
 });
 

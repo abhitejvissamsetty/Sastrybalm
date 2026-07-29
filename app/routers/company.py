@@ -2,7 +2,7 @@ import asyncio
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Request, HTTPException
+from fastapi import APIRouter, Depends, Form, Query, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 from app.dependencies import get_db, require_web_roles, require_web_auth
 from app.models.company import CompanyProfile, PaymentMode, SystemConfiguration
 from app.models.user import User, UserRole
-from app.utils.encryption import decrypt, encrypt
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/company", tags=["company"])
 templates = Jinja2Templates(directory="app/templates")
@@ -75,13 +75,16 @@ def _extract_gst_from_taxes(taxes: list) -> "_Decimal":
 @router.get("/profiles", response_class=HTMLResponse)
 async def profile_list(
     request: Request,
+    page: int = Query(default=1, ge=1),
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
-    profiles = db.query(CompanyProfile).order_by(CompanyProfile.name).all()
+    pagination = paginate(
+        db.query(CompanyProfile).order_by(CompanyProfile.name), page
+    )
     return templates.TemplateResponse("company/profile_list.html", {
         "request": request, "current_user": current_user,
-        "profiles": profiles, **get_flash(request),
+        "profiles": pagination.items, "pagination": pagination, **get_flash(request),
     })
 
 
@@ -102,42 +105,13 @@ async def profile_create(
     db: Session = Depends(get_db),
     code: str = Form(...),
     name: str = Form(...),
-    zap_base_url: Optional[str] = Form(default=None),
-    zap_api_key: Optional[str] = Form(default=None),
-    zap_backend_company: Optional[str] = Form(default=None),
-    cmms_base_url: Optional[str] = Form(default=None),
-    cmms_api_key: Optional[str] = Form(default=None),
-    cmms_backend_company: Optional[str] = Form(default=None),
-    connect_base_url: Optional[str] = Form(default=None),
-    connect_api_key: Optional[str] = Form(default=None),
-    connect_backend_company: Optional[str] = Form(default=None),
 ):
     if db.query(CompanyProfile).filter(CompanyProfile.code == code.upper()).first():
         return templates.TemplateResponse("company/profile_form.html", {
             "request": request, "current_user": current_user, "item": None,
             "error": f"Code '{code.upper()}' already exists.",
         })
-    profile = CompanyProfile(
-        code=code.upper(), name=name,
-        zap_base_url=zap_base_url or None,
-        zap_api_key_encrypted=encrypt(zap_api_key) if zap_api_key else None,
-        zap_backend_company=zap_backend_company or None,
-        cmms_base_url=cmms_base_url or None,
-        cmms_api_key_encrypted=encrypt(cmms_api_key) if cmms_api_key else None,
-        cmms_backend_company=cmms_backend_company or None,
-        connect_base_url=connect_base_url or None,
-        connect_api_key_encrypted=encrypt(connect_api_key) if connect_api_key else None,
-        connect_backend_company=connect_backend_company or None,
-    )
-    # Add ZAP-READY tag if ZAP credentials are set
-    tags = []
-    if zap_base_url and zap_api_key:
-        tags.append("ZAP-READY")
-    if cmms_base_url and cmms_api_key:
-        tags.append("CMMS-READY")
-    if connect_base_url and connect_api_key:
-        tags.append("CONNECT-READY")
-    profile.set_tags(tags)
+    profile = CompanyProfile(code=code.upper(), name=name)
     db.add(profile)
     db.commit()
     set_flash_success(request, f"Company profile '{name}' created.")
@@ -156,9 +130,6 @@ async def profile_edit(
         return RedirectResponse("/company/profiles", status_code=302)
     return templates.TemplateResponse("company/profile_form.html", {
         "request": request, "current_user": current_user, "item": item, "error": None,
-        "zap_api_key_hint": "••••••••" if item.zap_api_key_encrypted else "",
-        "cmms_api_key_hint": "••••••••" if item.cmms_api_key_encrypted else "",
-        "connect_api_key_hint": "••••••••" if item.connect_api_key_encrypted else "",
     })
 
 
@@ -169,15 +140,6 @@ async def profile_update(
     db: Session = Depends(get_db),
     code: str = Form(...),
     name: str = Form(...),
-    zap_base_url: Optional[str] = Form(default=None),
-    zap_api_key: Optional[str] = Form(default=None),
-    zap_backend_company: Optional[str] = Form(default=None),
-    cmms_base_url: Optional[str] = Form(default=None),
-    cmms_api_key: Optional[str] = Form(default=None),
-    cmms_backend_company: Optional[str] = Form(default=None),
-    connect_base_url: Optional[str] = Form(default=None),
-    connect_api_key: Optional[str] = Form(default=None),
-    connect_backend_company: Optional[str] = Form(default=None),
 ):
     item = db.query(CompanyProfile).filter(CompanyProfile.id == profile_id).first()
     if not item or not item.is_active:
@@ -185,44 +147,6 @@ async def profile_update(
         return RedirectResponse("/company/profiles", status_code=302)
     item.code = code.upper()
     item.name = name
-    item.zap_base_url = zap_base_url or None
-    item.zap_backend_company = zap_backend_company or None
-    item.cmms_base_url = cmms_base_url or None
-    item.cmms_backend_company = cmms_backend_company or None
-    item.connect_base_url = connect_base_url or None
-    item.connect_backend_company = connect_backend_company or None
-    
-    if zap_api_key:
-        item.zap_api_key_encrypted = encrypt(zap_api_key)
-    if cmms_api_key:
-        item.cmms_api_key_encrypted = encrypt(cmms_api_key)
-    if connect_api_key:
-        item.connect_api_key_encrypted = encrypt(connect_api_key)
-
-    # Maintain Dynamic Tags based on configured credentials
-    tags = item.get_tags()
-    if item.zap_base_url and item.zap_api_key_encrypted:
-        if "ZAP-READY" not in tags and "ZAP-ERROR" not in tags:
-            tags.append("ZAP-READY")
-    else:
-        if "ZAP-READY" in tags: tags.remove("ZAP-READY")
-        if "ZAP-ERROR" in tags: tags.remove("ZAP-ERROR")
-
-    if item.cmms_base_url and item.cmms_api_key_encrypted:
-        if "CMMS-READY" not in tags and "CMMS-ERROR" not in tags:
-            tags.append("CMMS-READY")
-    else:
-        if "CMMS-READY" in tags: tags.remove("CMMS-READY")
-        if "CMMS-ERROR" in tags: tags.remove("CMMS-ERROR")
-
-    if item.connect_base_url and item.connect_api_key_encrypted:
-        if "CONNECT-READY" not in tags and "CONNECT-ERROR" not in tags:
-            tags.append("CONNECT-READY")
-    else:
-        if "CONNECT-READY" in tags: tags.remove("CONNECT-READY")
-        if "CONNECT-ERROR" in tags: tags.remove("CONNECT-ERROR")
-
-    item.set_tags(tags)
     db.commit()
     set_flash_success(request, f"Company profile '{name}' updated.")
     return RedirectResponse("/company/profiles", status_code=302)
@@ -261,54 +185,6 @@ async def profile_delete(
     return RedirectResponse("/company/profiles", status_code=302)
 
 
-@router.post("/profiles/{profile_id}/test-zap")
-async def profile_test_zap(
-    profile_id: int,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
-    db: Session = Depends(get_db),
-):
-    return {"connected": True, "message": "Native operations mode active."}
-
-
-@router.post("/profiles/{profile_id}/test-cmms")
-async def profile_test_cmms(
-    profile_id: int,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
-    db: Session = Depends(get_db),
-):
-    return {"connected": True, "message": "Native operations mode active."}
-
-
-@router.post("/profiles/{profile_id}/test-connect")
-async def profile_test_connect(
-    profile_id: int,
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
-    db: Session = Depends(get_db),
-):
-    return {"connected": True, "message": "Native operations mode active."}
-
-
-@router.post("/profiles/test-zap-direct")
-async def profile_test_zap_direct(
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
-):
-    return {"connected": True, "message": "Native operations mode active."}
-
-
-@router.post("/profiles/test-cmms-direct")
-async def profile_test_cmms_direct(
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
-):
-    return {"connected": True, "message": "Native operations mode active."}
-
-
-@router.post("/profiles/test-connect-direct")
-async def profile_test_connect_direct(
-    current_user: User = Depends(require_web_roles(UserRole.admin)),
-):
-    return {"connected": True, "message": "Native operations mode active."}
-
-
 # ── System Configuration (singleton) ─────────────────────────────────────────
 
 @router.get("/config", response_class=HTMLResponse)
@@ -332,9 +208,6 @@ async def system_config_update(
     db: Session = Depends(get_db),
     gps_threshold_metres: int = Form(default=100),
     sync_interval_seconds: int = Form(default=300),
-    zap_fetch_interval_minutes: int = Form(default=60),
-    cmms_post_interval_minutes: int = Form(default=30),
-    connect_sync_interval_minutes: int = Form(default=30),
     payment_mode: str = Form(default="cash_only"),
     denomination_mandatory: bool = Form(default=False),
     flag_gps_distance_metres: int = Form(default=100),
@@ -346,9 +219,6 @@ async def system_config_update(
         db.add(config)
     config.gps_threshold_metres = max(10, gps_threshold_metres)
     config.sync_interval_seconds = max(60, sync_interval_seconds)
-    config.zap_fetch_interval_minutes = max(5, zap_fetch_interval_minutes)
-    config.cmms_post_interval_minutes = max(5, cmms_post_interval_minutes)
-    config.connect_sync_interval_minutes = max(5, connect_sync_interval_minutes)
     config.flag_gps_distance_metres = max(10, flag_gps_distance_metres)
     config.flag_min_visit_seconds = max(10, flag_min_visit_seconds)
     
@@ -369,7 +239,8 @@ async def system_config_update(
 @router.get("/profiles/{profile_id}/product-mappings", response_class=HTMLResponse)
 async def product_mappings_list(
     profile_id: int, request: Request,
-    current_user: User = Depends(require_web_auth),
+    page: int = Query(default=1, ge=1),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     if current_user.role != UserRole.admin and current_user.company_profile_id != profile_id:
@@ -382,12 +253,22 @@ async def product_mappings_list(
     from app.models.product_mapping import ProductAliasMap
     from app.models.product import Product
     
-    mappings = db.query(ProductAliasMap).filter(ProductAliasMap.company_profile_id == profile_id).all()
-    products = db.query(Product).filter(Product.is_active == True).order_by(Product.name).all()
+    pagination = paginate(
+        db.query(ProductAliasMap)
+        .filter(ProductAliasMap.company_profile_id == profile_id)
+        .order_by(ProductAliasMap.id),
+        page,
+    )
+    mappings = pagination.items
+    products = (
+        db.query(Product).filter(Product.is_active == True)
+        .order_by(Product.name).limit(500).all()
+    )
     
     return templates.TemplateResponse("company/product_mappings.html", {
         "request": request, "current_user": current_user,
         "profile": profile, "mappings": mappings, "products": products,
+        "pagination": pagination,
         **get_flash(request),
     })
 
@@ -395,12 +276,9 @@ async def product_mappings_list(
 @router.post("/profiles/{profile_id}/product-mappings/new")
 async def product_mapping_create(
     profile_id: int, request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     product_id: int = Form(...),
-    zap_item_code: Optional[str] = Form(default=None),
-    cmms_item_code: Optional[str] = Form(default=None),
-    connect_item_code: Optional[str] = Form(default=None),
     conversion_factor: float = Form(default=1.0),
 ):
     if current_user.role != UserRole.admin and current_user.company_profile_id != profile_id:
@@ -425,9 +303,6 @@ async def product_mapping_create(
     mapping = ProductAliasMap(
         company_profile_id=profile_id,
         product_id=product_id,
-        zap_item_code=zap_item_code or None,
-        cmms_item_code=cmms_item_code or None,
-        connect_item_code=connect_item_code or None,
         conversion_factor=Decimal(str(conversion_factor)),
     )
     db.add(mapping)
@@ -439,11 +314,8 @@ async def product_mapping_create(
 @router.post("/profiles/{profile_id}/product-mappings/{mapping_id}/edit")
 async def product_mapping_update(
     profile_id: int, mapping_id: int, request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
-    zap_item_code: Optional[str] = Form(default=None),
-    cmms_item_code: Optional[str] = Form(default=None),
-    connect_item_code: Optional[str] = Form(default=None),
     conversion_factor: float = Form(default=1.0),
 ):
     if current_user.role != UserRole.admin and current_user.company_profile_id != profile_id:
@@ -453,9 +325,6 @@ async def product_mapping_update(
     from decimal import Decimal
     mapping = db.query(ProductAliasMap).filter(ProductAliasMap.id == mapping_id, ProductAliasMap.company_profile_id == profile_id).first()
     if mapping:
-        mapping.zap_item_code = zap_item_code or None
-        mapping.cmms_item_code = cmms_item_code or None
-        mapping.connect_item_code = connect_item_code or None
         mapping.conversion_factor = Decimal(str(conversion_factor))
         db.commit()
         set_flash_success(request, "Product mapping updated.")
@@ -465,7 +334,7 @@ async def product_mapping_update(
 @router.post("/profiles/{profile_id}/product-mappings/{mapping_id}/delete")
 async def product_mapping_delete(
     profile_id: int, mapping_id: int, request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     if current_user.role != UserRole.admin and current_user.company_profile_id != profile_id:
@@ -485,7 +354,8 @@ async def product_mapping_delete(
 @router.get("/profiles/{profile_id}/account-mappings", response_class=HTMLResponse)
 async def account_mappings_list(
     profile_id: int, request: Request,
-    current_user: User = Depends(require_web_auth),
+    page: int = Query(default=1, ge=1),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     if current_user.role != UserRole.admin and current_user.company_profile_id != profile_id:
@@ -497,11 +367,17 @@ async def account_mappings_list(
         
     from app.models.product_mapping import AccountAliasMap
     
-    mappings = db.query(AccountAliasMap).filter(AccountAliasMap.company_profile_id == profile_id).all()
+    pagination = paginate(
+        db.query(AccountAliasMap)
+        .filter(AccountAliasMap.company_profile_id == profile_id)
+        .order_by(AccountAliasMap.id),
+        page,
+    )
+    mappings = pagination.items
     
     return templates.TemplateResponse("company/account_mappings.html", {
         "request": request, "current_user": current_user,
-        "profile": profile, "mappings": mappings,
+        "profile": profile, "mappings": mappings, "pagination": pagination,
         **get_flash(request),
     })
 
@@ -509,12 +385,10 @@ async def account_mappings_list(
 @router.post("/profiles/{profile_id}/account-mappings/new")
 async def account_mapping_create(
     profile_id: int, request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     account_name: str = Form(...),
     account_type: Optional[str] = Form(default=None),
-    zap_account_code: Optional[str] = Form(default=None),
-    cmms_account_code: Optional[str] = Form(default=None),
 ):
     if current_user.role != UserRole.admin and current_user.company_profile_id != profile_id:
         raise HTTPException(status_code=403, detail="Not authorized to access mappings for this company profile.")
@@ -530,8 +404,6 @@ async def account_mapping_create(
         company_profile_id=profile_id,
         account_name=account_name,
         account_type=account_type or None,
-        zap_account_code=zap_account_code or None,
-        cmms_account_code=cmms_account_code or None,
     )
     db.add(mapping)
     db.commit()
@@ -542,12 +414,10 @@ async def account_mapping_create(
 @router.post("/profiles/{profile_id}/account-mappings/{mapping_id}/edit")
 async def account_mapping_update(
     profile_id: int, mapping_id: int, request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
     account_name: str = Form(...),
     account_type: Optional[str] = Form(default=None),
-    zap_account_code: Optional[str] = Form(default=None),
-    cmms_account_code: Optional[str] = Form(default=None),
 ):
     if current_user.role != UserRole.admin and current_user.company_profile_id != profile_id:
         raise HTTPException(status_code=403, detail="Not authorized to access mappings for this company profile.")
@@ -557,8 +427,6 @@ async def account_mapping_update(
     if mapping:
         mapping.account_name = account_name
         mapping.account_type = account_type or None
-        mapping.zap_account_code = zap_account_code or None
-        mapping.cmms_account_code = cmms_account_code or None
         db.commit()
         set_flash_success(request, "Account mapping updated.")
     return RedirectResponse(f"/company/profiles/{profile_id}/account-mappings", status_code=302)
@@ -567,7 +435,7 @@ async def account_mapping_update(
 @router.post("/profiles/{profile_id}/account-mappings/{mapping_id}/delete")
 async def account_mapping_delete(
     profile_id: int, mapping_id: int, request: Request,
-    current_user: User = Depends(require_web_auth),
+    current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     if current_user.role != UserRole.admin and current_user.company_profile_id != profile_id:

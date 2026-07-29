@@ -4,29 +4,29 @@ import 'package:google_fonts/google_fonts.dart';
 class AppTheme {
   // ── Shadcn Light Tokens (Zinc / Neutral) ─────────────────────────
   static const Color lightBackground = Color(0xFFFAFAFA); // Zinc 50
-  static const Color lightSurface = Color(0xFFFFFFFF);    // Pure White
+  static const Color lightSurface = Color(0xFFFFFFFF); // Pure White
   static const Color lightSurfaceAlt = Color(0xFFF4F4F5); // Zinc 100
-  static const Color lightPrimary = Color(0xFF09090B);    // Zinc 950 (Black)
-  static const Color lightPrimaryLight = Color(0xFF18181B);// Zinc 900
+  static const Color lightPrimary = Color(0xFF09090B); // Zinc 950 (Black)
+  static const Color lightPrimaryLight = Color(0xFF18181B); // Zinc 900
   static const Color lightSuccess = Color(0xFF10B981);
   static const Color lightWarning = Color(0xFFF59E0B);
   static const Color lightDanger = Color(0xFFDC2626);
   static const Color lightTextPrimary = Color(0xFF09090B); // Zinc 950
-  static const Color lightTextSecondary = Color(0xFF71717A);// Zinc 500
-  static const Color lightBorder = Color(0xFFE4E4E7);    // Zinc 200
+  static const Color lightTextSecondary = Color(0xFF71717A); // Zinc 500
+  static const Color lightBorder = Color(0xFFE4E4E7); // Zinc 200
 
   // ── Shadcn Dark Tokens ───────────────────────────────────────────
-  static const Color darkBackground = Color(0xFF09090B);  // Zinc 950
-  static const Color darkSurface = Color(0xFF18181B);     // Zinc 900
-  static const Color darkSurfaceAlt = Color(0xFF27272A);  // Zinc 800
-  static const Color darkPrimary = Color(0xFFFAFAFA);     // Zinc 50 (White)
+  static const Color darkBackground = Color(0xFF09090B); // Zinc 950
+  static const Color darkSurface = Color(0xFF18181B); // Zinc 900
+  static const Color darkSurfaceAlt = Color(0xFF27272A); // Zinc 800
+  static const Color darkPrimary = Color(0xFFFAFAFA); // Zinc 50 (White)
   static const Color darkPrimaryLight = Color(0xFFE4E4E7); // Zinc 200
   static const Color darkSuccess = Color(0xFF10B981);
   static const Color darkWarning = Color(0xFFF59E0B);
   static const Color darkDanger = Color(0xFFEF4444);
-  static const Color darkTextPrimary = Color(0xFFFAFAFA);  // Zinc 50
-  static const Color darkTextSecondary = Color(0xFFA1A1AA);// Zinc 400
-  static const Color darkBorder = Color(0xFF27272A);     // Zinc 800
+  static const Color darkTextPrimary = Color(0xFFFAFAFA); // Zinc 50
+  static const Color darkTextSecondary = Color(0xFFA1A1AA); // Zinc 400
+  static const Color darkBorder = Color(0xFF27272A); // Zinc 800
 
   static ThemeData get light {
     return ThemeData(
@@ -40,26 +40,49 @@ class AppTheme {
         onPrimary: Colors.white,
         onSurface: lightTextPrimary,
       ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme).copyWith(
+      textTheme:
+          GoogleFonts.interTextTheme(ThemeData.light().textTheme).copyWith(
         headlineLarge: GoogleFonts.inter(
-          color: lightTextPrimary, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.8),
+            color: lightTextPrimary,
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8),
         headlineMedium: GoogleFonts.inter(
-          color: lightTextPrimary, fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+            color: lightTextPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5),
         titleLarge: GoogleFonts.inter(
-          color: lightTextPrimary, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.4),
+            color: lightTextPrimary,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4),
         titleMedium: GoogleFonts.inter(
-          color: lightTextPrimary, fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -0.2),
-        bodyLarge: GoogleFonts.inter(color: lightTextPrimary, fontSize: 14, fontWeight: FontWeight.w400),
-        bodyMedium: GoogleFonts.inter(color: lightTextSecondary, fontSize: 13, fontWeight: FontWeight.w400),
+            color: lightTextPrimary,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.2),
+        bodyLarge: GoogleFonts.inter(
+            color: lightTextPrimary, fontSize: 14, fontWeight: FontWeight.w400),
+        bodyMedium: GoogleFonts.inter(
+            color: lightTextSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w400),
         labelSmall: GoogleFonts.inter(
-          color: lightTextSecondary, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8),
+            color: lightTextSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: lightSurface,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: GoogleFonts.inter(
-          color: lightTextPrimary, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.4),
+            color: lightTextPrimary,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4),
         iconTheme: const IconThemeData(color: lightTextPrimary),
         shape: const Border(
           bottom: BorderSide(color: lightBorder, width: 1.0),
@@ -77,8 +100,10 @@ class AppTheme {
           backgroundColor: lightPrimary,
           foregroundColor: Colors.white,
           minimumSize: const Size(double.infinity, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: -0.2),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          textStyle: GoogleFonts.inter(
+              fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: -0.2),
           elevation: 0,
         ),
       ),
@@ -99,7 +124,8 @@ class AppTheme {
         ),
         labelStyle: GoogleFonts.inter(color: lightTextSecondary, fontSize: 13),
         hintStyle: GoogleFonts.inter(color: lightTextSecondary, fontSize: 13),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
       cardTheme: CardThemeData(
         color: lightSurface,
@@ -127,26 +153,49 @@ class AppTheme {
         onPrimary: darkBackground,
         onSurface: darkTextPrimary,
       ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
+      textTheme:
+          GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
         headlineLarge: GoogleFonts.inter(
-          color: darkTextPrimary, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.8),
+            color: darkTextPrimary,
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8),
         headlineMedium: GoogleFonts.inter(
-          color: darkTextPrimary, fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+            color: darkTextPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5),
         titleLarge: GoogleFonts.inter(
-          color: darkTextPrimary, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.4),
+            color: darkTextPrimary,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4),
         titleMedium: GoogleFonts.inter(
-          color: darkTextPrimary, fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -0.2),
-        bodyLarge: GoogleFonts.inter(color: darkTextPrimary, fontSize: 14, fontWeight: FontWeight.w400),
-        bodyMedium: GoogleFonts.inter(color: darkTextSecondary, fontSize: 13, fontWeight: FontWeight.w400),
+            color: darkTextPrimary,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.2),
+        bodyLarge: GoogleFonts.inter(
+            color: darkTextPrimary, fontSize: 14, fontWeight: FontWeight.w400),
+        bodyMedium: GoogleFonts.inter(
+            color: darkTextSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w400),
         labelSmall: GoogleFonts.inter(
-          color: darkTextSecondary, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8),
+            color: darkTextSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: darkBackground,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: GoogleFonts.inter(
-          color: darkTextPrimary, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.4),
+            color: darkTextPrimary,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4),
         iconTheme: const IconThemeData(color: darkTextPrimary),
         shape: const Border(
           bottom: BorderSide(color: darkBorder, width: 1.0),
@@ -164,8 +213,10 @@ class AppTheme {
           backgroundColor: darkPrimary,
           foregroundColor: darkBackground,
           minimumSize: const Size(double.infinity, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: -0.2),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          textStyle: GoogleFonts.inter(
+              fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: -0.2),
           elevation: 0,
         ),
       ),
@@ -186,7 +237,8 @@ class AppTheme {
         ),
         labelStyle: GoogleFonts.inter(color: darkTextSecondary, fontSize: 13),
         hintStyle: GoogleFonts.inter(color: darkTextSecondary, fontSize: 13),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
       cardTheme: CardThemeData(
         color: darkSurface,

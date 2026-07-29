@@ -1,5 +1,7 @@
 import logging
 import json
+import hashlib
+import hmac
 import smtplib
 import urllib.request
 import urllib.parse
@@ -7,7 +9,7 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
@@ -20,11 +22,54 @@ from app.models.beat_type import BeatTypeMaster
 from app.utils.beat_types import seed_default_beat_types
 from app.utils.encryption import encrypt, decrypt
 from app.utils.flash import get_flash, set_flash_error, set_flash_success
+from app.utils.pagination import paginate
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 templates = Jinja2Templates(directory="app/templates")
+
+
+def build_webhook_signature(secret: str, payload: bytes, timestamp: str) -> str:
+    """Return the mandatory HMAC-SHA256 signature for an outbound webhook."""
+    digest = hmac.new(
+        secret.encode("utf-8"),
+        timestamp.encode("utf-8") + b"." + payload,
+        hashlib.sha256,
+    ).hexdigest()
+    return f"sha256={digest}"
+
+
+def _smtp_form_values(db: Session) -> dict:
+    defaults = {
+        "smtp_host": "",
+        "smtp_port": 587,
+        "smtp_user": "",
+        "smtp_password": "",
+        "smtp_from": "noreply@safar.com",
+        "smtp_use_tls": True,
+    }
+    try:
+        row = db.execute(text(
+            "SELECT smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, "
+            "smtp_use_tls FROM system_configuration WHERE id = 1"
+        )).fetchone()
+        if not row:
+            return defaults
+        password = row[3] or ""
+        if password.startswith("gAAAAA"):
+            password = decrypt(password)
+        return {
+            "smtp_host": row[0] or "",
+            "smtp_port": row[1] or 587,
+            "smtp_user": row[2] or "",
+            "smtp_password": password,
+            "smtp_from": row[4] or defaults["smtp_from"],
+            "smtp_use_tls": bool(row[5]) if row[5] is not None else True,
+        }
+    except Exception:
+        logger.exception("Unable to load SMTP settings")
+        return defaults
 
 
 @router.get("/smtp", response_class=HTMLResponse)
@@ -33,44 +78,10 @@ async def smtp_settings_form(
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
-    """Admin interface to view and edit database-stored SMTP settings."""
-    smtp_config = {
-        "smtp_host": "",
-        "smtp_port": "587",
-        "smtp_user": "",
-        "smtp_password": "",
-        "smtp_from": "noreply@safar.com",
-        "smtp_use_tls": True,
-    }
-    try:
-        row = db.execute(text("SELECT smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_use_tls FROM system_configuration WHERE id = 1 LIMIT 1")).fetchone()
-        if not row:
-            db.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))
-            db.commit()
-            row = db.execute(text("SELECT smtp_host, smtp_port, smtp_user, smtp_password, smtp_from, smtp_use_tls FROM system_configuration WHERE id = 1 LIMIT 1")).fetchone()
-
-        if row:
-            pwd = row[3] or ""
-            if pwd.startswith("gAAAAA"):
-                try:
-                    pwd = decrypt(pwd)
-                except Exception:
-                    pass
-            smtp_config = {
-                "smtp_host": row[0] or "",
-                "smtp_port": str(row[1] or 587),
-                "smtp_user": row[2] or "",
-                "smtp_password": pwd,
-                "smtp_from": row[4] or "noreply@safar.com",
-                "smtp_use_tls": bool(row[5]) if row[5] is not None else True,
-            }
-    except Exception as exc:
-        logger.warning("Error loading SMTP settings from DB: %s", exc)
-
     return templates.TemplateResponse("settings/smtp.html", {
         "request": request,
         "current_user": current_user,
-        "smtp": smtp_config,
+        "smtp": _smtp_form_values(db),
         **get_flash(request),
     })
 
@@ -80,41 +91,33 @@ async def smtp_settings_save(
     request: Request,
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
-    smtp_host: str = Form(""),
+    smtp_host: str = Form(...),
     smtp_port: int = Form(587),
     smtp_user: str = Form(""),
     smtp_password: str = Form(""),
-    smtp_from: str = Form("noreply@safar.com"),
-    smtp_use_tls: Optional[str] = Form(default=None),
+    smtp_from: str = Form(...),
+    smtp_use_tls: Optional[str] = Form(None),
 ):
-    """Save SMTP settings into database system_configuration table with UPSERT guarantee."""
-    encrypted_pwd = encrypt(smtp_password) if smtp_password else ""
-    use_tls_val = 1 if smtp_use_tls else 0
     try:
         db.execute(text("INSERT IGNORE INTO system_configuration (id) VALUES (1)"))
-        db.execute(text("""
-            UPDATE system_configuration SET 
-                smtp_host = :host,
-                smtp_port = :port,
-                smtp_user = :user,
-                smtp_password = :pwd,
-                smtp_from = :from_email,
-                smtp_use_tls = :use_tls
-            WHERE id = 1
-        """), {
-            "host": smtp_host,
+        db.execute(text(
+            "UPDATE system_configuration SET smtp_host=:host, smtp_port=:port, "
+            "smtp_user=:username, smtp_password=:password, smtp_from=:sender, "
+            "smtp_use_tls=:tls WHERE id=1"
+        ), {
+            "host": smtp_host.strip(),
             "port": smtp_port,
-            "user": smtp_user,
-            "pwd": encrypted_pwd,
-            "from_email": smtp_from,
-            "use_tls": use_tls_val,
+            "username": smtp_user.strip(),
+            "password": encrypt(smtp_password) if smtp_password else "",
+            "sender": smtp_from.strip(),
+            "tls": bool(smtp_use_tls),
         })
         db.commit()
-        set_flash_success(request, f"SMTP settings for '{smtp_host}' successfully saved to database.")
-    except Exception as exc:
+        set_flash_success(request, "SMTP configuration saved.")
+    except Exception:
         db.rollback()
-        set_flash_error(request, f"Failed to save SMTP settings: {exc}")
-
+        logger.exception("Unable to save SMTP settings")
+        set_flash_error(request, "SMTP configuration could not be saved.")
     return RedirectResponse("/settings/smtp", status_code=302)
 
 
@@ -122,43 +125,28 @@ async def smtp_settings_save(
 async def smtp_settings_test(
     request: Request,
     current_user: User = Depends(require_web_roles(UserRole.admin)),
-    smtp_host: str = Form(""),
+    smtp_host: str = Form(...),
     smtp_port: int = Form(587),
     smtp_user: str = Form(""),
     smtp_password: str = Form(""),
-    smtp_from: str = Form("noreply@safar.com"),
-    smtp_use_tls: Optional[str] = Form(default=None),
+    smtp_from: str = Form(...),
+    smtp_use_tls: Optional[str] = Form(None),
 ):
-    """Test SMTP Connection and send a test email verification."""
-    if not smtp_host:
-        set_flash_error(request, "SMTP Host cannot be empty.")
-        return RedirectResponse("/settings/smtp", status_code=302)
-
-    use_tls = bool(smtp_use_tls)
     try:
-        server = smtplib.SMTP(smtp_host, smtp_port, timeout=8)
-        server.ehlo()
-        if use_tls:
-            server.starttls()
-            server.ehlo()
-
-        if smtp_user and smtp_password:
-            server.login(smtp_user, smtp_password)
-
-        test_recipient = current_user.email or smtp_from or smtp_user
-        if test_recipient:
-            msg = MIMEText(f"Hello {current_user.full_name},\n\nThis is a test email sent from Safar SFA to verify your SMTP server configuration.\n\nTime: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
-            msg["Subject"] = "Safar SFA — Test SMTP Connection Successful"
-            msg["From"] = smtp_from or smtp_user
-            msg["To"] = test_recipient
-            server.sendmail(smtp_from or smtp_user, [test_recipient], msg.as_string())
-
-        server.quit()
-        set_flash_success(request, f"SMTP Connection Successful! Connected to '{smtp_host}:{smtp_port}' and sent test email to '{test_recipient}'.")
-    except Exception as exc:
-        logger.warning("SMTP test connection error for %s:%s: %s", smtp_host, smtp_port, exc)
-        set_flash_error(request, f"SMTP Test Connection Failed: {exc}")
-
+        message = MIMEText("Safar SMTP configuration test.")
+        message["Subject"] = "Safar SMTP test"
+        message["From"] = smtp_from
+        message["To"] = current_user.email
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as server:
+            if smtp_use_tls:
+                server.starttls()
+            if smtp_user and smtp_password:
+                server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_from, [current_user.email], message.as_string())
+        set_flash_success(request, "SMTP test email sent successfully.")
+    except Exception:
+        logger.exception("SMTP connection test failed")
+        set_flash_error(request, "SMTP test failed. Verify the server and credentials.")
     return RedirectResponse("/settings/smtp", status_code=302)
 
 
@@ -172,15 +160,19 @@ async def beat_types_legacy_redirect():
 @router.get("/sales-channels", response_class=HTMLResponse)
 async def sales_channels_list(
     request: Request,
+    page: int = Query(default=1, ge=1),
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     seed_default_beat_types(db)
-    items = db.query(BeatTypeMaster).order_by(BeatTypeMaster.name).all()
+    pagination = paginate(
+        db.query(BeatTypeMaster).order_by(BeatTypeMaster.name), page
+    )
+    items = pagination.items
     return templates.TemplateResponse("settings/sales_channels.html", {
         "request": request,
         "current_user": current_user,
-        "items": items,
+        "items": items, "pagination": pagination,
         **get_flash(request),
     })
 
@@ -248,17 +240,19 @@ async def sales_channels_delete(
 @router.get("/warehouses", response_class=HTMLResponse)
 async def warehouses_list(
     request: Request,
+    page: int = Query(default=1, ge=1),
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
     from app.models.warehouse import Warehouse
-    warehouses = db.query(Warehouse).order_by(Warehouse.name).all()
+    pagination = paginate(db.query(Warehouse).order_by(Warehouse.name), page)
+    warehouses = pagination.items
 
 
     return templates.TemplateResponse("settings/warehouses.html", {
         "request": request,
         "current_user": current_user,
-        "warehouses": warehouses,
+        "warehouses": warehouses, "pagination": pagination,
         **get_flash(request),
     })
 
@@ -335,15 +329,19 @@ async def warehouses_delete(
 @router.get("/webhooks", response_class=HTMLResponse)
 async def webhooks_settings_form(
     request: Request,
+    page: int = Query(default=1, ge=1),
     current_user: User = Depends(require_web_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ):
-    webhooks = db.query(SystemWebhook).order_by(SystemWebhook.created_at.desc()).all()
+    pagination = paginate(
+        db.query(SystemWebhook).order_by(SystemWebhook.created_at.desc()), page
+    )
+    webhooks = pagination.items
     return templates.TemplateResponse("settings/webhooks.html", {
         "request": request,
         "current_user": current_user,
         "webhooks": webhooks,
-        "WebhookEvent": WebhookEvent,
+        "WebhookEvent": WebhookEvent, "pagination": pagination,
         **get_flash(request),
     })
 
@@ -356,17 +354,23 @@ async def webhook_create(
     name: str = Form(...),
     event_type: str = Form(...),
     endpoint_url: str = Form(...),
-    secret_key: Optional[str] = Form(default=None),
+    secret_key: str = Form(...),
 ):
     if event_type not in [e.value for e in WebhookEvent]:
         set_flash_error(request, f"Invalid event type '{event_type}'.")
+        return RedirectResponse("/settings/webhooks", status_code=302)
+    if len(secret_key) < 32:
+        set_flash_error(request, "Webhook signing key must be at least 32 characters.")
+        return RedirectResponse("/settings/webhooks", status_code=302)
+    if not endpoint_url.lower().startswith("https://"):
+        set_flash_error(request, "Webhook endpoint must use HTTPS.")
         return RedirectResponse("/settings/webhooks", status_code=302)
 
     wh = SystemWebhook(
         name=name,
         event_type=WebhookEvent(event_type),
         endpoint_url=endpoint_url,
-        secret_key=secret_key or None,
+        secret_key=secret_key,
         is_active=True,
     )
     db.add(wh)
@@ -433,10 +437,17 @@ async def webhook_test(
     }
     
     data_bytes = json.dumps(payload).encode("utf-8")
+    timestamp = str(int(datetime.utcnow().timestamp()))
+    signature = build_webhook_signature(wh.secret_key, data_bytes, timestamp)
     req = urllib.request.Request(
         wh.endpoint_url,
         data=data_bytes,
-        headers={"Content-Type": "application/json", "User-Agent": "SafarSFA-Webhook/1.0"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "SafarSFA-Webhook/1.0",
+            "X-Safar-Timestamp": timestamp,
+            "X-Safar-Signature": signature,
+        },
         method="POST"
     )
 

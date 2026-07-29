@@ -24,8 +24,7 @@ class OrderType(str, enum.Enum):
 
 
 class FlowType(str, enum.Enum):
-    zap_invoice = "zap_invoice"
-    connect = "connect"
+    native_order = "native_order"
 
 
 class SyncStatus(str, enum.Enum):
@@ -47,22 +46,30 @@ class Order(Base):
     id = Column(Integer, primary_key=True)
     order_number = Column(String(30), unique=True, nullable=False, index=True)
     outlet_id = Column(Integer, ForeignKey("outlets.id", ondelete="RESTRICT"), nullable=True)
+    party_id = Column(Integer, nullable=True, index=True)
+    party_type = Column(String(30), default="Outlet", nullable=False)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     beat_id = Column(Integer, ForeignKey("beats.id", ondelete="SET NULL"), nullable=True)
     visit_id = Column(Integer, ForeignKey("visit_records.id", ondelete="SET NULL"), nullable=True)
     company_profile_id = Column(Integer, ForeignKey("company_profiles.id", ondelete="SET NULL"), nullable=True)
     channel_partner_id = Column(Integer, ForeignKey("local_channel_partners.id", ondelete="SET NULL"), nullable=True, index=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True, index=True)
+    is_company_order = Column(Boolean, default=False, nullable=False)
+    is_paid = Column(Boolean, default=False, nullable=False)
+    payment_type = Column(String(30), nullable=True)  # Full, Partial, Credit
+    payment_mode = Column(String(30), nullable=True)  # Cash, UPI, NEFT/RTGS, Others
+    payment_reference = Column(String(100), nullable=True)
+    delivery_address = Column(Text, nullable=True)
     is_regional_company = Column(Boolean, default=False, nullable=False)
     order_type = Column(Enum(OrderType), default=OrderType.secondary, nullable=False)
     status = Column(Enum(OrderStatus), default=OrderStatus.draft, nullable=False)
-    flow_type = Column(Enum(FlowType), default=FlowType.zap_invoice, nullable=False)
+    flow_type = Column(Enum(FlowType), default=FlowType.native_order, nullable=False)
     sync_status = Column(Enum(SyncStatus), default=SyncStatus.not_applicable, nullable=False)
     payment_settlement = Column(
         Enum(PaymentSettlementStatus),
         default=PaymentSettlementStatus.unpaid,
         nullable=False,
     )
-    connect_ref = Column(String(100), nullable=True)
     order_date = Column(Date, nullable=False, default=ist_today)
     notes = Column(Text, nullable=True)
     sync_error = Column(Text, nullable=True)
@@ -79,9 +86,22 @@ class Order(Base):
     visit = relationship("VisitRecord", foreign_keys=[visit_id])
     company_profile = relationship("CompanyProfile", foreign_keys=[company_profile_id])
     channel_partner = relationship("LocalChannelPartner", foreign_keys=[channel_partner_id])
+    warehouse = relationship("Warehouse", foreign_keys=[warehouse_id])
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="order")
     history_logs = relationship("OrderHistoryLog", back_populates="order", cascade="all, delete-orphan", order_by="OrderHistoryLog.created_at.desc()")
+
+    @property
+    def party_name(self) -> str:
+        if self.party_type == "Channel Partner":
+            return self.channel_partner.name if self.channel_partner else "—"
+        return self.outlet.name if self.outlet else "—"
+
+    @property
+    def party_mobile(self) -> str:
+        if self.party_type == "Channel Partner":
+            return (self.channel_partner.mobile or self.channel_partner.phone or "") if self.channel_partner else ""
+        return (self.outlet.mobile or "") if self.outlet else ""
 
     @property
     def subtotal(self) -> float:

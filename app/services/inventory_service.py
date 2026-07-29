@@ -17,10 +17,22 @@ def record_stock_movement(
     warehouse_id: Optional[int] = None,
     reference_no: Optional[str] = None,
     notes: Optional[str] = None,
-    created_by_id: Optional[int] = None
+    created_by_id: Optional[int] = None,
+    *,
+    commit: bool = True,
 ) -> StockMovement:
     """Logs stock movement and updates current product & warehouse stock balances."""
-    product = db.query(Product).filter(Product.id == product_id).first()
+    if movement_type not in {"INWARD", "OUTWARD", "ADJUSTMENT"}:
+        raise ValueError(f"Unsupported stock movement type: {movement_type}.")
+    if quantity < 0:
+        raise ValueError("Stock quantity cannot be negative.")
+
+    product = (
+        db.query(Product)
+        .filter(Product.id == product_id)
+        .with_for_update()
+        .first()
+    )
     if not product:
         raise ValueError(f"Product ID {product_id} not found.")
 
@@ -29,7 +41,7 @@ def record_stock_movement(
         pws = db.query(ProductWarehouseStock).filter(
             ProductWarehouseStock.product_id == product_id,
             ProductWarehouseStock.warehouse_id == warehouse_id
-        ).first()
+        ).with_for_update().first()
         if not pws:
             pws = ProductWarehouseStock(
                 product_id=product_id,
@@ -42,14 +54,22 @@ def record_stock_movement(
         if movement_type == "INWARD":
             pws.stock_qty += quantity
         elif movement_type == "OUTWARD":
-            pws.stock_qty = max(0, pws.stock_qty - quantity)
+            if pws.stock_qty < quantity:
+                raise ValueError(
+                    f"Insufficient stock: requested {quantity}, available {pws.stock_qty}."
+                )
+            pws.stock_qty -= quantity
         elif movement_type == "ADJUSTMENT":
             pws.stock_qty = quantity
     else:
         if movement_type == "INWARD":
             product.stock_qty += quantity
         elif movement_type == "OUTWARD":
-            product.stock_qty = max(0, product.stock_qty - quantity)
+            if product.stock_qty < quantity:
+                raise ValueError(
+                    f"Insufficient stock: requested {quantity}, available {product.stock_qty}."
+                )
+            product.stock_qty -= quantity
         elif movement_type == "ADJUSTMENT":
             product.stock_qty = quantity
 
@@ -73,7 +93,10 @@ def record_stock_movement(
         created_by_id=created_by_id
     )
     db.add(movement)
-    db.commit()
-    db.refresh(movement)
+    if commit:
+        db.commit()
+        db.refresh(movement)
+    else:
+        db.flush()
     logger.info("Stock movement recorded: %s %d units for product %s in WH %s (Total Stock: %d)", movement_type, quantity, product.name, str(warehouse_id), product.stock_qty)
     return movement

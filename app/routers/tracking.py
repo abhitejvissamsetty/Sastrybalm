@@ -11,6 +11,12 @@ from app.models.timesheet import Timesheet, VisitRecord
 from app.models.user import User, UserRole
 from app.utils.flash import get_flash
 from app.utils.pagination import paginate
+from app.services.access_control import (
+    scope_employee_record_query,
+    scope_outlet_query,
+    scope_user_query,
+    scope_visit_query,
+)
 
 router = APIRouter(prefix="/tracking", tags=["tracking"])
 templates = Jinja2Templates(directory="app/templates")
@@ -25,7 +31,7 @@ async def visit_list(
     is_joint: str = Query(default=""),
     page: int = Query(default=1, ge=1),
 ):
-    query = db.query(VisitRecord)
+    query = scope_visit_query(db.query(VisitRecord), current_user, db)
     if user_id:
         query = query.filter(VisitRecord.user_id == int(user_id))
     if is_joint == "yes":
@@ -35,7 +41,9 @@ async def visit_list(
 
     query = query.order_by(VisitRecord.visit_time.desc())
     pagination = paginate(query, page)
-    reps = db.query(User).filter(User.role == UserRole.field_rep, User.is_active == True).order_by(User.full_name).all()
+    reps = scope_user_query(
+        db.query(User), current_user, db, include_self=False
+    ).filter(User.role == UserRole.field_rep, User.is_active == True).order_by(User.full_name).all()
     return templates.TemplateResponse("timesheets/visits.html", {
         "request": request, "current_user": current_user,
         "pagination": pagination, "user_id": user_id, "is_joint": is_joint, "reps": reps,
@@ -54,7 +62,7 @@ async def gps_map_view(
     today = date.today().isoformat()
     selected_date = map_date or today
     reps = (
-        db.query(User)
+        scope_user_query(db.query(User), current_user, db, include_self=False)
         .filter(User.role == UserRole.field_rep, User.is_active == True)
         .order_by(User.full_name)
         .all()
@@ -75,15 +83,22 @@ async def gps_map_data(
     db: Session = Depends(get_db),
     map_date: str = Query(default=""),
     user_id: str = Query(default=""),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=100, ge=1, le=100),
 ):
     today = date.today().isoformat()
     selected_date = map_date or today
 
     # Check-ins for the day
-    ts_query = db.query(Timesheet).filter(Timesheet.work_date == selected_date)
+    ts_query = scope_employee_record_query(
+        db.query(Timesheet), Timesheet, current_user, db
+    ).filter(Timesheet.work_date == selected_date)
     if user_id:
         ts_query = ts_query.filter(Timesheet.user_id == int(user_id))
-    timesheets = ts_query.all()
+    timesheet_total = ts_query.count()
+    timesheets = ts_query.order_by(Timesheet.id).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
 
     checkins = []
     for ts in timesheets:
@@ -104,13 +119,16 @@ async def gps_map_data(
 
     # Visit records for the day
     vr_query = (
-        db.query(VisitRecord)
+        scope_visit_query(db.query(VisitRecord), current_user, db)
         .filter(VisitRecord.visit_time >= f"{selected_date} 00:00:00")
         .filter(VisitRecord.visit_time <= f"{selected_date} 23:59:59")
     )
     if user_id:
         vr_query = vr_query.filter(VisitRecord.user_id == int(user_id))
-    visits = vr_query.all()
+    visit_total = vr_query.count()
+    visits = vr_query.order_by(VisitRecord.id).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
 
     visit_markers = []
     for v in visits:
@@ -128,13 +146,16 @@ async def gps_map_data(
             })
 
     # All approved outlets with GPS coords
-    outlets = (
-        db.query(Outlet)
+    outlet_query = (
+        scope_outlet_query(db.query(Outlet), current_user, db)
         .filter(Outlet.status == OutletStatus.active)
         .filter(Outlet.gps_lat.isnot(None))
         .filter(Outlet.gps_lng.isnot(None))
-        .all()
     )
+    outlet_total = outlet_query.count()
+    outlets = outlet_query.order_by(Outlet.id).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
     outlet_markers = [
         {
             "id": o.id,
@@ -148,6 +169,9 @@ async def gps_map_data(
     ]
 
     return JSONResponse({
+        "page": page,
+        "per_page": per_page,
+        "total": max(timesheet_total, visit_total, outlet_total),
         "checkins": checkins,
         "visits": visit_markers,
         "outlets": outlet_markers,

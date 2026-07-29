@@ -1,4 +1,12 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.base import Base
@@ -6,6 +14,11 @@ from app.models.base import Base
 
 class ProductWarehouseStock(Base):
     __tablename__ = "product_warehouse_stocks"
+    __table_args__ = (
+        UniqueConstraint(
+            "product_id", "warehouse_id", name="uq_product_warehouse_stock"
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)

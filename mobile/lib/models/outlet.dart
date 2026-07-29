@@ -32,32 +32,40 @@ class Outlet {
   });
 
   factory Outlet.fromJson(Map<String, dynamic> json) => Outlet(
-    id: json['id'],
-    name: json['name'] ?? '',
-    code: json['code'] ?? '',
-    beatId: json['beat_id'],
-    territoryId: json['territory_id'],
-    ownerName: json['owner_name'],
-    mobile: json['mobile'],
-    address: json['address'],
-    channel: json['channel'],
-    gpsLat: (json['gps_lat'] as num?)?.toDouble(),
-    gpsLng: (json['gps_lng'] as num?)?.toDouble(),
-    photoUrl: json['photo_url'],
-    isIncomplete: json['is_incomplete'] == true,
-    missingFields: json['missing_fields'] != null ? List<String>.from(json['missing_fields']) : [],
-  );
+        id: json['id'],
+        name: json['name'] ?? '',
+        code: json['code'] ?? '',
+        beatId: json['beat_id'],
+        territoryId: json['territory_id'],
+        ownerName: json['owner_name'],
+        mobile: json['mobile'],
+        address: json['address'],
+        channel: json['channel'],
+        gpsLat: (json['gps_lat'] as num?)?.toDouble(),
+        gpsLng: (json['gps_lng'] as num?)?.toDouble(),
+        photoUrl: json['photo_url'],
+        isIncomplete: json['is_incomplete'] == true,
+        missingFields: json['missing_fields'] != null
+            ? List<String>.from(json['missing_fields'])
+            : [],
+      );
 
   bool get hasGps => gpsLat != null && gpsLng != null;
 
   String get channelLabel {
     switch (channel) {
-      case 'general_trade': return 'GT';
-      case 'modern_trade': return 'MT';
-      case 'pharmacy': return 'Pharmacy';
-      case 'horeca': return 'HoReCa';
-      case 'institutional': return 'Institutional';
-      default: return channel ?? 'General';
+      case 'general_trade':
+        return 'GT';
+      case 'modern_trade':
+        return 'MT';
+      case 'pharmacy':
+        return 'Pharmacy';
+      case 'horeca':
+        return 'HoReCa';
+      case 'institutional':
+        return 'Institutional';
+      default:
+        return channel ?? 'General';
     }
   }
 }
@@ -84,13 +92,13 @@ class Beat {
   });
 
   factory Beat.fromJson(Map<String, dynamic> json) => Beat(
-    id: json['id'],
-    name: json['name'] ?? '',
-    code: json['code'] ?? '',
-    beatType: json['beat_type'] ?? 'GT',
-    l1PositionName: json['l1_position_name'],
-    assignedUserName: json['assigned_user_name'],
-    activeOutletCount: json['active_outlet_count'] ?? 0,
-    outlets: [],
-  );
+        id: json['id'],
+        name: json['name'] ?? '',
+        code: json['code'] ?? '',
+        beatType: json['beat_type'] ?? 'GT',
+        l1PositionName: json['l1_position_name'],
+        assignedUserName: json['assigned_user_name'],
+        activeOutletCount: json['active_outlet_count'] ?? 0,
+        outlets: [],
+      );
 }

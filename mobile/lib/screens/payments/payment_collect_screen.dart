@@ -76,8 +76,7 @@ class _PaymentCollectScreenState extends ConsumerState<PaymentCollectScreen> {
     if (!_isDenominationSumValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-                Text('Denomination totals must match the payment amount')),
+            content: Text('Denomination totals must match the payment amount')),
       );
       return;
     }
@@ -110,7 +109,8 @@ class _PaymentCollectScreenState extends ConsumerState<PaymentCollectScreen> {
       } else {
         // ── Offline path: queue and store a temp local record ─────────────
         final syncNotifier = ref.read(syncProvider.notifier);
-        final denominations = _method == 'cash' ? _denominations : <String, int>{};
+        final denominations =
+            _method == 'cash' ? _denominations : <String, int>{};
 
         // Create a temporary local ID (negative timestamp) so the UI can track it
         final tempId = -DateTime.now().millisecondsSinceEpoch;
@@ -237,7 +237,7 @@ class _PaymentCollectScreenState extends ConsumerState<PaymentCollectScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: _method,
+                      initialValue: _method,
                       dropdownColor: theme.cardTheme.color,
                       style: theme.textTheme.bodyLarge,
                       decoration: const InputDecoration(

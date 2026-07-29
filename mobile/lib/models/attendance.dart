@@ -26,9 +26,11 @@ class AttendanceState {
       checkedIn: true,
       timesheetId: json['id'],
       checkinTime: json['checkin_time'] != null
-          ? DateFormatter.parseDateTime(json['checkin_time']) : null,
+          ? DateFormatter.parseDateTime(json['checkin_time'])
+          : null,
       checkoutTime: json['checkout_time'] != null
-          ? DateFormatter.parseDateTime(json['checkout_time']) : null,
+          ? DateFormatter.parseDateTime(json['checkout_time'])
+          : null,
       visitCount: json['visit_count'] ?? 0,
       status: json['status'] ?? 'open',
     );
@@ -61,18 +63,19 @@ class VisitRecord {
   });
 
   factory VisitRecord.fromJson(Map<String, dynamic> json) => VisitRecord(
-    id: json['id'],
-    outletId: json['outlet_id'] ?? 0,
-    distanceFromOutlet: (json['distance_from_outlet'] as num?)?.toDouble(),
-    visitTime: DateFormatter.parseDateTime(json['visit_time']),
-    checkoutTime: json['checkout_time'] != null
-        ? DateFormatter.parseDateTime(json['checkout_time']) : null,
-    flagged: json['flagged'] ?? false,
-  );
+        id: json['id'],
+        outletId: json['outlet_id'] ?? 0,
+        distanceFromOutlet: (json['distance_from_outlet'] as num?)?.toDouble(),
+        visitTime: DateFormatter.parseDateTime(json['visit_time']),
+        checkoutTime: json['checkout_time'] != null
+            ? DateFormatter.parseDateTime(json['checkout_time'])
+            : null,
+        flagged: json['flagged'] ?? false,
+      );
 
   bool get isActive => checkoutTime == null;
   Duration get duration =>
-    (checkoutTime ?? DateTime.now()).difference(visitTime);
+      (checkoutTime ?? DateTime.now()).difference(visitTime);
 }
 
 class Payment {
@@ -93,11 +96,11 @@ class Payment {
   });
 
   factory Payment.fromJson(Map<String, dynamic> json) => Payment(
-    id: json['id'],
-    paymentRef: json['payment_ref'],
-    status: json['status'],
-    amount: (json['amount'] as num).toDouble(),
-    method: json['method'],
-    outletId: json['outlet_id'],
-  );
+        id: json['id'],
+        paymentRef: json['payment_ref'],
+        status: json['status'],
+        amount: (json['amount'] as num).toDouble(),
+        method: json['method'],
+        outletId: json['outlet_id'],
+      );
 }
