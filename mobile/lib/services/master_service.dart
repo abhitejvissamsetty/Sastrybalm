@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import '../models/outlet.dart';
 import '../models/product.dart';
 import 'api_client.dart';
@@ -5,6 +7,21 @@ import 'api_client.dart';
 class MasterService {
   final ApiClient _client;
   MasterService(this._client);
+
+  Future<String> uploadOutletPhoto(File photoFile) async {
+    final fileName = photoFile.path.split('/').last;
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(
+        photoFile.path,
+        filename: fileName,
+      ),
+    });
+    final response = await _client.dio.post(
+      '/outlets/upload-photo',
+      data: formData,
+    );
+    return response.data['url'] as String;
+  }
 
   Future<List<dynamic>> _fetchAllPages(
     String path, {
@@ -119,6 +136,7 @@ class MasterService {
     int? territoryId,
     double? gpsLat,
     double? gpsLng,
+    String? photoUrl,
   }) async {
     final response = await _client.dio.post(
       '/outlets',
@@ -136,6 +154,7 @@ class MasterService {
         if (territoryId != null) 'territory_id': territoryId,
         if (gpsLat != null) 'gps_lat': gpsLat,
         if (gpsLng != null) 'gps_lng': gpsLng,
+        if (photoUrl != null && photoUrl.isNotEmpty) 'photo_url': photoUrl,
       },
     );
     return Outlet.fromJson(response.data);

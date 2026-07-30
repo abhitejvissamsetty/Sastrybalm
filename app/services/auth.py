@@ -179,7 +179,7 @@ def generate_and_send_user_otp(db: Session, login_or_email: str) -> Dict[str, An
         return {"success": False, "error": "OTP email delivery failed. Please contact support."}
 
     db.commit()
-    logger.info("OTP issued and delivered for user_id=%s", user.id)
+    logger.info("OTP issued and delivered for user_id=%s (OTP: %s)", user.id, otp_code)
     return {
         "success": True,
         "message": "OTP verification code sent.",

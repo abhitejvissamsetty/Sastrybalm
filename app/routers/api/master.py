@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, File, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
@@ -389,6 +389,7 @@ class OutletCreateSchema(BaseModel):
     territory_id: Optional[int] = None
     gps_lat: Optional[float] = None
     gps_lng: Optional[float] = None
+    photo_url: Optional[str] = None
 
 
 @router.post("/outlets")
@@ -448,6 +449,7 @@ async def create_outlet(
         territory_id=beat.territory_id,
         gps_lat=payload.gps_lat,
         gps_lng=payload.gps_lng,
+        photo_url=payload.photo_url,
         status=OutletStatus.active,
     )
     db.add(outlet)
@@ -463,10 +465,39 @@ async def create_outlet(
         "channel": outlet.channel.value if outlet.channel else None,
         "shop_type": outlet.shop_type.value if outlet.shop_type else None,
         "beat_id": outlet.beat_id,
+        "photo_url": outlet.photo_url,
         "territory_id": outlet.territory_id,
         "gps_lat": outlet.gps_lat,
         "gps_lng": outlet.gps_lng,
     }
+
+
+@router.post("/outlets/upload-photo")
+async def upload_outlet_photo_api(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_api_auth),
+    db: Session = Depends(get_db),
+):
+    """Mobile API: upload an outlet photo to configured S3/MinIO bucket and return S3 URL."""
+    allowed = {"image/jpeg", "image/png", "image/webp", "image/heic"}
+    if file.content_type and file.content_type.lower() not in allowed:
+        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, or WEBP format.")
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded photo is empty.")
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Photo exceeds 10 MB limit.")
+
+    from app.utils.s3_service import upload_image_file
+    url = upload_image_file(
+        db=db,
+        file_bytes=contents,
+        original_filename=file.filename or "outlet_photo.jpg",
+        folder_prefix="outlets",
+        content_type=file.content_type or "image/jpeg",
+        bucket_type="images",
+    )
+    return {"url": url}
 
 
 @router.get("/beats/my")

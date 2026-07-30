@@ -461,23 +461,40 @@ class _JointWorkingScreenState extends ConsumerState<JointWorkingScreen> {
             )
           : null,
       floatingActionButton: (_step == 3 && _viewMode == 0)
-          ? FloatingActionButton.small(
-              heroTag: 'fab_search_joint_outlets',
-              backgroundColor: const Color(0xFFF4F4F5),
-              foregroundColor: const Color(0xFF09090B),
-              onPressed: () {
-                setState(() {
-                  _showSearch = !_showSearch;
-                  if (!_showSearch) {
-                    _searchCtrl.clear();
-                    _outletQuery = '';
-                  }
-                });
-              },
-              tooltip: 'Search Outlets',
-              child: Icon(_showSearch
-                  ? Icons.search_off_rounded
-                  : Icons.search_rounded),
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton.small(
+                  heroTag: 'fab_search_joint_outlets',
+                  backgroundColor: const Color(0xFFF4F4F5),
+                  foregroundColor: const Color(0xFF09090B),
+                  onPressed: () {
+                    setState(() {
+                      _showSearch = !_showSearch;
+                      if (!_showSearch) {
+                        _searchCtrl.clear();
+                        _outletQuery = '';
+                      }
+                    });
+                  },
+                  tooltip: 'Search Outlets',
+                  child: Icon(_showSearch
+                      ? Icons.search_off_rounded
+                      : Icons.search_rounded),
+                ),
+                const SizedBox(width: 12),
+                FloatingActionButton.extended(
+                  heroTag: 'fab_add_joint_outlet',
+                  backgroundColor: const Color(0xFF09090B),
+                  foregroundColor: Colors.white,
+                  onPressed: () => context.push('/outlet/new'),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text(
+                    'New Outlet',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             )
           : null,
     );

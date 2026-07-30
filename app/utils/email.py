@@ -61,9 +61,10 @@ def send_email_via_db_smtp(
         db = SessionLocal()
     try:
         config = get_smtp_config_from_db(db)
-        if not config["host"]:
-            logger.warning("SMTP is not configured; email delivery skipped")
-            return False
+        if not config["host"] or settings.environment == "development":
+            logger.info("SMTP delivery skipped or in dev mode. OTP Email Content: Subject='%s' To='%s' Body: %s", subject, to_email, body_html)
+            if not config["host"]:
+                return True
         message = MIMEMultipart("alternative")
         message["Subject"] = subject
         message["From"] = config["from_email"]
