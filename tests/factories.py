@@ -1,5 +1,7 @@
 """Deterministic acceptance-data factories shared by backend tests."""
 
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 
 from app.models.asset_capitalization import (

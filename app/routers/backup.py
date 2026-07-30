@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse

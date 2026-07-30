@@ -1,24 +1,23 @@
 services:
-  # ── MySQL Database ──────────────────────────────────────────────────────────
+  # ── PostgreSQL Database ──────────────────────────────────────────────────────
   db:
-    image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
+    image: postgres:16-alpine
     container_name: safar-db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
-      MYSQL_DATABASE: ${DB_NAME:-safar_db}
-      MYSQL_USER: ${DB_USER:-safar_user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-safar_db}
+      POSTGRES_USER: ${DB_USER:-safar_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     ports:
-      - "127.0.0.1:3308:3306"     # local diagnostics only; never exposed publicly
+      - "127.0.0.1:5432:5432"     # local diagnostics only; never exposed publicly
     volumes:
-      - mysql_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-safar_user} -d ${DB_NAME:-safar_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 20s
     networks:
       - safar-net
 
@@ -52,11 +51,10 @@ services:
       - SECURE_COOKIES=${SECURE_COOKIES:-false}
       - ENABLE_API_DOCS=${ENABLE_API_DOCS:-true}
       - DB_HOST=db
-      - DB_PORT=3306
+      - DB_PORT=5432
       - DB_USER=${DB_USER:-safar_user}
       - DB_PASSWORD=${DB_PASSWORD:?Set DB_PASSWORD in .env}
       - DB_NAME=${DB_NAME:-safar_db}
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
       - BACKUP_ENCRYPTION_KEY=${BACKUP_ENCRYPTION_KEY:-}
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
@@ -95,7 +93,7 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in .env}
       - DB_HOST=db
-      - DB_PORT=3306
+      - DB_PORT=5432
       - DB_USER=${DB_USER:-safar_user}
       - DB_PASSWORD=${DB_PASSWORD:?Set DB_PASSWORD in .env}
       - DB_NAME=${DB_NAME:-safar_db}
@@ -131,7 +129,7 @@ services:
       - safar-net
 
 volumes:
-  mysql_data:
+  postgres_data:
   uploads_data:
   backup_data:
 

@@ -145,7 +145,7 @@ def test_encrypted_sql_backup_upload_is_private_and_integrity_checked(
     assert calls["Metadata"]["sha256"]
 
 
-def test_encrypted_sql_restore_uses_mysql_and_runs_alembic(
+def test_encrypted_sql_restore_uses_cli_and_runs_alembic(
     monkeypatch, tmp_path
 ):
     monkeypatch.setattr(
@@ -161,7 +161,7 @@ def test_encrypted_sql_restore_uses_mysql_and_runs_alembic(
     restored = {}
 
     def fake_run(command, **kwargs):
-        if command == ["mysql", "--version"]:
+        if command in (["psql", "--version"], ["mysql", "--version"]):
             return SimpleNamespace(returncode=0)
         restored["sql"] = Path(kwargs["stdin"].name).read_text()
         return SimpleNamespace(returncode=0, stderr="")

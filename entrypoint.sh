@@ -3,16 +3,16 @@ set -e
 
 echo "=== Safar Entrypoint ==="
 
-# ── Step 0: Wait for MySQL TCP port to be reachable ────────────────────────
+# ── Step 0: Wait for PostgreSQL TCP port to be reachable ────────────────────
 DB_HOST="${DB_HOST:-db}"
-DB_PORT="${DB_PORT:-3306}"
-echo "Waiting for MySQL at ${DB_HOST}:${DB_PORT}..."
+DB_PORT="${DB_PORT:-5432}"
+echo "Waiting for PostgreSQL at ${DB_HOST}:${DB_PORT}..."
 for i in $(seq 1 60); do
     if timeout 1 bash -c "echo > /dev/tcp/${DB_HOST}/${DB_PORT}" 2>/dev/null; then
-        echo "MySQL port is reachable."
+        echo "PostgreSQL port is reachable."
         break
     fi
-    echo "[${i}/60] MySQL not yet reachable, retrying in 2s..."
+    echo "[${i}/60] PostgreSQL not yet reachable, retrying in 2s..."
     sleep 2
 done
 

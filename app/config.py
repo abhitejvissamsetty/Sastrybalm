@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     timezone_offset: str = "+05:30"
 
     db_host: str = "localhost"
-    db_port: int = 8889
-    db_user: str = "root"
+    db_port: int = 5432
+    db_user: str = "safar_user"
     db_password: str = ""
     db_name: str = "safar_db"
 
@@ -112,8 +112,8 @@ class Settings(BaseSettings):
     @property
     def db_url(self) -> str:
         return (
-            f"mysql+pymysql://{self.db_user}:{self.db_password}"
-            f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
+            f"postgresql+psycopg2://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 
 

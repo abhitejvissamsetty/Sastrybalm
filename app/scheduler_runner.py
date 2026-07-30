@@ -43,7 +43,14 @@ async def run() -> None:
     settings.validate_runtime_security()
     owner_id = f"{socket.gethostname()}:{os.getpid()}"
     lock_connection = engine.connect()
-    if engine.dialect.name == "mysql":
+    if engine.dialect.name == "postgresql":
+        acquired = lock_connection.execute(
+            text("SELECT pg_try_advisory_lock(hashtext('safar_scheduler_owner'))")
+        ).scalar()
+        if not acquired:
+            lock_connection.close()
+            raise RuntimeError("Another scheduler owns the database advisory lock.")
+    elif engine.dialect.name == "mysql":
         acquired = lock_connection.execute(
             text("SELECT GET_LOCK('safar_scheduler_owner', 0)")
         ).scalar()
@@ -64,7 +71,11 @@ async def run() -> None:
     finally:
         stop_event.set()
         await heartbeat_task
-        if engine.dialect.name == "mysql":
+        if engine.dialect.name == "postgresql":
+            lock_connection.execute(
+                text("SELECT pg_advisory_unlock(hashtext('safar_scheduler_owner'))")
+            )
+        elif engine.dialect.name == "mysql":
             lock_connection.execute(
                 text("SELECT RELEASE_LOCK('safar_scheduler_owner')")
             )

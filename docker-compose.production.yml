@@ -4,10 +4,9 @@ services:
     cpus: 2.0
     pids_limit: 512
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set a rotated MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME:?Set DB_NAME}
-      MYSQL_USER: ${DB_USER:?Set a least-privilege DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD:?Set a rotated DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:?Set DB_NAME}
+      POSTGRES_USER: ${DB_USER:?Set a least-privilege DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set a rotated DB_PASSWORD}
     ports: !reset []
 
   adminer:

@@ -21,11 +21,14 @@ engine = create_engine(settings.db_url, **engine_kwargs)
 
 
 @event.listens_for(engine, "connect")
-def set_mysql_timezone(dbapi_connection, connection_record):
+def set_database_timezone(dbapi_connection, connection_record):
     """Enforces GMT+05:30 (IST) session timezone on every database connection."""
     try:
         cursor = dbapi_connection.cursor()
-        cursor.execute("SET time_zone = '+05:30';")
+        if engine.dialect.name == "postgresql":
+            cursor.execute("SET TIME ZONE '+05:30';")
+        else:
+            cursor.execute("SET time_zone = '+05:30';")
         cursor.close()
     except Exception:
         pass

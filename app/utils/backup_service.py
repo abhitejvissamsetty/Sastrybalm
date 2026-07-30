@@ -3,6 +3,8 @@ Backup Service — Generates full system database backups in standard executable
 Supports instant web download, automatic 5-backup retention policy (deletes older backups),
 and automated daily scheduler backups.
 """
+from __future__ import annotations
+
 import os
 import re
 import logging
@@ -82,10 +84,12 @@ def _upload_encrypted_backup(db: Session, filepath: str) -> str | None:
     return object_key
 
 
-def _sql_escape_value(val: Any) -> str:
+def _sql_escape_value(val: Any, is_postgres: bool = False) -> str:
     if val is None:
         return "NULL"
     if isinstance(val, bool):
+        if is_postgres:
+            return "TRUE" if val else "FALSE"
         return "1" if val else "0"
     if isinstance(val, (int, float, Decimal)):
         return str(val)
@@ -94,13 +98,16 @@ def _sql_escape_value(val: Any) -> str:
     if isinstance(val, (dict, list)):
         import json
         s = json.dumps(val)
-        escaped = s.replace("\\", "\\\\").replace("'", "\\'").replace("\0", "\\0").replace("\n", "\\n").replace("\r", "\\r")
+        escaped = s.replace("\\", "\\\\").replace("'", "''" if is_postgres else "\\'").replace("\0", "")
         return f"'{escaped}'"
     if hasattr(val, "value"):  # Enums
         s = str(val.value)
     else:
         s = str(val)
-    escaped = s.replace("\\", "\\\\").replace("'", "\\'").replace("\0", "\\0").replace("\n", "\\n").replace("\r", "\\r")
+    if is_postgres:
+        escaped = s.replace("'", "''")
+    else:
+        escaped = s.replace("\\", "\\\\").replace("'", "\\'").replace("\0", "\\0").replace("\n", "\\n").replace("\r", "\\r")
     return f"'{escaped}'"
 
 
@@ -134,17 +141,26 @@ def create_full_system_backup() -> str:
     sql_filepath = os.path.join(BACKUP_DIR, sql_filename)
 
     db: Session = SessionLocal()
+    is_postgres = (db.bind.dialect.name == "postgresql") if db.bind else False
+    def q(identifier: str) -> str:
+        return f'"{identifier}"' if is_postgres else f'`{identifier}`'
+
+    engine_name = "PostgreSQL" if is_postgres else "MySQL / MariaDB"
     sql_lines: List[str] = [
         "-- ========================================================",
         "-- Safar SFA Enterprise SQL Database Backup",
         f"-- Generated At: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        "-- Database Engine: MySQL / MariaDB",
+        f"-- Database Engine: {engine_name}",
         "-- Software Version: Safar SFA v2.0 Enterprise",
         "-- ========================================================\n",
-        "SET FOREIGN_KEY_CHECKS=0;",
-        "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";",
-        "SET time_zone = \"+00:00\";\n",
     ]
+
+    if is_postgres:
+        sql_lines.append("SET session_replication_role = 'replica';\n")
+    else:
+        sql_lines.append("SET FOREIGN_KEY_CHECKS=0;")
+        sql_lines.append("SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";")
+        sql_lines.append("SET time_zone = \"+00:00\";\n")
 
     try:
         table_names = inspect(db.get_bind()).get_table_names()
@@ -154,34 +170,40 @@ def create_full_system_backup() -> str:
             )
         for table_name in table_names:
             sql_lines.append(f"-- --------------------------------------------------------")
-            sql_lines.append(f"-- Table structure for table `{table_name}`")
+            sql_lines.append(f"-- Table structure for table {q(table_name)}")
             sql_lines.append(f"-- --------------------------------------------------------")
-            sql_lines.append(f"DROP TABLE IF EXISTS `{table_name}`;")
-            create_res = db.execute(text(f"SHOW CREATE TABLE `{table_name}`")).fetchone()
-            if not create_res or len(create_res) < 2:
-                raise RuntimeError(f"Unable to read schema for backup table {table_name}.")
-            sql_lines.append(f"{create_res[1]};\n")
+            if is_postgres:
+                sql_lines.append(f"DROP TABLE IF EXISTS {q(table_name)} CASCADE;\n")
+            else:
+                sql_lines.append(f"DROP TABLE IF EXISTS `{table_name}`;")
+                create_res = db.execute(text(f"SHOW CREATE TABLE `{table_name}`")).fetchone()
+                if not create_res or len(create_res) < 2:
+                    raise RuntimeError(f"Unable to read schema for backup table {table_name}.")
+                sql_lines.append(f"{create_res[1]};\n")
 
-            result = db.execute(text(f"SELECT * FROM `{table_name}`"))
+            result = db.execute(text(f"SELECT * FROM {q(table_name)}"))
             keys = list(result.keys())
             rows = result.fetchall()
             if rows:
-                col_names = ", ".join([f"`{col}`" for col in keys])
-                sql_lines.append(f"-- Dumping data for table `{table_name}`")
+                col_names = ", ".join([q(col) for col in keys])
+                sql_lines.append(f"-- Dumping data for table {q(table_name)}")
 
                 value_rows = []
                 for row in rows:
                     row_dict = dict(zip(keys, row))
-                    val_str = ", ".join([_sql_escape_value(row_dict[col]) for col in keys])
+                    val_str = ", ".join([_sql_escape_value(row_dict[col], is_postgres) for col in keys])
                     value_rows.append(f"({val_str})")
 
                 batch_size = 100
                 for i in range(0, len(value_rows), batch_size):
                     batch = value_rows[i:i + batch_size]
-                    sql_lines.append(f"INSERT INTO `{table_name}` ({col_names}) VALUES\n" + ",\n".join(batch) + ";")
+                    sql_lines.append(f"INSERT INTO {q(table_name)} ({col_names}) VALUES\n" + ",\n".join(batch) + ";")
                 sql_lines.append("")
 
-        sql_lines.append("SET FOREIGN_KEY_CHECKS=1;\n")
+        if is_postgres:
+            sql_lines.append("SET session_replication_role = 'origin';\n")
+        else:
+            sql_lines.append("SET FOREIGN_KEY_CHECKS=1;\n")
 
         encrypted = _backup_cipher().encrypt("\n".join(sql_lines).encode("utf-8"))
         with open(sql_filepath, "wb") as f:
@@ -236,24 +258,39 @@ def restore_sql_backup(sql_filepath: str, db: Session = None) -> None:
     except InvalidToken as exc:
         raise RuntimeError("Backup decryption failed; key or file is invalid.") from exc
 
-    # Try fast path: pipe via mysql CLI subprocess (available inside Docker container)
-    mysql_cmd = [
-        "mysql",
-        f"-h{settings.db_host}",
-        f"-P{settings.db_port}",
-        f"-u{settings.db_user}",
-        f"-p{settings.db_password}",
-        settings.db_name,
-    ]
-
-    mysql_available = False
+    # Fast path: pipe via psql or mysql CLI subprocess if available
+    cli_cmd = None
+    cli_env = os.environ.copy()
     try:
-        check = subprocess.run(["mysql", "--version"], capture_output=True, timeout=5)
-        mysql_available = check.returncode == 0
+        check_pg = subprocess.run(["psql", "--version"], capture_output=True, timeout=5)
+        if check_pg.returncode == 0:
+            cli_cmd = [
+                "psql",
+                "-h", settings.db_host,
+                "-p", str(settings.db_port),
+                "-U", settings.db_user,
+                "-d", settings.db_name,
+            ]
+            cli_env["PGPASSWORD"] = settings.db_password
     except Exception:
-        mysql_available = False
+        pass
 
-    if mysql_available:
+    if cli_cmd is None:
+        try:
+            check_mysql = subprocess.run(["mysql", "--version"], capture_output=True, timeout=5)
+            if check_mysql.returncode == 0:
+                cli_cmd = [
+                    "mysql",
+                    f"-h{settings.db_host}",
+                    f"-P{settings.db_port}",
+                    f"-u{settings.db_user}",
+                    f"-p{settings.db_password}",
+                    settings.db_name,
+                ]
+        except Exception:
+            pass
+
+    if cli_cmd:
         try:
             with tempfile.NamedTemporaryFile(
                 mode="w", encoding="utf-8", suffix=".sql"
@@ -263,16 +300,17 @@ def restore_sql_backup(sql_filepath: str, db: Session = None) -> None:
                 f.flush()
                 f.seek(0)
                 result = subprocess.run(
-                    mysql_cmd,
+                    cli_cmd,
                     stdin=f,
                     capture_output=True,
                     text=True,
                     timeout=120,
+                    env=cli_env,
                 )
             if result.returncode != 0:
-                raise RuntimeError(f"mysql restore failed: {result.stderr[:500]}")
+                raise RuntimeError(f"CLI restore failed: {result.stderr[:500]}")
             else:
-                logger.info("mysql CLI restore succeeded: %s", sql_filepath)
+                logger.info("CLI restore succeeded: %s", sql_filepath)
                 from alembic import command
                 from alembic.config import Config
                 command.upgrade(Config("alembic.ini"), "head")
@@ -291,7 +329,10 @@ def restore_sql_backup(sql_filepath: str, db: Session = None) -> None:
         sql_content = sql_content.replace("\r\n", "\n")
         raw_stmts = re.split(r";\s*\n", sql_content)
 
-        db.execute(text("SET FOREIGN_KEY_CHECKS=0;"))
+        if db.bind and db.bind.dialect.name == "postgresql":
+            db.execute(text("SET session_replication_role = 'replica';"))
+        else:
+            db.execute(text("SET FOREIGN_KEY_CHECKS=0;"))
 
         for raw in raw_stmts:
             stmt = raw.strip()
@@ -310,7 +351,10 @@ def restore_sql_backup(sql_filepath: str, db: Session = None) -> None:
                 continue
             db.execute(text(clean))
 
-        db.execute(text("SET FOREIGN_KEY_CHECKS=1;"))
+        if db.bind and db.bind.dialect.name == "postgresql":
+            db.execute(text("SET session_replication_role = 'origin';"))
+        else:
+            db.execute(text("SET FOREIGN_KEY_CHECKS=1;"))
         db.commit()
         logger.info("SQLAlchemy restore completed: %s", sql_filepath)
     except Exception as e:
